@@ -482,21 +482,39 @@ CREATE POLICY "Users can delete scenario items in own scenarios" ON scenario_ite
 CREATE POLICY "Users can read project configs" ON project_cost_params FOR SELECT USING (
   EXISTS (SELECT 1 FROM projects WHERE projects.id = project_cost_params.project_id AND projects.owner_id = auth.uid())
 );
-CREATE POLICY "Users can manage project configs" ON project_cost_params FOR ALL USING (
+CREATE POLICY "Users can insert project configs" ON project_cost_params FOR INSERT WITH CHECK (
+  EXISTS (SELECT 1 FROM projects WHERE projects.id = project_cost_params.project_id AND projects.owner_id = auth.uid())
+);
+CREATE POLICY "Users can update project configs" ON project_cost_params FOR UPDATE USING (
+  EXISTS (SELECT 1 FROM projects WHERE projects.id = project_cost_params.project_id AND projects.owner_id = auth.uid())
+);
+CREATE POLICY "Users can delete project configs" ON project_cost_params FOR DELETE USING (
   EXISTS (SELECT 1 FROM projects WHERE projects.id = project_cost_params.project_id AND projects.owner_id = auth.uid())
 );
 
 CREATE POLICY "Users can read project mix rules" ON project_mix_rules FOR SELECT USING (
   EXISTS (SELECT 1 FROM projects WHERE projects.id = project_mix_rules.project_id AND projects.owner_id = auth.uid())
 );
-CREATE POLICY "Users can manage project mix rules" ON project_mix_rules FOR ALL USING (
+CREATE POLICY "Users can insert project mix rules" ON project_mix_rules FOR INSERT WITH CHECK (
+  EXISTS (SELECT 1 FROM projects WHERE projects.id = project_mix_rules.project_id AND projects.owner_id = auth.uid())
+);
+CREATE POLICY "Users can update project mix rules" ON project_mix_rules FOR UPDATE USING (
+  EXISTS (SELECT 1 FROM projects WHERE projects.id = project_mix_rules.project_id AND projects.owner_id = auth.uid())
+);
+CREATE POLICY "Users can delete project mix rules" ON project_mix_rules FOR DELETE USING (
   EXISTS (SELECT 1 FROM projects WHERE projects.id = project_mix_rules.project_id AND projects.owner_id = auth.uid())
 );
 
 CREATE POLICY "Users can read project rents" ON project_rents FOR SELECT USING (
   EXISTS (SELECT 1 FROM projects WHERE projects.id = project_rents.project_id AND projects.owner_id = auth.uid())
 );
-CREATE POLICY "Users can manage project rents" ON project_rents FOR ALL USING (
+CREATE POLICY "Users can insert project rents" ON project_rents FOR INSERT WITH CHECK (
+  EXISTS (SELECT 1 FROM projects WHERE projects.id = project_rents.project_id AND projects.owner_id = auth.uid())
+);
+CREATE POLICY "Users can update project rents" ON project_rents FOR UPDATE USING (
+  EXISTS (SELECT 1 FROM projects WHERE projects.id = project_rents.project_id AND projects.owner_id = auth.uid())
+);
+CREATE POLICY "Users can delete project rents" ON project_rents FOR DELETE USING (
   EXISTS (SELECT 1 FROM projects WHERE projects.id = project_rents.project_id AND projects.owner_id = auth.uid())
 );
 
@@ -509,7 +527,23 @@ CREATE POLICY "Users can read scenario configs" ON scenario_cost_params FOR SELE
     WHERE scenarios.id = scenario_cost_params.scenario_id AND projects.owner_id = auth.uid()
   )
 );
-CREATE POLICY "Users can manage scenario configs" ON scenario_cost_params FOR ALL USING (
+CREATE POLICY "Users can insert scenario configs" ON scenario_cost_params FOR INSERT WITH CHECK (
+  EXISTS (
+    SELECT 1 FROM scenarios
+    JOIN sites ON sites.id = scenarios.site_id
+    JOIN projects ON projects.id = sites.project_id 
+    WHERE scenarios.id = scenario_cost_params.scenario_id AND projects.owner_id = auth.uid()
+  )
+);
+CREATE POLICY "Users can update scenario configs" ON scenario_cost_params FOR UPDATE USING (
+  EXISTS (
+    SELECT 1 FROM scenarios
+    JOIN sites ON sites.id = scenarios.site_id
+    JOIN projects ON projects.id = sites.project_id 
+    WHERE scenarios.id = scenario_cost_params.scenario_id AND projects.owner_id = auth.uid()
+  )
+);
+CREATE POLICY "Users can delete scenario configs" ON scenario_cost_params FOR DELETE USING (
   EXISTS (
     SELECT 1 FROM scenarios
     JOIN sites ON sites.id = scenarios.site_id
@@ -526,7 +560,23 @@ CREATE POLICY "Users can read scenario mix rules" ON scenario_mix_rules FOR SELE
     WHERE scenarios.id = scenario_mix_rules.scenario_id AND projects.owner_id = auth.uid()
   )
 );
-CREATE POLICY "Users can manage scenario mix rules" ON scenario_mix_rules FOR ALL USING (
+CREATE POLICY "Users can insert scenario mix rules" ON scenario_mix_rules FOR INSERT WITH CHECK (
+  EXISTS (
+    SELECT 1 FROM scenarios
+    JOIN sites ON sites.id = scenarios.site_id
+    JOIN projects ON projects.id = sites.project_id 
+    WHERE scenarios.id = scenario_mix_rules.scenario_id AND projects.owner_id = auth.uid()
+  )
+);
+CREATE POLICY "Users can update scenario mix rules" ON scenario_mix_rules FOR UPDATE USING (
+  EXISTS (
+    SELECT 1 FROM scenarios
+    JOIN sites ON sites.id = scenarios.site_id
+    JOIN projects ON projects.id = sites.project_id 
+    WHERE scenarios.id = scenario_mix_rules.scenario_id AND projects.owner_id = auth.uid()
+  )
+);
+CREATE POLICY "Users can delete scenario mix rules" ON scenario_mix_rules FOR DELETE USING (
   EXISTS (
     SELECT 1 FROM scenarios
     JOIN sites ON sites.id = scenarios.site_id
@@ -543,7 +593,23 @@ CREATE POLICY "Users can read scenario rents" ON scenario_rents FOR SELECT USING
     WHERE scenarios.id = scenario_rents.scenario_id AND projects.owner_id = auth.uid()
   )
 );
-CREATE POLICY "Users can manage scenario rents" ON scenario_rents FOR ALL USING (
+CREATE POLICY "Users can insert scenario rents" ON scenario_rents FOR INSERT WITH CHECK (
+  EXISTS (
+    SELECT 1 FROM scenarios
+    JOIN sites ON sites.id = scenarios.site_id
+    JOIN projects ON projects.id = sites.project_id 
+    WHERE scenarios.id = scenario_rents.scenario_id AND projects.owner_id = auth.uid()
+  )
+);
+CREATE POLICY "Users can update scenario rents" ON scenario_rents FOR UPDATE USING (
+  EXISTS (
+    SELECT 1 FROM scenarios
+    JOIN sites ON sites.id = scenarios.site_id
+    JOIN projects ON projects.id = sites.project_id 
+    WHERE scenarios.id = scenario_rents.scenario_id AND projects.owner_id = auth.uid()
+  )
+);
+CREATE POLICY "Users can delete scenario rents" ON scenario_rents FOR DELETE USING (
   EXISTS (
     SELECT 1 FROM scenarios
     JOIN sites ON sites.id = scenarios.site_id
