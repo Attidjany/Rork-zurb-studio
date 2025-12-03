@@ -1,8 +1,19 @@
 import { protectedProcedure } from "../../../create-context";
-import { supabase } from "@/lib/supabase";
+import { createClient } from '@supabase/supabase-js';
 
 export default protectedProcedure.query(async ({ ctx }) => {
   console.log('[tRPC] Fetching projects for user:', ctx.user.id);
+  
+  const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL!;
+  const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!;
+  
+  const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+    global: {
+      headers: {
+        Authorization: ctx.req.headers.get('authorization') || '',
+      },
+    },
+  });
   
   const { data, error } = await supabase
     .from('projects')
