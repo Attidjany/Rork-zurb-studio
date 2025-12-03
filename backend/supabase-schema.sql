@@ -324,6 +324,10 @@ ALTER TABLE scenario_mix_rules ENABLE ROW LEVEL SECURITY;
 ALTER TABLE scenario_rents ENABLE ROW LEVEL SECURITY;
 
 -- Profiles policies
+DROP POLICY IF EXISTS "Users can read own profile" ON profiles;
+DROP POLICY IF EXISTS "Users can update own profile" ON profiles;
+DROP POLICY IF EXISTS "Admins can read all profiles" ON profiles;
+
 CREATE POLICY "Users can read own profile" ON profiles FOR SELECT USING (auth.uid() = id);
 CREATE POLICY "Users can update own profile" ON profiles FOR UPDATE USING (auth.uid() = id);
 CREATE POLICY "Admins can read all profiles" ON profiles FOR SELECT USING (
@@ -331,12 +335,22 @@ CREATE POLICY "Admins can read all profiles" ON profiles FOR SELECT USING (
 );
 
 -- Projects policies
+DROP POLICY IF EXISTS "Users can read own projects" ON projects;
+DROP POLICY IF EXISTS "Users can create projects" ON projects;
+DROP POLICY IF EXISTS "Users can update own projects" ON projects;
+DROP POLICY IF EXISTS "Users can delete own projects" ON projects;
+
 CREATE POLICY "Users can read own projects" ON projects FOR SELECT USING (owner_id = auth.uid());
 CREATE POLICY "Users can create projects" ON projects FOR INSERT WITH CHECK (owner_id = auth.uid());
 CREATE POLICY "Users can update own projects" ON projects FOR UPDATE USING (owner_id = auth.uid());
 CREATE POLICY "Users can delete own projects" ON projects FOR DELETE USING (owner_id = auth.uid());
 
 -- Sites policies
+DROP POLICY IF EXISTS "Users can read sites from own projects" ON sites;
+DROP POLICY IF EXISTS "Users can create sites in own projects" ON sites;
+DROP POLICY IF EXISTS "Users can update sites in own projects" ON sites;
+DROP POLICY IF EXISTS "Users can delete sites in own projects" ON sites;
+
 CREATE POLICY "Users can read sites from own projects" ON sites FOR SELECT USING (
   EXISTS (SELECT 1 FROM projects WHERE projects.id = sites.project_id AND projects.owner_id = auth.uid())
 );
@@ -351,6 +365,11 @@ CREATE POLICY "Users can delete sites in own projects" ON sites FOR DELETE USING
 );
 
 -- Blocks policies
+DROP POLICY IF EXISTS "Users can read blocks from own sites" ON blocks;
+DROP POLICY IF EXISTS "Users can create blocks in own sites" ON blocks;
+DROP POLICY IF EXISTS "Users can update blocks in own sites" ON blocks;
+DROP POLICY IF EXISTS "Users can delete blocks in own sites" ON blocks;
+
 CREATE POLICY "Users can read blocks from own sites" ON blocks FOR SELECT USING (
   EXISTS (
     SELECT 1 FROM sites 
@@ -381,6 +400,11 @@ CREATE POLICY "Users can delete blocks in own sites" ON blocks FOR DELETE USING 
 );
 
 -- Parcels policies (similar pattern)
+DROP POLICY IF EXISTS "Users can read parcels from own blocks" ON parcels;
+DROP POLICY IF EXISTS "Users can create parcels in own blocks" ON parcels;
+DROP POLICY IF EXISTS "Users can update parcels in own blocks" ON parcels;
+DROP POLICY IF EXISTS "Users can delete parcels in own blocks" ON parcels;
+
 CREATE POLICY "Users can read parcels from own blocks" ON parcels FOR SELECT USING (
   EXISTS (
     SELECT 1 FROM blocks
@@ -415,6 +439,11 @@ CREATE POLICY "Users can delete parcels in own blocks" ON parcels FOR DELETE USI
 );
 
 -- Scenarios policies
+DROP POLICY IF EXISTS "Users can read scenarios from own sites" ON scenarios;
+DROP POLICY IF EXISTS "Users can create scenarios in own sites" ON scenarios;
+DROP POLICY IF EXISTS "Users can update scenarios in own sites" ON scenarios;
+DROP POLICY IF EXISTS "Users can delete scenarios in own sites" ON scenarios;
+
 CREATE POLICY "Users can read scenarios from own sites" ON scenarios FOR SELECT USING (
   EXISTS (
     SELECT 1 FROM sites 
@@ -445,6 +474,11 @@ CREATE POLICY "Users can delete scenarios in own sites" ON scenarios FOR DELETE 
 );
 
 -- Scenario items policies
+DROP POLICY IF EXISTS "Users can read scenario items from own scenarios" ON scenario_items;
+DROP POLICY IF EXISTS "Users can create scenario items in own scenarios" ON scenario_items;
+DROP POLICY IF EXISTS "Users can update scenario items in own scenarios" ON scenario_items;
+DROP POLICY IF EXISTS "Users can delete scenario items in own scenarios" ON scenario_items;
+
 CREATE POLICY "Users can read scenario items from own scenarios" ON scenario_items FOR SELECT USING (
   EXISTS (
     SELECT 1 FROM scenarios
@@ -479,6 +513,11 @@ CREATE POLICY "Users can delete scenario items in own scenarios" ON scenario_ite
 );
 
 -- Project-specific config policies
+DROP POLICY IF EXISTS "Users can read project configs" ON project_cost_params;
+DROP POLICY IF EXISTS "Users can insert project configs" ON project_cost_params;
+DROP POLICY IF EXISTS "Users can update project configs" ON project_cost_params;
+DROP POLICY IF EXISTS "Users can delete project configs" ON project_cost_params;
+
 CREATE POLICY "Users can read project configs" ON project_cost_params FOR SELECT USING (
   EXISTS (SELECT 1 FROM projects WHERE projects.id = project_cost_params.project_id AND projects.owner_id = auth.uid())
 );
@@ -492,6 +531,11 @@ CREATE POLICY "Users can delete project configs" ON project_cost_params FOR DELE
   EXISTS (SELECT 1 FROM projects WHERE projects.id = project_cost_params.project_id AND projects.owner_id = auth.uid())
 );
 
+DROP POLICY IF EXISTS "Users can read project mix rules" ON project_mix_rules;
+DROP POLICY IF EXISTS "Users can insert project mix rules" ON project_mix_rules;
+DROP POLICY IF EXISTS "Users can update project mix rules" ON project_mix_rules;
+DROP POLICY IF EXISTS "Users can delete project mix rules" ON project_mix_rules;
+
 CREATE POLICY "Users can read project mix rules" ON project_mix_rules FOR SELECT USING (
   EXISTS (SELECT 1 FROM projects WHERE projects.id = project_mix_rules.project_id AND projects.owner_id = auth.uid())
 );
@@ -504,6 +548,11 @@ CREATE POLICY "Users can update project mix rules" ON project_mix_rules FOR UPDA
 CREATE POLICY "Users can delete project mix rules" ON project_mix_rules FOR DELETE USING (
   EXISTS (SELECT 1 FROM projects WHERE projects.id = project_mix_rules.project_id AND projects.owner_id = auth.uid())
 );
+
+DROP POLICY IF EXISTS "Users can read project rents" ON project_rents;
+DROP POLICY IF EXISTS "Users can insert project rents" ON project_rents;
+DROP POLICY IF EXISTS "Users can update project rents" ON project_rents;
+DROP POLICY IF EXISTS "Users can delete project rents" ON project_rents;
 
 CREATE POLICY "Users can read project rents" ON project_rents FOR SELECT USING (
   EXISTS (SELECT 1 FROM projects WHERE projects.id = project_rents.project_id AND projects.owner_id = auth.uid())
@@ -519,6 +568,11 @@ CREATE POLICY "Users can delete project rents" ON project_rents FOR DELETE USING
 );
 
 -- Scenario-specific config policies
+DROP POLICY IF EXISTS "Users can read scenario configs" ON scenario_cost_params;
+DROP POLICY IF EXISTS "Users can insert scenario configs" ON scenario_cost_params;
+DROP POLICY IF EXISTS "Users can update scenario configs" ON scenario_cost_params;
+DROP POLICY IF EXISTS "Users can delete scenario configs" ON scenario_cost_params;
+
 CREATE POLICY "Users can read scenario configs" ON scenario_cost_params FOR SELECT USING (
   EXISTS (
     SELECT 1 FROM scenarios
@@ -552,6 +606,11 @@ CREATE POLICY "Users can delete scenario configs" ON scenario_cost_params FOR DE
   )
 );
 
+DROP POLICY IF EXISTS "Users can read scenario mix rules" ON scenario_mix_rules;
+DROP POLICY IF EXISTS "Users can insert scenario mix rules" ON scenario_mix_rules;
+DROP POLICY IF EXISTS "Users can update scenario mix rules" ON scenario_mix_rules;
+DROP POLICY IF EXISTS "Users can delete scenario mix rules" ON scenario_mix_rules;
+
 CREATE POLICY "Users can read scenario mix rules" ON scenario_mix_rules FOR SELECT USING (
   EXISTS (
     SELECT 1 FROM scenarios
@@ -584,6 +643,11 @@ CREATE POLICY "Users can delete scenario mix rules" ON scenario_mix_rules FOR DE
     WHERE scenarios.id = scenario_mix_rules.scenario_id AND projects.owner_id = auth.uid()
   )
 );
+
+DROP POLICY IF EXISTS "Users can read scenario rents" ON scenario_rents;
+DROP POLICY IF EXISTS "Users can insert scenario rents" ON scenario_rents;
+DROP POLICY IF EXISTS "Users can update scenario rents" ON scenario_rents;
+DROP POLICY IF EXISTS "Users can delete scenario rents" ON scenario_rents;
 
 CREATE POLICY "Users can read scenario rents" ON scenario_rents FOR SELECT USING (
   EXISTS (
