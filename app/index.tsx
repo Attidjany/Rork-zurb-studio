@@ -10,6 +10,7 @@ import {
   Modal,
   TextInput,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { trpc } from '@/lib/trpc';
@@ -28,10 +29,15 @@ export default function ProjectsScreen() {
   const projectsQuery = trpc.projects.list.useQuery();
   const createProjectMutation = trpc.projects.create.useMutation({
     onSuccess: () => {
+      console.log('[Projects] Project created successfully');
       projectsQuery.refetch();
       setNewProjectName('');
       setNewProjectDesc('');
       setModalVisible(false);
+    },
+    onError: (error) => {
+      console.error('[Projects] Failed to create project:', error);
+      Alert.alert('Error', `Failed to create project: ${error.message}`);
     },
   });
   const [modalVisible, setModalVisible] = useState<boolean>(false);

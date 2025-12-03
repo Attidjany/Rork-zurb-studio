@@ -79,7 +79,7 @@ export default function SignUpScreen() {
           />
 
           {password && confirmPassword && password !== confirmPassword && (
-            <Text style={styles.errorText}>Passwords don't match</Text>
+            <Text style={styles.errorText}>Passwords do not match</Text>
           )}
 
           <TouchableOpacity
