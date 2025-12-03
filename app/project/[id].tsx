@@ -236,7 +236,7 @@ export default function ProjectScreen() {
                 />
               </>
             ) : (
-              <ScrollView style={styles.polygonContainer} showsVerticalScrollIndicator>
+              <ScrollView style={styles.polygonContainer} showsVerticalScrollIndicator={false}>
                 <Text style={styles.polygonLabel}>Coordinates (min 3 points)</Text>
                 {polygonCoords.map((coord, index) => (
                   <View key={index} style={styles.coordRow}>
