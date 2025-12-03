@@ -7,12 +7,18 @@ import { supabase } from "@/lib/supabase";
 export const trpc = createTRPCReact<AppRouter>();
 
 const getBaseUrl = () => {
-  if (process.env.EXPO_PUBLIC_RORK_API_BASE_URL) {
-    return process.env.EXPO_PUBLIC_RORK_API_BASE_URL;
+  const baseUrl = process.env.EXPO_PUBLIC_RORK_API_BASE_URL;
+  
+  if (baseUrl) {
+    console.log('[tRPC Client] Using base URL:', baseUrl);
+    return baseUrl;
   }
 
+  console.error('[tRPC Client] EXPO_PUBLIC_RORK_API_BASE_URL is not set');
+  console.error('[tRPC Client] Available env vars:', Object.keys(process.env).filter(k => k.startsWith('EXPO_PUBLIC')));
+  
   throw new Error(
-    "No base url found, please set EXPO_PUBLIC_RORK_API_BASE_URL"
+    "Backend URL not available. Make sure the app is started with 'bun start' or 'bunx rork start'. The EXPO_PUBLIC_RORK_API_BASE_URL environment variable is required."
   );
 };
 
