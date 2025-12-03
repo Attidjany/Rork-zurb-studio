@@ -4,13 +4,13 @@ import React, { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform, Modal, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import MapView, { Marker, PROVIDER_DEFAULT } from 'react-native-maps';
-import { useZUDS } from '@/contexts/ZUDSContext';
+import { useZURB } from '@/contexts/ZURBContext';
 import { DEFAULT_TYPOLOGIES } from '@/constants/typologies';
 
 export default function SiteScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { projects, scenarios, createScenario } = useZUDS();
+  const { projects, scenarios, createScenario } = useZURB();
   const [modalVisible, setModalVisible] = useState<boolean>(false);
   const [scenarioName, setScenarioName] = useState<string>('');
   const [scenarioNotes, setScenarioNotes] = useState<string>('');

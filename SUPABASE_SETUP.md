@@ -109,7 +109,7 @@ Your app is now ready to use Supabase!
 ### Frontend (Mobile App)
 - React Native with Expo
 - Supabase client configured in `lib/supabase.ts`
-- Context provider in `contexts/ZUDSContext.tsx`
+- Context provider in `contexts/ZURBContext.tsx`
 
 ### Backend (Supabase)
 - PostgreSQL database with PostGIS

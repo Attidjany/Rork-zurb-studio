@@ -4,7 +4,7 @@ import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { ZUDSContext } from "@/contexts/ZUDSContext";
+import { ZURBContext } from "@/contexts/ZURBContext";
 import { AuthContext } from "@/contexts/AuthContext";
 import { trpc, trpcClient } from "@/lib/trpc";
 
@@ -35,11 +35,11 @@ export default function RootLayout() {
     <trpc.Provider client={trpcClient} queryClient={queryClient}>
       <QueryClientProvider client={queryClient}>
         <AuthContext>
-          <ZUDSContext>
+          <ZURBContext>
             <GestureHandlerRootView>
               <RootLayoutNav />
             </GestureHandlerRootView>
-          </ZUDSContext>
+          </ZURBContext>
         </AuthContext>
       </QueryClientProvider>
     </trpc.Provider>

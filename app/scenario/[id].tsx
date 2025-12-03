@@ -12,14 +12,14 @@ import {
   FlatList,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useZUDS } from '@/contexts/ZUDSContext';
+import { useZURB } from '@/contexts/ZURBContext';
 import { DEFAULT_TYPOLOGIES } from '@/constants/typologies';
 import { ScenarioItem } from '@/types';
 import { calculateScenarioResults } from '@/utils/calculations';
 
 export default function ScenarioScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { scenarios, updateScenario, costParams, mixRules, getRentsMap, overheads } = useZUDS();
+  const { scenarios, updateScenario, costParams, mixRules, getRentsMap, overheads } = useZURB();
   const [modalVisible, setModalVisible] = useState<boolean>(false);
   const [selectedTypology, setSelectedTypology] = useState<string>('');
   const [units, setUnits] = useState<string>('');

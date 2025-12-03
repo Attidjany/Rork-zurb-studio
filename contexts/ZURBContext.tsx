@@ -18,15 +18,15 @@ import {
 } from '@/constants/costs';
 
 const STORAGE_KEYS = {
-  PROJECTS: 'zuds_projects',
-  SCENARIOS: 'zuds_scenarios',
-  COST_PARAMS: 'zuds_cost_params',
-  MIX_RULES: 'zuds_mix_rules',
-  RENTS: 'zuds_rents',
-  OVERHEADS: 'zuds_overheads',
+  PROJECTS: 'zurb_projects',
+  SCENARIOS: 'zurb_scenarios',
+  COST_PARAMS: 'zurb_cost_params',
+  MIX_RULES: 'zurb_mix_rules',
+  RENTS: 'zurb_rents',
+  OVERHEADS: 'zurb_overheads',
 };
 
-export const [ZUDSContext, useZUDS] = createContextHook(() => {
+export const [ZURBContext, useZURB] = createContextHook(() => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [scenarios, setScenarios] = useState<{ [siteId: string]: Scenario[] }>({});
   const [costParams, setCostParams] = useState<CostParams>(DEFAULT_COST_PARAMS);

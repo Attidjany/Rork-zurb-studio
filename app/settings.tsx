@@ -10,7 +10,7 @@ import {
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useZUDS } from '@/contexts/ZUDSContext';
+import { useZURB } from '@/contexts/ZURBContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { CostParams, OverheadConfig } from '@/types';
 import { LogOut } from 'lucide-react-native';
@@ -23,7 +23,7 @@ export default function SettingsScreen() {
     overheads,
     updateCostParams,
     updateOverheads,
-  } = useZUDS();
+  } = useZURB();
   const { signOut, user } = useAuth();
 
   const [goldPrice, setGoldPrice] = useState<string>(costParams.goldUsdPerOz.toString());
