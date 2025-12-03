@@ -65,7 +65,7 @@ export default function ProjectsScreen() {
       <Stack.Screen
         options={{
           headerShown: true,
-          title: 'ZUDS Projects',
+          title: 'ZURB Studio',
           headerRight: () => (
             <TouchableOpacity
               onPress={() => router.push('/settings' as any)}
