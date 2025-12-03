@@ -11,7 +11,9 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useZUDS } from '@/contexts/ZUDSContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { CostParams, OverheadConfig } from '@/types';
+import { LogOut } from 'lucide-react-native';
 
 export default function SettingsScreen() {
   const {
@@ -22,6 +24,7 @@ export default function SettingsScreen() {
     updateCostParams,
     updateOverheads,
   } = useZUDS();
+  const { signOut, user } = useAuth();
 
   const [goldPrice, setGoldPrice] = useState<string>(costParams.goldUsdPerOz.toString());
   const [gramsMid, setGramsMid] = useState<string>(costParams.gramsMidEnd.toString());
@@ -69,6 +72,24 @@ export default function SettingsScreen() {
       />
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Account</Text>
+          <View style={styles.card}>
+            <View style={styles.accountRow}>
+              <Text style={styles.accountLabel}>Email</Text>
+              <Text style={styles.accountValue}>{user?.email}</Text>
+            </View>
+            <TouchableOpacity
+              style={styles.signOutButton}
+              onPress={signOut}
+              testID="sign-out-button"
+            >
+              <LogOut size={20} color="#FF3B30" />
+              <Text style={styles.signOutText}>Sign Out</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Gold-Indexed Costs</Text>
           <View style={styles.card}>
@@ -303,5 +324,34 @@ const styles = StyleSheet.create({
   rentAmount: {
     fontSize: 16,
     color: '#007AFF',
+  },
+  accountRow: {
+    marginBottom: 16,
+  },
+  accountLabel: {
+    fontSize: 14,
+    fontWeight: '600' as const,
+    color: '#666666',
+    marginBottom: 4,
+  },
+  accountValue: {
+    fontSize: 16,
+    color: '#000000',
+  },
+  signOutButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFF5F5',
+    borderRadius: 8,
+    paddingVertical: 14,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: '#FF3B30',
+  },
+  signOutText: {
+    fontSize: 16,
+    fontWeight: '600' as const,
+    color: '#FF3B30',
   },
 });
