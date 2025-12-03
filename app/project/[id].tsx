@@ -10,16 +10,36 @@ import {
   Modal,
   TextInput,
   ScrollView,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useZUDS } from '@/contexts/ZUDSContext';
-import { Site } from '@/types';
+import { trpc } from '@/lib/trpc';
 import { calculatePolygonArea, getPolygonCenter } from '@/utils/geometry';
+
+type Site = {
+  id: string;
+  project_id: string;
+  name: string;
+  area_ha: number | null;
+  created_at: string;
+  updated_at: string;
+};
 
 export default function ProjectScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { projects, createSite } = useZUDS();
+  const projectQuery = trpc.projects.get.useQuery({ projectId: id as string }, { enabled: !!id });
+  const sitesQuery = trpc.sites.list.useQuery({ projectId: id as string }, { enabled: !!id });
+  const createSiteMutation = trpc.sites.create.useMutation({
+    onSuccess: () => {
+      console.log('[Site] Site created successfully');
+      sitesQuery.refetch();
+      resetForm();
+    },
+    onError: (error) => {
+      console.error('[Site] Error creating site:', error);
+    },
+  });
   const [modalVisible, setModalVisible] = useState<boolean>(false);
   const [siteName, setSiteName] = useState<string>('');
   const [usePolygon, setUsePolygon] = useState<boolean>(false);
@@ -28,12 +48,10 @@ export default function ProjectScreen() {
   const [latitude, setLatitude] = useState<string>('14.6937');
   const [longitude, setLongitude] = useState<string>('-17.4441');
 
-  const project = useMemo(() => {
-    return projects.find(p => p.id === id);
-  }, [projects, id]);
-
   const handleCreateSite = () => {
     if (!siteName.trim() || !id) return;
+
+    console.log('[Site] Creating site:', siteName);
 
     if (usePolygon) {
       const coords = polygonCoords
@@ -46,8 +64,14 @@ export default function ProjectScreen() {
       if (coords.length >= 3) {
         const area = calculatePolygonArea(coords);
         const center = getPolygonCenter(coords);
-        createSite(id, siteName.trim(), area, center.latitude, center.longitude, coords);
-        resetForm();
+        createSiteMutation.mutate({
+          projectId: id,
+          name: siteName.trim(),
+          areaHa: area,
+          latitude: center.latitude,
+          longitude: center.longitude,
+          polygon: coords,
+        });
       }
     } else {
       if (siteArea.trim()) {
@@ -55,8 +79,13 @@ export default function ProjectScreen() {
         const lat = parseFloat(latitude);
         const lng = parseFloat(longitude);
         if (!isNaN(area) && !isNaN(lat) && !isNaN(lng)) {
-          createSite(id, siteName.trim(), area, lat, lng);
-          resetForm();
+          createSiteMutation.mutate({
+            projectId: id,
+            name: siteName.trim(),
+            areaHa: area,
+            latitude: lat,
+            longitude: lng,
+          });
         }
       }
     }
@@ -115,21 +144,30 @@ export default function ProjectScreen() {
         <MapPin size={20} color="#007AFF" />
         <Text style={styles.siteName}>{item.name}</Text>
       </View>
-      <Text style={styles.siteArea}>{item.areaHa.toFixed(2)} ha</Text>
-      <Text style={styles.siteLocation}>
-        {item.location.latitude.toFixed(4)}, {item.location.longitude.toFixed(4)}
-      </Text>
-      <Text style={styles.siteBlocks}>{item.blocks.length} blocks</Text>
+      {item.area_ha && (
+        <Text style={styles.siteArea}>{item.area_ha.toFixed(2)} ha</Text>
+      )}
     </TouchableOpacity>
   );
 
-  if (!project) {
+  if (projectQuery.isLoading || sitesQuery.isLoading) {
+    return (
+      <View style={styles.centerContainer}>
+        <ActivityIndicator size="large" color="#007AFF" />
+      </View>
+    );
+  }
+
+  if (!projectQuery.data) {
     return (
       <View style={styles.centerContainer}>
         <Text style={styles.errorText}>Project not found</Text>
       </View>
     );
   }
+
+  const project = projectQuery.data;
+  const sites = sitesQuery.data || [];
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
@@ -151,13 +189,13 @@ export default function ProjectScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Sites</Text>
 
-          {project.sites.length === 0 ? (
+          {sites.length === 0 ? (
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyText}>No sites yet. Create your first site.</Text>
             </View>
           ) : (
             <FlatList
-              data={project.sites}
+              data={sites}
               renderItem={renderSite}
               keyExtractor={item => item.id}
               scrollEnabled={false}
@@ -289,10 +327,14 @@ export default function ProjectScreen() {
               <TouchableOpacity
                 style={[styles.modalButton, styles.createButton]}
                 onPress={handleCreateSite}
-                disabled={!siteName.trim() || (!usePolygon && !siteArea.trim()) || (usePolygon && polygonCoords.filter(c => c.latitude && c.longitude).length < 3)}
+                disabled={!siteName.trim() || (!usePolygon && !siteArea.trim()) || (usePolygon && polygonCoords.filter(c => c.latitude && c.longitude).length < 3) || createSiteMutation.isPending}
                 testID="confirm-create-button"
               >
-                <Text style={styles.createButtonText}>Create</Text>
+                {createSiteMutation.isPending ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.createButtonText}>Create</Text>
+                )}
               </TouchableOpacity>
             </View>
           </View>

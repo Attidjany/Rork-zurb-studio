@@ -12,22 +12,39 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useZUDS } from '@/contexts/ZUDSContext';
-import { Project } from '@/types';
+import { trpc } from '@/lib/trpc';
+
+type Project = {
+  id: string;
+  name: string;
+  description: string | null;
+  created_at: string;
+  updated_at: string;
+  owner_id: string;
+};
 
 export default function ProjectsScreen() {
   const router = useRouter();
-  const { projects, isLoading, createProject } = useZUDS();
+  const projectsQuery = trpc.projects.list.useQuery();
+  const createProjectMutation = trpc.projects.create.useMutation({
+    onSuccess: () => {
+      projectsQuery.refetch();
+      setNewProjectName('');
+      setNewProjectDesc('');
+      setModalVisible(false);
+    },
+  });
   const [modalVisible, setModalVisible] = useState<boolean>(false);
   const [newProjectName, setNewProjectName] = useState<string>('');
   const [newProjectDesc, setNewProjectDesc] = useState<string>('');
 
   const handleCreateProject = () => {
     if (newProjectName.trim()) {
-      createProject(newProjectName.trim(), newProjectDesc.trim());
-      setNewProjectName('');
-      setNewProjectDesc('');
-      setModalVisible(false);
+      console.log('[Projects] Creating project:', newProjectName);
+      createProjectMutation.mutate({
+        name: newProjectName.trim(),
+        description: newProjectDesc.trim() || undefined,
+      });
     }
   };
 
@@ -39,7 +56,6 @@ export default function ProjectsScreen() {
     >
       <View style={styles.projectHeader}>
         <Text style={styles.projectName}>{item.name}</Text>
-        <Text style={styles.projectSites}>{item.sites.length} sites</Text>
       </View>
       {item.description ? (
         <Text style={styles.projectDesc} numberOfLines={2}>
@@ -47,18 +63,20 @@ export default function ProjectsScreen() {
         </Text>
       ) : null}
       <Text style={styles.projectDate}>
-        {new Date(item.createdAt).toLocaleDateString()}
+        {new Date(item.created_at).toLocaleDateString()}
       </Text>
     </TouchableOpacity>
   );
 
-  if (isLoading) {
+  if (projectsQuery.isLoading) {
     return (
       <View style={styles.centerContainer}>
         <ActivityIndicator size="large" color="#007AFF" />
       </View>
     );
   }
+
+  const projects = projectsQuery.data || [];
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -150,10 +168,14 @@ export default function ProjectsScreen() {
               <TouchableOpacity
                 style={[styles.modalButton, styles.createButton]}
                 onPress={handleCreateProject}
-                disabled={!newProjectName.trim()}
+                disabled={!newProjectName.trim() || createProjectMutation.isPending}
                 testID="confirm-create-button"
               >
-                <Text style={styles.createButtonText}>Create</Text>
+                {createProjectMutation.isPending ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.createButtonText}>Create</Text>
+                )}
               </TouchableOpacity>
             </View>
           </View>
