@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "ZURB Studio",
-    "slug": "urban-design-studio-mvp-plyt5fa",
+    "slug": "zurb-studio",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -15,14 +15,14 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "app.rork.urban-design-studio-mvp-plyt5fa"
+      "bundleIdentifier": "app.rork.zurb-studio"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "app.rork.urban_design_studio_mvp_plyt5fa"
+      "package": "app.rork.zurb-studio"
     },
     "web": {
       "favicon": "./assets/images/favicon.png"
