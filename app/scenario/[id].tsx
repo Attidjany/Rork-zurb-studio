@@ -1,17 +1,16 @@
 import { Stack, useLocalSearchParams, router } from 'expo-router';
 import React, { useMemo, useState } from 'react';
-import { Settings2, Building2 } from 'lucide-react-native';
-import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity, Alert } from 'react-native';
+import { Settings2 } from 'lucide-react-native';
+import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useZURB } from '@/contexts/ZURBContext';
 import { USD_TO_XOF } from '@/lib/goldPrice';
 import {
   UNIT_BUILD_AREAS,
-  UNIT_COSTS_PER_M2,
-  UNIT_RENTS_MONTHLY,
   DEFAULT_LEASE_YEARS,
   BUILDING_TYPES,
   VILLA_LAYOUTS,
+  HOUSING_TYPES,
 } from '@/constants/typologies';
 import { DbBlock, DbHalfBlock, DbUnit } from '@/types';
 
@@ -20,9 +19,12 @@ export default function ScenarioScreen() {
   const {
     scenarios,
     sites,
+    projects,
     getBlocksBySiteId,
     getHalfBlocksByBlockId,
     getUnitsByHalfBlockId,
+    getScenarioCostParamsByScenarioId,
+    getProjectCostParamsByProjectId,
     loadScenarios,
     loadBlocks,
     loadHalfBlocks,
@@ -45,6 +47,28 @@ export default function ScenarioScreen() {
     if (!scenario) return null;
     return sites.find(s => s.id === scenario.site_id) || null;
   }, [sites, scenario]);
+
+  const project = useMemo(() => {
+    if (!site) return null;
+    return projects.find(p => p.id === site.project_id) || null;
+  }, [projects, site]);
+
+  const scenarioCostParams = useMemo(() => {
+    if (!scenario) return [];
+    return getScenarioCostParamsByScenarioId(scenario.id);
+  }, [getScenarioCostParamsByScenarioId, scenario]);
+
+  const projectCostParams = useMemo(() => {
+    if (!project) return [];
+    return getProjectCostParamsByProjectId(project.id);
+  }, [getProjectCostParamsByProjectId, project]);
+
+  const costParams = useMemo(() => {
+    return projectCostParams.map(pp => {
+      const override = scenarioCostParams.find(sp => sp.unit_type === pp.unit_type);
+      return override || pp;
+    });
+  }, [projectCostParams, scenarioCostParams]);
 
   const siteBlocks = useMemo(() => {
     if (!scenario) return [];
@@ -73,8 +97,9 @@ export default function ScenarioScreen() {
               unitsByType[plotSizeKey] = (unitsByType[plotSizeKey] || 0) + plot.count;
 
               const buildArea = UNIT_BUILD_AREAS[plotSizeKey] || plot.size * 0.3;
-              const costPerM2 = UNIT_COSTS_PER_M2[plotSizeKey] || 1000;
-              const rentMonthly = UNIT_RENTS_MONTHLY[plotSizeKey] || 500;
+              const costParam = costParams.find(cp => cp.unit_type === plotSizeKey);
+              const costPerM2 = costParam ? costParam.cost_per_m2 : 1000;
+              const rentMonthly = costParam ? costParam.rent_monthly : 500;
 
               totalBuildArea += buildArea * plot.count;
               totalCosts += buildArea * costPerM2 * plot.count;
@@ -83,16 +108,18 @@ export default function ScenarioScreen() {
           }
         } else if (hb.type === 'apartments') {
           units.forEach((unit: DbUnit) => {
-            if (unit.building_type && ['AM1', 'AM2', 'AH'].includes(unit.building_type)) {
+            if (unit.building_type && ['AB1', 'AB2', 'ABH'].includes(unit.building_type)) {
               const buildingConfig = BUILDING_TYPES.find(bt => bt.id === unit.building_type);
               if (buildingConfig?.units) {
                 Object.entries(buildingConfig.units).forEach(([unitType, count]) => {
                   totalResidentialUnits += count;
                   unitsByType[unitType] = (unitsByType[unitType] || 0) + count;
 
-                  const buildArea = UNIT_BUILD_AREAS[unitType] || 80;
-                  const costPerM2 = UNIT_COSTS_PER_M2[unitType] || 900;
-                  const rentMonthly = UNIT_RENTS_MONTHLY[unitType] || 400;
+                  const costParam = costParams.find(cp => cp.unit_type === unitType);
+                  const housingConfig = HOUSING_TYPES[unitType];
+                  const buildArea = costParam ? costParam.build_area_m2 : (housingConfig?.defaultArea || 80);
+                  const costPerM2 = costParam ? costParam.cost_per_m2 : 900;
+                  const rentMonthly = costParam ? costParam.rent_monthly : (housingConfig?.defaultRent || 400);
 
                   totalBuildArea += buildArea * count;
                   totalCosts += buildArea * costPerM2 * count;
@@ -115,7 +142,7 @@ export default function ScenarioScreen() {
       unitsByType,
       rentalPeriodYears,
     };
-  }, [siteBlocks, getHalfBlocksByBlockId, getUnitsByHalfBlockId]);
+  }, [siteBlocks, getHalfBlocksByBlockId, getUnitsByHalfBlockId, costParams]);
 
   if (!scenario || !site) {
     return (
@@ -149,13 +176,7 @@ export default function ScenarioScreen() {
           <Text style={styles.parametersButtonText}>Configure Scenario Parameters</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.buildingTypesButton}
-          onPress={() => Alert.alert('Building Type Selection', 'Building type selection feature coming soon. You will be able to select apartment building types (AB1, AB2, ABH), equipment/utilities, and villa types here.')}
-        >
-          <Building2 size={20} color="#34C759" />
-          <Text style={styles.buildingTypesButtonText}>Select Building Types</Text>
-        </TouchableOpacity>
+
 
         <View style={styles.summaryCard}>
           <Text style={styles.summaryTitle}>Scenario Summary</Text>
@@ -246,24 +267,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600' as const,
     color: '#007AFF',
-  },
-  buildingTypesButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#E8F5E9',
-    marginHorizontal: 16,
-    marginTop: 12,
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#81C784',
-    gap: 8,
-  },
-  buildingTypesButtonText: {
-    fontSize: 15,
-    fontWeight: '600' as const,
-    color: '#34C759',
   },
   summaryCard: {
     backgroundColor: '#FFFFFF',

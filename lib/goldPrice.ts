@@ -2,7 +2,7 @@ export const DEFAULT_GOLD_PRICE_PER_GRAM = 65;
 export const DEFAULT_GOLD_PRICE_PER_OZ = 2020;
 export const GOLD_API_URL = 'https://www.goldapi.io/api/XAU/USD';
 export const TROY_OZ_TO_GRAMS = 31.1035;
-export const USD_TO_XOF = 620;
+export const USD_TO_XOF = 570;
 
 export interface GoldPriceData {
   pricePerGram: number;

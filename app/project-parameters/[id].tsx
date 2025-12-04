@@ -34,6 +34,7 @@ export default function ProjectParametersScreen() {
   const [goldPrice, setGoldPrice] = useState<GoldPriceData>(getCachedGoldPrice() || getDefaultGoldPrice());
   const [loadingGoldPrice, setLoadingGoldPrice] = useState<boolean>(false);
   const [editingParam, setEditingParam] = useState<string | null>(null);
+  const [editingCostType, setEditingCostType] = useState<string | null>(null);
   const [isLoadingParams, setIsLoadingParams] = useState<boolean>(false);
   const [editValues, setEditValues] = useState<{
     build_area_m2: string;
@@ -44,6 +45,7 @@ export default function ProjectParametersScreen() {
     cost_type: '',
     rent_monthly: '',
   });
+  const [editCostValue, setEditCostValue] = useState<string>('');
 
   const project = useMemo(() => {
     return projects.find(p => p.id === id) || null;
@@ -310,23 +312,14 @@ export default function ProjectParametersScreen() {
         </View>
 
         <View style={styles.goldPriceCard}>
-          <View style={styles.goldPriceHeader}>
+          <View style={styles.goldPriceMainHeader}>
             <View style={styles.goldPriceIcon}>
-              <TrendingUp size={20} color="#FFB700" />
+              <TrendingUp size={24} color="#FFB700" />
             </View>
-            <View style={styles.goldPriceInfo}>
-              <Text style={styles.goldPriceLabel}>Live Gold Price (updates daily)</Text>
-              <View style={styles.goldPriceRow}>
-                <Text style={styles.goldPriceValue}>
-                  {(goldPrice.pricePerGram * USD_TO_XOF).toLocaleString(undefined, {maximumFractionDigits: 0})} XOF/g
-                </Text>
-                <Text style={styles.goldPriceSeparator}>•</Text>
-                <Text style={styles.goldPriceValue}>
-                  {(goldPrice.pricePerOz * USD_TO_XOF).toLocaleString(undefined, {maximumFractionDigits: 0})} XOF/oz
-                </Text>
-              </View>
+            <View style={styles.goldPriceTitleSection}>
+              <Text style={styles.goldPriceLabel}>Live Gold Price</Text>
               <Text style={styles.goldPriceTimestamp}>
-                Last updated: {new Date(goldPrice.timestamp).toLocaleDateString()}
+                Updates daily • Last: {new Date(goldPrice.timestamp).toLocaleDateString()}
               </Text>
             </View>
             <TouchableOpacity
@@ -340,6 +333,37 @@ export default function ProjectParametersScreen() {
                 <Text style={styles.refreshButtonText}>Refresh</Text>
               )}
             </TouchableOpacity>
+          </View>
+          
+          <View style={styles.goldPriceGrid}>
+            <View style={styles.goldPriceItem}>
+              <Text style={styles.goldPriceItemLabel}>$/g</Text>
+              <Text style={styles.goldPriceItemValue}>
+                ${goldPrice.pricePerGram.toFixed(2)}
+              </Text>
+            </View>
+            <View style={styles.goldPriceItem}>
+              <Text style={styles.goldPriceItemLabel}>$/oz</Text>
+              <Text style={styles.goldPriceItemValue}>
+                ${goldPrice.pricePerOz.toFixed(2)}
+              </Text>
+            </View>
+            <View style={styles.goldPriceItem}>
+              <Text style={styles.goldPriceItemLabel}>XOF/g</Text>
+              <Text style={styles.goldPriceItemValue}>
+                {(goldPrice.pricePerGram * USD_TO_XOF).toLocaleString(undefined, {maximumFractionDigits: 0})}
+              </Text>
+            </View>
+            <View style={styles.goldPriceItem}>
+              <Text style={styles.goldPriceItemLabel}>XOF/oz</Text>
+              <Text style={styles.goldPriceItemValue}>
+                {(goldPrice.pricePerOz * USD_TO_XOF).toLocaleString(undefined, {maximumFractionDigits: 0})}
+              </Text>
+            </View>
+          </View>
+          
+          <View style={styles.exchangeRateInfo}>
+            <Text style={styles.exchangeRateText}>Exchange Rate: 1 USD = {USD_TO_XOF} XOF</Text>
           </View>
         </View>
 
@@ -374,6 +398,7 @@ export default function ProjectParametersScreen() {
             if (!param) return null;
 
             const config = CONSTRUCTION_COSTS[type];
+            const isEditing = editingCostType === type;
 
             return (
               <View key={param.id} style={styles.costCard}>
@@ -382,22 +407,73 @@ export default function ProjectParametersScreen() {
                   <Text style={styles.costName}>{config.name}</Text>
                 </View>
 
-                <View style={styles.costDetails}>
-                  <View style={styles.costDetailRow}>
-                    <Text style={styles.costDetailLabel}>Gold Content:</Text>
-                    <Text style={styles.costDetailValue}>{config.goldGramsPerM2.toFixed(2)} g Au/m²</Text>
+                {isEditing ? (
+                  <View style={styles.editForm}>
+                    <View style={styles.inputGroup}>
+                      <Text style={styles.inputLabel}>Gold Content (g Au/m²)</Text>
+                      <TextInput
+                        style={styles.input}
+                        value={editCostValue}
+                        onChangeText={setEditCostValue}
+                        keyboardType="decimal-pad"
+                        placeholder="Gold grams per m²"
+                      />
+                    </View>
+                    <View style={styles.editButtons}>
+                      <TouchableOpacity
+                        style={[styles.editButton, styles.cancelButton]}
+                        onPress={() => {
+                          setEditingCostType(null);
+                          setEditCostValue('');
+                        }}
+                      >
+                        <Text style={styles.cancelButtonText}>Cancel</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.editButton, styles.saveButton]}
+                        onPress={async () => {
+                          const newGoldGrams = parseFloat(editCostValue);
+                          if (!isNaN(newGoldGrams)) {
+                            CONSTRUCTION_COSTS[type].goldGramsPerM2 = newGoldGrams;
+                            setEditingCostType(null);
+                            setEditCostValue('');
+                            await loadProjectCostParams();
+                          }
+                        }}
+                      >
+                        <Text style={styles.saveButtonText}>Save</Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
-                  <View style={styles.costDetailRow}>
-                    <Text style={styles.costDetailLabel}>Cost per m²:</Text>
-                    <Text style={styles.costDetailValue}>{(config.goldGramsPerM2 * goldPrice.pricePerGram * USD_TO_XOF).toLocaleString(undefined, {maximumFractionDigits: 0})} XOF/m²</Text>
-                  </View>
-                  <View style={styles.costDetailRow}>
-                    <Text style={styles.costDetailLabel}>Calculated at:</Text>
-                    <Text style={styles.costDetailValueSmall}>
-                      {config.goldGramsPerM2.toFixed(2)} g × {(goldPrice.pricePerGram * USD_TO_XOF).toLocaleString(undefined, {maximumFractionDigits: 0})} XOF/g
-                    </Text>
-                  </View>
-                </View>
+                ) : (
+                  <>
+                    <View style={styles.costDetails}>
+                      <View style={styles.costDetailRow}>
+                        <Text style={styles.costDetailLabel}>Gold Content:</Text>
+                        <Text style={styles.costDetailValue}>{config.goldGramsPerM2.toFixed(2)} g Au/m²</Text>
+                      </View>
+                      <View style={styles.costDetailRow}>
+                        <Text style={styles.costDetailLabel}>Cost per m²:</Text>
+                        <Text style={styles.costDetailValue}>{(config.goldGramsPerM2 * goldPrice.pricePerGram * USD_TO_XOF).toLocaleString(undefined, {maximumFractionDigits: 0})} XOF/m²</Text>
+                      </View>
+                      <View style={styles.costDetailRow}>
+                        <Text style={styles.costDetailLabel}>Calculated at:</Text>
+                        <Text style={styles.costDetailValueSmall}>
+                          {config.goldGramsPerM2.toFixed(2)} g × {(goldPrice.pricePerGram * USD_TO_XOF).toLocaleString(undefined, {maximumFractionDigits: 0})} XOF/g
+                        </Text>
+                      </View>
+                    </View>
+                    <TouchableOpacity
+                      style={styles.editTriggerSmall}
+                      onPress={() => {
+                        setEditingCostType(type);
+                        setEditCostValue(config.goldGramsPerM2.toString());
+                      }}
+                    >
+                      <Text style={styles.editTriggerTextSmall}>Edit Gold Content</Text>
+                    </TouchableOpacity>
+                  </>
+                )}
               </View>
             );
           })}
@@ -505,47 +581,71 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#FFE082',
   },
-  goldPriceHeader: {
+  goldPriceMainHeader: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: 20,
   },
   goldPriceIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: 'rgba(255, 183, 0, 0.15)',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
   },
-  goldPriceInfo: {
+  goldPriceTitleSection: {
     flex: 1,
   },
   goldPriceLabel: {
-    fontSize: 13,
-    color: '#8D6E00',
-    marginBottom: 4,
-    fontWeight: '600' as const,
-  },
-  goldPriceRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 4,
-  },
-  goldPriceValue: {
     fontSize: 16,
+    color: '#8D6E00',
     fontWeight: '700' as const,
-    color: '#8D6E00',
-  },
-  goldPriceSeparator: {
-    fontSize: 14,
-    color: '#8D6E00',
+    marginBottom: 4,
   },
   goldPriceTimestamp: {
     fontSize: 11,
     color: '#A67C00',
-    marginTop: 2,
+  },
+  goldPriceGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginBottom: 16,
+  },
+  goldPriceItem: {
+    flex: 1,
+    minWidth: '45%',
+    backgroundColor: 'rgba(255, 183, 0, 0.08)',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#FFE082',
+  },
+  goldPriceItemLabel: {
+    fontSize: 12,
+    color: '#A67C00',
+    fontWeight: '600' as const,
+    marginBottom: 6,
+  },
+  goldPriceItemValue: {
+    fontSize: 20,
+    fontWeight: '700' as const,
+    color: '#8D6E00',
+  },
+  exchangeRateInfo: {
+    backgroundColor: 'rgba(255, 183, 0, 0.08)',
+    borderRadius: 8,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#FFE082',
+  },
+  exchangeRateText: {
+    fontSize: 13,
+    color: '#8D6E00',
+    fontWeight: '600' as const,
+    textAlign: 'center',
   },
   refreshButton: {
     paddingHorizontal: 16,
@@ -768,6 +868,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8F9FA',
     borderWidth: 1,
     borderColor: '#E9ECEF',
+    marginTop: 12,
   },
   editTriggerTextSmall: {
     fontSize: 13,
