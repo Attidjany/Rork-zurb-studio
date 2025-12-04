@@ -13,11 +13,23 @@ app.use(
   trpcServer({
     router: appRouter,
     createContext,
+    onError({ error, path }) {
+      console.error(`[tRPC Error] ${path}:`, error);
+    },
   })
 );
 
 app.get("/", (c) => {
-  return c.json({ status: "ok", message: "API is running" });
+  return c.json({ status: "ok", message: "ZURB API is running" });
+});
+
+app.get("/api", (c) => {
+  return c.json({ status: "ok", message: "ZURB API is running" });
+});
+
+app.onError((err, c) => {
+  console.error('[Hono Error]', err);
+  return c.json({ error: err.message }, 500);
 });
 
 export default app;
