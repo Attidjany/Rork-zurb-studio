@@ -993,6 +993,7 @@ export const [ZURBContext, useZURB] = createContextHook(() => {
         if (error) throw error;
 
         console.log('[ZURB] Project construction cost created:', data);
+        setProjectConstructionCosts(prev => [...prev, data]);
         return data;
       } catch (error: any) {
         console.error('[ZURB] Error creating project construction cost:', error);
@@ -1005,6 +1006,10 @@ export const [ZURBContext, useZURB] = createContextHook(() => {
 
   const updateProjectConstructionCost = useCallback(
     async (costId: string, updates: { code?: string; name?: string; gold_grams_per_m2?: number }) => {
+      setProjectConstructionCosts(prev => 
+        prev.map(cost => cost.id === costId ? { ...cost, ...updates } : cost)
+      );
+      
       try {
         const { error } = await supabase
           .from('project_construction_costs')
@@ -1017,13 +1022,16 @@ export const [ZURBContext, useZURB] = createContextHook(() => {
       } catch (error: any) {
         console.error('[ZURB] Error updating project construction cost:', error);
         Alert.alert('Error', error.message || 'Failed to update construction cost type');
+        await loadProjectConstructionCosts();
       }
     },
-    []
+    [loadProjectConstructionCosts]
   );
 
   const deleteProjectConstructionCost = useCallback(
     async (costId: string) => {
+      setProjectConstructionCosts(prev => prev.filter(cost => cost.id !== costId));
+      
       try {
         const { error } = await supabase
           .from('project_construction_costs')
@@ -1037,10 +1045,11 @@ export const [ZURBContext, useZURB] = createContextHook(() => {
       } catch (error: any) {
         console.error('[ZURB] Error deleting project construction cost:', error);
         Alert.alert('Error', error.message || 'Failed to delete construction cost type');
+        await loadProjectConstructionCosts();
         return false;
       }
     },
-    []
+    [loadProjectConstructionCosts]
   );
 
   const createProjectHousingType = useCallback(
@@ -1071,6 +1080,7 @@ export const [ZURBContext, useZURB] = createContextHook(() => {
         if (error) throw error;
 
         console.log('[ZURB] Project housing type created:', data);
+        setProjectHousingTypes(prev => [...prev, data]);
         return data;
       } catch (error: any) {
         console.error('[ZURB] Error creating project housing type:', error);
@@ -1089,6 +1099,10 @@ export const [ZURBContext, useZURB] = createContextHook(() => {
       default_cost_type?: string;
       default_rent_monthly?: number;
     }) => {
+      setProjectHousingTypes(prev => 
+        prev.map(type => type.id === typeId ? { ...type, ...updates } : type)
+      );
+      
       try {
         const { error } = await supabase
           .from('project_housing_types')
@@ -1101,13 +1115,16 @@ export const [ZURBContext, useZURB] = createContextHook(() => {
       } catch (error: any) {
         console.error('[ZURB] Error updating project housing type:', error);
         Alert.alert('Error', error.message || 'Failed to update housing type');
+        await loadProjectHousingTypes();
       }
     },
-    []
+    [loadProjectHousingTypes]
   );
 
   const deleteProjectHousingType = useCallback(
     async (typeId: string) => {
+      setProjectHousingTypes(prev => prev.filter(type => type.id !== typeId));
+      
       try {
         const { error } = await supabase
           .from('project_housing_types')
@@ -1121,10 +1138,11 @@ export const [ZURBContext, useZURB] = createContextHook(() => {
       } catch (error: any) {
         console.error('[ZURB] Error deleting project housing type:', error);
         Alert.alert('Error', error.message || 'Failed to delete housing type');
+        await loadProjectHousingTypes();
         return false;
       }
     },
-    []
+    [loadProjectHousingTypes]
   );
 
   const createProjectEquipmentUtilityType = useCallback(
@@ -1155,6 +1173,7 @@ export const [ZURBContext, useZURB] = createContextHook(() => {
         if (error) throw error;
 
         console.log('[ZURB] Project equipment utility type created:', data);
+        setProjectEquipmentUtilityTypes(prev => [...prev, data]);
         return data;
       } catch (error: any) {
         console.error('[ZURB] Error creating project equipment utility type:', error);
@@ -1173,6 +1192,10 @@ export const [ZURBContext, useZURB] = createContextHook(() => {
       building_occupation_pct?: number;
       cost_type?: string;
     }) => {
+      setProjectEquipmentUtilityTypes(prev => 
+        prev.map(type => type.id === typeId ? { ...type, ...updates } : type)
+      );
+      
       try {
         const { error } = await supabase
           .from('project_equipment_utility_types')
@@ -1185,13 +1208,16 @@ export const [ZURBContext, useZURB] = createContextHook(() => {
       } catch (error: any) {
         console.error('[ZURB] Error updating project equipment utility type:', error);
         Alert.alert('Error', error.message || 'Failed to update equipment/utility type');
+        await loadProjectEquipmentUtilityTypes();
       }
     },
-    []
+    [loadProjectEquipmentUtilityTypes]
   );
 
   const deleteProjectEquipmentUtilityType = useCallback(
     async (typeId: string) => {
+      setProjectEquipmentUtilityTypes(prev => prev.filter(type => type.id !== typeId));
+      
       try {
         const { error } = await supabase
           .from('project_equipment_utility_types')
@@ -1205,10 +1231,11 @@ export const [ZURBContext, useZURB] = createContextHook(() => {
       } catch (error: any) {
         console.error('[ZURB] Error deleting project equipment utility type:', error);
         Alert.alert('Error', error.message || 'Failed to delete equipment/utility type');
+        await loadProjectEquipmentUtilityTypes();
         return false;
       }
     },
-    []
+    [loadProjectEquipmentUtilityTypes]
   );
 
   return {

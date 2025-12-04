@@ -443,12 +443,20 @@ export default function ProjectParametersScreen() {
                     <Text style={styles.costCode}>{cost.code}</Text>
                     <Text style={styles.costName}>{cost.name}</Text>
                   </View>
-                  <TouchableOpacity
-                    style={styles.deleteButton}
-                    onPress={() => handleDeleteCost(cost.id, cost.code)}
-                  >
-                    <Trash2 size={18} color="#DC3545" />
-                  </TouchableOpacity>
+                  <View style={styles.actionButtons}>
+                    <TouchableOpacity
+                      style={styles.editButton}
+                      onPress={() => handleEditCost(cost)}
+                    >
+                      <Edit2 size={18} color="#007AFF" />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.deleteButton}
+                      onPress={() => handleDeleteCost(cost.id, cost.code)}
+                    >
+                      <Trash2 size={18} color="#DC3545" />
+                    </TouchableOpacity>
+                  </View>
                 </View>
                 <View style={styles.costDetails}>
                   <View style={styles.costDetailRow}>
@@ -494,12 +502,20 @@ export default function ProjectParametersScreen() {
                     <Text style={styles.housingCode}>{type.code}</Text>
                     <Text style={styles.housingName}>{type.name}</Text>
                   </View>
-                  <TouchableOpacity
-                    style={styles.deleteButton}
-                    onPress={() => handleDeleteHousing(type.id, type.code)}
-                  >
-                    <Trash2 size={18} color="#DC3545" />
-                  </TouchableOpacity>
+                  <View style={styles.actionButtons}>
+                    <TouchableOpacity
+                      style={styles.editButton}
+                      onPress={() => handleEditHousing(type)}
+                    >
+                      <Edit2 size={18} color="#007AFF" />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.deleteButton}
+                      onPress={() => handleDeleteHousing(type.id, type.code)}
+                    >
+                      <Trash2 size={18} color="#DC3545" />
+                    </TouchableOpacity>
+                  </View>
                 </View>
                 <View style={styles.housingDetails}>
                   <View style={styles.housingDetailRow}>
@@ -555,12 +571,20 @@ export default function ProjectParametersScreen() {
                     <Text style={styles.housingCode}>{type.code}</Text>
                     <Text style={styles.housingName}>{type.name}</Text>
                   </View>
-                  <TouchableOpacity
-                    style={styles.deleteButton}
-                    onPress={() => handleDeleteHousing(type.id, type.code)}
-                  >
-                    <Trash2 size={18} color="#DC3545" />
-                  </TouchableOpacity>
+                  <View style={styles.actionButtons}>
+                    <TouchableOpacity
+                      style={styles.editButton}
+                      onPress={() => handleEditHousing(type)}
+                    >
+                      <Edit2 size={18} color="#007AFF" />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.deleteButton}
+                      onPress={() => handleDeleteHousing(type.id, type.code)}
+                    >
+                      <Trash2 size={18} color="#DC3545" />
+                    </TouchableOpacity>
+                  </View>
                 </View>
                 <View style={styles.housingDetails}>
                   <View style={styles.housingDetailRow}>
@@ -616,12 +640,20 @@ export default function ProjectParametersScreen() {
                     <Text style={styles.housingCode}>{type.code}</Text>
                     <Text style={styles.housingName}>{type.name}</Text>
                   </View>
-                  <TouchableOpacity
-                    style={styles.deleteButton}
-                    onPress={() => handleDeleteHousing(type.id, type.code)}
-                  >
-                    <Trash2 size={18} color="#DC3545" />
-                  </TouchableOpacity>
+                  <View style={styles.actionButtons}>
+                    <TouchableOpacity
+                      style={styles.editButton}
+                      onPress={() => handleEditHousing(type)}
+                    >
+                      <Edit2 size={18} color="#007AFF" />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.deleteButton}
+                      onPress={() => handleDeleteHousing(type.id, type.code)}
+                    >
+                      <Trash2 size={18} color="#DC3545" />
+                    </TouchableOpacity>
+                  </View>
                 </View>
                 <View style={styles.housingDetails}>
                   <View style={styles.housingDetailRow}>
@@ -681,12 +713,20 @@ export default function ProjectParametersScreen() {
                       <Text style={styles.categoryBadgeText}>{type.category.toUpperCase()}</Text>
                     </View>
                   </View>
-                  <TouchableOpacity
-                    style={styles.deleteButton}
-                    onPress={() => handleDeleteEquipment(type.id, type.code)}
-                  >
-                    <Trash2 size={18} color="#DC3545" />
-                  </TouchableOpacity>
+                  <View style={styles.actionButtons}>
+                    <TouchableOpacity
+                      style={styles.editButton}
+                      onPress={() => handleEditEquipment(type)}
+                    >
+                      <Edit2 size={18} color="#007AFF" />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.deleteButton}
+                      onPress={() => handleDeleteEquipment(type.id, type.code)}
+                    >
+                      <Trash2 size={18} color="#DC3545" />
+                    </TouchableOpacity>
+                  </View>
                 </View>
                 <View style={styles.equipmentDetails}>
                   <View style={styles.equipmentDetailRow}>
@@ -717,6 +757,249 @@ export default function ProjectParametersScreen() {
           })}
         </View>
       </ScrollView>
+
+      <Modal
+        visible={editCostModalVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => {
+          setEditCostModalVisible(false);
+          setEditingCost(null);
+          setNewCostCode('');
+          setNewCostName('');
+          setNewCostGoldGrams('');
+        }}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Edit Construction Cost Type</Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Code (e.g., ZME)"
+              value={newCostCode}
+              onChangeText={setNewCostCode}
+              autoCapitalize="characters"
+            />
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Description"
+              value={newCostName}
+              onChangeText={setNewCostName}
+            />
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Gold Content (g Au/m²)"
+              value={newCostGoldGrams}
+              onChangeText={setNewCostGoldGrams}
+              keyboardType="decimal-pad"
+            />
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalCancelButton]}
+                onPress={() => {
+                  setEditCostModalVisible(false);
+                  setEditingCost(null);
+                  setNewCostCode('');
+                  setNewCostName('');
+                  setNewCostGoldGrams('');
+                }}
+              >
+                <Text style={styles.modalCancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalSaveButton]}
+                onPress={handleSaveEditCost}
+              >
+                <Text style={styles.modalSaveButtonText}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={editHousingModalVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => {
+          setEditHousingModalVisible(false);
+          setEditingHousing(null);
+          setNewHousingCode('');
+          setNewHousingName('');
+          setNewHousingArea('');
+          setNewHousingRent('');
+        }}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Edit Housing Type</Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Code (e.g., AMS)"
+              value={newHousingCode}
+              onChangeText={setNewHousingCode}
+              autoCapitalize="characters"
+            />
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Description"
+              value={newHousingName}
+              onChangeText={setNewHousingName}
+            />
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Default Area (m²)"
+              value={newHousingArea}
+              onChangeText={setNewHousingArea}
+              keyboardType="decimal-pad"
+            />
+            <View style={styles.pickerContainer}>
+              <Text style={styles.pickerLabel}>Cost Type:</Text>
+              <View style={styles.pickerOptions}>
+                {constructionCosts.map((cost) => (
+                  <TouchableOpacity
+                    key={cost.code}
+                    style={[
+                      styles.pickerOption,
+                      newHousingCostType === cost.code && styles.pickerOptionSelected,
+                    ]}
+                    onPress={() => setNewHousingCostType(cost.code)}
+                  >
+                    <Text
+                      style={[
+                        styles.pickerOptionText,
+                        newHousingCostType === cost.code && styles.pickerOptionTextSelected,
+                      ]}
+                    >
+                      {cost.code}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Default Monthly Rent (XOF)"
+              value={newHousingRent}
+              onChangeText={setNewHousingRent}
+              keyboardType="decimal-pad"
+            />
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalCancelButton]}
+                onPress={() => {
+                  setEditHousingModalVisible(false);
+                  setEditingHousing(null);
+                  setNewHousingCode('');
+                  setNewHousingName('');
+                  setNewHousingArea('');
+                  setNewHousingRent('');
+                }}
+              >
+                <Text style={styles.modalCancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalSaveButton]}
+                onPress={handleSaveEditHousing}
+              >
+                <Text style={styles.modalSaveButtonText}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={editEquipmentModalVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => {
+          setEditEquipmentModalVisible(false);
+          setEditingEquipment(null);
+          setNewEquipmentCode('');
+          setNewEquipmentName('');
+          setNewEquipmentLandArea('1800');
+          setNewEquipmentOccupation('0.3');
+        }}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Edit Equipment/Utility Type</Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Code (e.g., EQS)"
+              value={newEquipmentCode}
+              onChangeText={setNewEquipmentCode}
+              autoCapitalize="characters"
+            />
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Description"
+              value={newEquipmentName}
+              onChangeText={setNewEquipmentName}
+            />
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Land Area (m²)"
+              value={newEquipmentLandArea}
+              onChangeText={setNewEquipmentLandArea}
+              keyboardType="decimal-pad"
+            />
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Building Occupation (0-1, e.g., 0.3 for 30%)"
+              value={newEquipmentOccupation}
+              onChangeText={setNewEquipmentOccupation}
+              keyboardType="decimal-pad"
+            />
+            <View style={styles.pickerContainer}>
+              <Text style={styles.pickerLabel}>Cost Type:</Text>
+              <View style={styles.pickerOptions}>
+                {constructionCosts.map((cost) => (
+                  <TouchableOpacity
+                    key={cost.code}
+                    style={[
+                      styles.pickerOption,
+                      newEquipmentCostType === cost.code && styles.pickerOptionSelected,
+                    ]}
+                    onPress={() => setNewEquipmentCostType(cost.code)}
+                  >
+                    <Text
+                      style={[
+                        styles.pickerOptionText,
+                        newEquipmentCostType === cost.code && styles.pickerOptionTextSelected,
+                      ]}
+                    >
+                      {cost.code}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalCancelButton]}
+                onPress={() => {
+                  setEditEquipmentModalVisible(false);
+                  setEditingEquipment(null);
+                  setNewEquipmentCode('');
+                  setNewEquipmentName('');
+                  setNewEquipmentLandArea('1800');
+                  setNewEquipmentOccupation('0.3');
+                }}
+              >
+                <Text style={styles.modalCancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalSaveButton]}
+                onPress={handleSaveEditEquipment}
+              >
+                <Text style={styles.modalSaveButtonText}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       <Modal
         visible={addCostModalVisible}
@@ -1152,6 +1435,13 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#6C757D',
     lineHeight: 18,
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  editButton: {
+    padding: 4,
   },
   deleteButton: {
     padding: 4,
