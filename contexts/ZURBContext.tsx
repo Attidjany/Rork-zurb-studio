@@ -205,12 +205,93 @@ export const [ZURBContext, useZURB] = createContextHook(() => {
         if (error) throw error;
 
         console.log('[ZURB] Project deleted');
+        return true;
       } catch (error: any) {
         console.error('[ZURB] Error deleting project:', error);
         Alert.alert('Error', error.message || 'Failed to delete project');
+        return false;
       }
     },
     []
+  );
+
+  const duplicateProject = useCallback(
+    async (projectId: string) => {
+      try {
+        const original = projects.find(p => p.id === projectId);
+        if (!original) throw new Error('Project not found');
+
+        const { data, error } = await supabase
+          .from('projects')
+          .insert({
+            name: `${original.name} (Copy)`,
+            description: original.description,
+            owner_id: user!.id,
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        console.log('[ZURB] Project duplicated:', data);
+        return data;
+      } catch (error: any) {
+        console.error('[ZURB] Error duplicating project:', error);
+        Alert.alert('Error', error.message || 'Failed to duplicate project');
+        return null;
+      }
+    },
+    [projects, user]
+  );
+
+  const deleteSite = useCallback(
+    async (siteId: string) => {
+      try {
+        const { error } = await supabase
+          .from('sites')
+          .delete()
+          .eq('id', siteId);
+
+        if (error) throw error;
+
+        console.log('[ZURB] Site deleted');
+        return true;
+      } catch (error: any) {
+        console.error('[ZURB] Error deleting site:', error);
+        Alert.alert('Error', error.message || 'Failed to delete site');
+        return false;
+      }
+    },
+    []
+  );
+
+  const duplicateSite = useCallback(
+    async (siteId: string) => {
+      try {
+        const original = sites.find(s => s.id === siteId);
+        if (!original) throw new Error('Site not found');
+
+        const { data, error } = await supabase
+          .from('sites')
+          .insert({
+            project_id: original.project_id,
+            name: `${original.name} (Copy)`,
+            area_ha: original.area_ha,
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        console.log('[ZURB] Site duplicated:', data);
+        return data;
+      } catch (error: any) {
+        console.error('[ZURB] Error duplicating site:', error);
+        Alert.alert('Error', error.message || 'Failed to duplicate site');
+        return null;
+      }
+    },
+    [sites]
   );
 
   const createSite = useCallback(
@@ -291,6 +372,45 @@ export const [ZURBContext, useZURB] = createContextHook(() => {
     []
   );
 
+  const deleteScenario = useCallback(
+    (scenarioId: string) => {
+      setScenarios(prev => {
+        const newScenarios = { ...prev };
+        for (const siteId in newScenarios) {
+          newScenarios[siteId] = newScenarios[siteId].filter(scenario => scenario.id !== scenarioId);
+        }
+        return newScenarios;
+      });
+      return true;
+    },
+    []
+  );
+
+  const duplicateScenario = useCallback(
+    (scenarioId: string) => {
+      let duplicated: Scenario | null = null;
+      setScenarios(prev => {
+        const newScenarios = { ...prev };
+        for (const siteId in newScenarios) {
+          const original = newScenarios[siteId].find(s => s.id === scenarioId);
+          if (original) {
+            duplicated = {
+              ...original,
+              id: Date.now().toString(),
+              name: `${original.name} (Copy)`,
+              createdAt: new Date(),
+            };
+            newScenarios[siteId] = [...newScenarios[siteId], duplicated];
+            break;
+          }
+        }
+        return newScenarios;
+      });
+      return duplicated;
+    },
+    []
+  );
+
   const getSitesByProjectId = useCallback(
     (projectId: string) => {
       return sites.filter(s => s.project_id === projectId);
@@ -317,7 +437,10 @@ export const [ZURBContext, useZURB] = createContextHook(() => {
     createProject,
     updateProject,
     deleteProject,
+    duplicateProject,
     createSite,
+    deleteSite,
+    duplicateSite,
     getSitesByProjectId,
     updateCostParams,
     updateMixRules,
@@ -326,5 +449,9 @@ export const [ZURBContext, useZURB] = createContextHook(() => {
     getRentsMap,
     createScenario,
     updateScenario,
+    deleteScenario,
+    duplicateScenario,
+    loadProjects,
+    loadSites,
   };
 });

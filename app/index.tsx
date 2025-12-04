@@ -1,5 +1,5 @@
 import { Stack, useRouter } from 'expo-router';
-import { Settings, Plus } from 'lucide-react-native';
+import { Settings, Plus, Copy, Trash2 } from 'lucide-react-native';
 import React, { useState } from 'react';
 import {
   View,
@@ -10,6 +10,8 @@ import {
   Modal,
   TextInput,
   ActivityIndicator,
+  RefreshControl,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useZURB } from '@/contexts/ZURBContext';
@@ -25,11 +27,39 @@ type Project = {
 
 export default function ProjectsScreen() {
   const router = useRouter();
-  const { projects, isLoading, createProject } = useZURB();
+  const { projects, isLoading, createProject, loadProjects, deleteProject, duplicateProject } = useZURB();
   const [modalVisible, setModalVisible] = useState<boolean>(false);
   const [newProjectName, setNewProjectName] = useState<string>('');
   const [newProjectDesc, setNewProjectDesc] = useState<string>('');
   const [isCreating, setIsCreating] = useState<boolean>(false);
+  const [refreshing, setRefreshing] = useState<boolean>(false);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await loadProjects();
+    setRefreshing(false);
+  };
+
+  const handleDelete = async (projectId: string) => {
+    Alert.alert(
+      'Delete Project',
+      'Are you sure you want to delete this project? This will also delete all associated sites.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            await deleteProject(projectId);
+          },
+        },
+      ]
+    );
+  };
+
+  const handleDuplicate = async (projectId: string) => {
+    await duplicateProject(projectId);
+  };
 
   const handleCreateProject = async () => {
     if (newProjectName.trim()) {
@@ -48,23 +78,41 @@ export default function ProjectsScreen() {
   };
 
   const renderProject = ({ item }: { item: Project }) => (
-    <TouchableOpacity
-      style={styles.projectCard}
-      onPress={() => router.push({ pathname: '/project/[id]', params: { id: item.id } } as any)}
-      testID={`project-${item.id}`}
-    >
-      <View style={styles.projectHeader}>
-        <Text style={styles.projectName}>{item.name}</Text>
-      </View>
-      {item.description ? (
-        <Text style={styles.projectDesc} numberOfLines={2}>
-          {item.description}
+    <View style={styles.projectCard}>
+      <TouchableOpacity
+        style={styles.projectCardMain}
+        onPress={() => router.push({ pathname: '/project/[id]', params: { id: item.id } } as any)}
+        testID={`project-${item.id}`}
+      >
+        <View style={styles.projectHeader}>
+          <Text style={styles.projectName}>{item.name}</Text>
+        </View>
+        {item.description ? (
+          <Text style={styles.projectDesc} numberOfLines={2}>
+            {item.description}
+          </Text>
+        ) : null}
+        <Text style={styles.projectDate}>
+          {new Date(item.created_at).toLocaleDateString()}
         </Text>
-      ) : null}
-      <Text style={styles.projectDate}>
-        {new Date(item.created_at).toLocaleDateString()}
-      </Text>
-    </TouchableOpacity>
+      </TouchableOpacity>
+      <View style={styles.projectActions}>
+        <TouchableOpacity
+          style={styles.actionBtn}
+          onPress={() => handleDuplicate(item.id)}
+          testID={`duplicate-project-${item.id}`}
+        >
+          <Copy size={18} color="#007AFF" />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.actionBtn}
+          onPress={() => handleDelete(item.id)}
+          testID={`delete-project-${item.id}`}
+        >
+          <Trash2 size={18} color="#FF3B30" />
+        </TouchableOpacity>
+      </View>
+    </View>
   );
 
   if (isLoading) {
@@ -108,6 +156,9 @@ export default function ProjectsScreen() {
             keyExtractor={item => item.id}
             contentContainerStyle={styles.listContainer}
             showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+            }
           />
         )}
 
@@ -206,13 +257,33 @@ const styles = StyleSheet.create({
   projectCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
-    padding: 16,
     marginBottom: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+    overflow: 'hidden',
+  },
+  projectCardMain: {
+    padding: 16,
+  },
+  projectActions: {
+    flexDirection: 'row',
+    borderTopWidth: 1,
+    borderTopColor: '#F5F5F7',
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+    gap: 8,
+  },
+  actionBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    borderRadius: 6,
+    backgroundColor: '#F5F5F7',
   },
   projectHeader: {
     flexDirection: 'row',

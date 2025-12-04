@@ -1,7 +1,7 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { Plus, FileText } from 'lucide-react-native';
+import { Plus, FileText, Copy, Trash2 } from 'lucide-react-native';
 import React, { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, TextInput } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, TextInput, RefreshControl, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useZURB } from '@/contexts/ZURBContext';
 import { DEFAULT_TYPOLOGIES } from '@/constants/typologies';
@@ -9,10 +9,38 @@ import { DEFAULT_TYPOLOGIES } from '@/constants/typologies';
 export default function SiteScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { sites, scenarios, createScenario } = useZURB();
+  const { sites, scenarios, createScenario, loadSites, deleteScenario, duplicateScenario } = useZURB();
   const [modalVisible, setModalVisible] = useState<boolean>(false);
   const [scenarioName, setScenarioName] = useState<string>('');
   const [scenarioNotes, setScenarioNotes] = useState<string>('');
+  const [refreshing, setRefreshing] = useState<boolean>(false);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await loadSites();
+    setRefreshing(false);
+  };
+
+  const handleDeleteScenario = (scenarioId: string) => {
+    Alert.alert(
+      'Delete Scenario',
+      'Are you sure you want to delete this scenario?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            deleteScenario(scenarioId);
+          },
+        },
+      ]
+    );
+  };
+
+  const handleDuplicateScenario = (scenarioId: string) => {
+    duplicateScenario(scenarioId);
+  };
 
   const site = useMemo(() => {
     return sites.find(s => s.id === id) || null;
@@ -49,7 +77,13 @@ export default function SiteScreen() {
         }}
       />
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.content}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+        }
+      >
 
         <View style={styles.infoCard}>
           <View style={styles.infoRow}>
@@ -88,30 +122,47 @@ export default function SiteScreen() {
           ) : (
             <View style={styles.scenariosList}>
               {siteScenarios.map(scenario => (
-                <TouchableOpacity
-                  key={scenario.id}
-                  style={styles.scenarioCard}
-                  onPress={() => {
-                    router.push({ pathname: '/scenario/[id]', params: { id: scenario.id } } as any);
-                  }}
-                  testID={`scenario-${scenario.id}`}
-                >
-                  <View style={styles.scenarioHeader}>
-                    <FileText size={18} color="#007AFF" />
-                    <Text style={styles.scenarioName}>{scenario.name}</Text>
+                <View key={scenario.id} style={styles.scenarioCard}>
+                  <TouchableOpacity
+                    style={styles.scenarioCardMain}
+                    onPress={() => {
+                      router.push({ pathname: '/scenario/[id]', params: { id: scenario.id } } as any);
+                    }}
+                    testID={`scenario-${scenario.id}`}
+                  >
+                    <View style={styles.scenarioHeader}>
+                      <FileText size={18} color="#007AFF" />
+                      <Text style={styles.scenarioName}>{scenario.name}</Text>
+                    </View>
+                    {scenario.notes ? (
+                      <Text style={styles.scenarioNotes} numberOfLines={2}>
+                        {scenario.notes}
+                      </Text>
+                    ) : null}
+                    <View style={styles.scenarioFooter}>
+                      <Text style={styles.scenarioItems}>{scenario.items.length} items</Text>
+                      <Text style={styles.scenarioDate}>
+                        {new Date(scenario.createdAt).toLocaleDateString()}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                  <View style={styles.scenarioActions}>
+                    <TouchableOpacity
+                      style={styles.actionBtn}
+                      onPress={() => handleDuplicateScenario(scenario.id)}
+                      testID={`duplicate-scenario-${scenario.id}`}
+                    >
+                      <Copy size={16} color="#007AFF" />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.actionBtn}
+                      onPress={() => handleDeleteScenario(scenario.id)}
+                      testID={`delete-scenario-${scenario.id}`}
+                    >
+                      <Trash2 size={16} color="#FF3B30" />
+                    </TouchableOpacity>
                   </View>
-                  {scenario.notes ? (
-                    <Text style={styles.scenarioNotes} numberOfLines={2}>
-                      {scenario.notes}
-                    </Text>
-                  ) : null}
-                  <View style={styles.scenarioFooter}>
-                    <Text style={styles.scenarioItems}>{scenario.items.length} items</Text>
-                    <Text style={styles.scenarioDate}>
-                      {new Date(scenario.createdAt).toLocaleDateString()}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
+                </View>
               ))}
             </View>
           )}
@@ -336,12 +387,32 @@ const styles = StyleSheet.create({
   scenarioCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
-    padding: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+    overflow: 'hidden',
+  },
+  scenarioCardMain: {
+    padding: 16,
+  },
+  scenarioActions: {
+    flexDirection: 'row',
+    borderTopWidth: 1,
+    borderTopColor: '#F5F5F7',
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    gap: 8,
+  },
+  actionBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 6,
+    borderRadius: 6,
+    backgroundColor: '#F5F5F7',
   },
   scenarioHeader: {
     flexDirection: 'row',

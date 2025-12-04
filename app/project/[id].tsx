@@ -1,5 +1,5 @@
 import { Stack, useRouter, useLocalSearchParams } from 'expo-router';
-import { Plus, MapPin } from 'lucide-react-native';
+import { Plus, MapPin, Copy, Trash2 } from 'lucide-react-native';
 import React, { useState } from 'react';
 import {
   View,
@@ -11,6 +11,8 @@ import {
   TextInput,
   ScrollView,
   ActivityIndicator,
+  RefreshControl,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useZURB } from '@/contexts/ZURBContext';
@@ -27,11 +29,39 @@ type Site = {
 export default function ProjectScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { projects, getSitesByProjectId, createSite, isLoading } = useZURB();
+  const { projects, getSitesByProjectId, createSite, isLoading, loadSites, deleteSite, duplicateSite } = useZURB();
   const [modalVisible, setModalVisible] = useState<boolean>(false);
   const [siteName, setSiteName] = useState<string>('');
   const [siteArea, setSiteArea] = useState<string>('');
   const [isCreating, setIsCreating] = useState<boolean>(false);
+  const [refreshing, setRefreshing] = useState<boolean>(false);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await loadSites();
+    setRefreshing(false);
+  };
+
+  const handleDeleteSite = async (siteId: string) => {
+    Alert.alert(
+      'Delete Site',
+      'Are you sure you want to delete this site?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            await deleteSite(siteId);
+          },
+        },
+      ]
+    );
+  };
+
+  const handleDuplicateSite = async (siteId: string) => {
+    await duplicateSite(siteId);
+  };
 
   const project = projects.find(p => p.id === id);
   const projectSites = getSitesByProjectId(id || '');
@@ -60,21 +90,39 @@ export default function ProjectScreen() {
   };
 
   const renderSite = ({ item }: { item: Site }) => (
-    <TouchableOpacity
-      style={styles.siteCard}
-      onPress={() => {
-        router.push({ pathname: '/site/[id]', params: { id: item.id } } as any);
-      }}
-      testID={`site-${item.id}`}
-    >
-      <View style={styles.siteHeader}>
-        <MapPin size={20} color="#007AFF" />
-        <Text style={styles.siteName}>{item.name}</Text>
+    <View style={styles.siteCard}>
+      <TouchableOpacity
+        style={styles.siteCardMain}
+        onPress={() => {
+          router.push({ pathname: '/site/[id]', params: { id: item.id } } as any);
+        }}
+        testID={`site-${item.id}`}
+      >
+        <View style={styles.siteHeader}>
+          <MapPin size={20} color="#007AFF" />
+          <Text style={styles.siteName}>{item.name}</Text>
+        </View>
+        {item.area_ha && (
+          <Text style={styles.siteArea}>{item.area_ha.toFixed(2)} ha</Text>
+        )}
+      </TouchableOpacity>
+      <View style={styles.siteActions}>
+        <TouchableOpacity
+          style={styles.actionBtn}
+          onPress={() => handleDuplicateSite(item.id)}
+          testID={`duplicate-site-${item.id}`}
+        >
+          <Copy size={16} color="#007AFF" />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.actionBtn}
+          onPress={() => handleDeleteSite(item.id)}
+          testID={`delete-site-${item.id}`}
+        >
+          <Trash2 size={16} color="#FF3B30" />
+        </TouchableOpacity>
       </View>
-      {item.area_ha && (
-        <Text style={styles.siteArea}>{item.area_ha.toFixed(2)} ha</Text>
-      )}
-    </TouchableOpacity>
+    </View>
   );
 
   if (isLoading) {
@@ -102,7 +150,13 @@ export default function ProjectScreen() {
         }}
       />
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.content}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+        }
+      >
         {project.description ? (
           <View style={styles.descriptionCard}>
             <Text style={styles.descriptionLabel}>Description</Text>
@@ -252,12 +306,32 @@ const styles = StyleSheet.create({
   siteCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
-    padding: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+    overflow: 'hidden',
+  },
+  siteCardMain: {
+    padding: 16,
+  },
+  siteActions: {
+    flexDirection: 'row',
+    borderTopWidth: 1,
+    borderTopColor: '#F5F5F7',
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    gap: 8,
+  },
+  actionBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 6,
+    borderRadius: 6,
+    backgroundColor: '#F5F5F7',
   },
   siteHeader: {
     flexDirection: 'row',
