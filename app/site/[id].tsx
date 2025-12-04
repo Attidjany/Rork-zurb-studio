@@ -38,6 +38,7 @@ export default function SiteScreen() {
     loadSites,
     loadBlocks,
     loadHalfBlocks,
+    loadScenarios,
     updateHalfBlock,
     createUnit,
   } = useZURB();
@@ -51,7 +52,7 @@ export default function SiteScreen() {
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await Promise.all([loadSites(), loadBlocks(), loadHalfBlocks()]);
+    await Promise.all([loadSites(), loadBlocks(), loadHalfBlocks(), loadScenarios()]);
     setRefreshing(false);
   };
 

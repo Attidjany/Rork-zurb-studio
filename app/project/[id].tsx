@@ -29,7 +29,7 @@ type Site = {
 export default function ProjectScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { projects, getSitesByProjectId, createSite, isLoading, loadSites, deleteSite, duplicateSite } = useZURB();
+  const { projects, getSitesByProjectId, createSite, isLoading, loadSites, loadProjects, deleteSite, duplicateSite } = useZURB();
   const [modalVisible, setModalVisible] = useState<boolean>(false);
   const [siteName, setSiteName] = useState<string>('');
   const [siteArea, setSiteArea] = useState<string>('');
@@ -38,7 +38,7 @@ export default function ProjectScreen() {
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await loadSites();
+    await Promise.all([loadProjects(), loadSites()]);
     setRefreshing(false);
   };
 

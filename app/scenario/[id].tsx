@@ -1,12 +1,15 @@
 import { Stack, useLocalSearchParams } from 'expo-router';
-import React, { useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useZURB } from '@/contexts/ZURBContext';
 import {
+  UNIT_BUILD_AREAS,
   UNIT_COSTS_PER_M2,
   UNIT_RENTS_MONTHLY,
   DEFAULT_LEASE_YEARS,
+  BUILDING_TYPES,
+  VILLA_LAYOUTS,
 } from '@/constants/typologies';
 import { DbBlock, DbHalfBlock, DbUnit } from '@/types';
 
@@ -18,7 +21,19 @@ export default function ScenarioScreen() {
     getBlocksBySiteId,
     getHalfBlocksByBlockId,
     getUnitsByHalfBlockId,
+    loadScenarios,
+    loadBlocks,
+    loadHalfBlocks,
+    loadUnits,
   } = useZURB();
+
+  const [refreshing, setRefreshing] = useState<boolean>(false);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await Promise.all([loadScenarios(), loadBlocks(), loadHalfBlocks(), loadUnits()]);
+    setRefreshing(false);
+  };
 
   const scenario = useMemo(() => {
     return scenarios.find(s => s.id === id) || null;
@@ -47,30 +62,44 @@ export default function ScenarioScreen() {
       halfBlocks.forEach((hb: DbHalfBlock) => {
         const units = getUnitsByHalfBlockId(hb.id);
 
-        units.forEach((unit: DbUnit) => {
-          if (unit.unit_type === 'villa') {
-            totalResidentialUnits += 1;
-            const sizeKey = `villa_${unit.size_m2}` as string;
-            unitsByType[sizeKey] = (unitsByType[sizeKey] || 0) + 1;
+        if (hb.type === 'villas' && hb.villa_layout) {
+          const layout = VILLA_LAYOUTS.find(l => l.id === hb.villa_layout);
+          if (layout) {
+            layout.plots.forEach(plot => {
+              const plotSizeKey = `villa_${plot.size}`;
+              totalResidentialUnits += plot.count;
+              unitsByType[plotSizeKey] = (unitsByType[plotSizeKey] || 0) + plot.count;
 
-            const costPerM2 = UNIT_COSTS_PER_M2[sizeKey] || 1000;
-            const rentMonthly = UNIT_RENTS_MONTHLY[sizeKey] || 500;
+              const buildArea = UNIT_BUILD_AREAS[plotSizeKey] || plot.size * 0.3;
+              const costPerM2 = UNIT_COSTS_PER_M2[plotSizeKey] || 1000;
+              const rentMonthly = UNIT_RENTS_MONTHLY[plotSizeKey] || 500;
 
-            totalBuildArea += unit.size_m2 || 0;
-            totalCosts += (unit.size_m2 || 0) * costPerM2;
-            totalRevenue += rentMonthly * 12 * DEFAULT_LEASE_YEARS;
-          } else if (unit.building_type && ['AM1', 'AM2', 'AH'].includes(unit.building_type)) {
-            const buildingUnits: { [key: string]: number } = {
-              AM1: 30,
-              AM2: 30,
-              AH: 25,
-            };
-            const unitsCount = buildingUnits[unit.building_type] || 0;
-            totalResidentialUnits += unitsCount;
-
-            unitsByType[unit.building_type] = (unitsByType[unit.building_type] || 0) + unitsCount;
+              totalBuildArea += buildArea * plot.count;
+              totalCosts += buildArea * costPerM2 * plot.count;
+              totalRevenue += rentMonthly * 12 * DEFAULT_LEASE_YEARS * plot.count;
+            });
           }
-        });
+        } else if (hb.type === 'apartments') {
+          units.forEach((unit: DbUnit) => {
+            if (unit.building_type && ['AM1', 'AM2', 'AH'].includes(unit.building_type)) {
+              const buildingConfig = BUILDING_TYPES.find(bt => bt.id === unit.building_type);
+              if (buildingConfig?.units) {
+                Object.entries(buildingConfig.units).forEach(([unitType, count]) => {
+                  totalResidentialUnits += count;
+                  unitsByType[unitType] = (unitsByType[unitType] || 0) + count;
+
+                  const buildArea = UNIT_BUILD_AREAS[unitType] || 80;
+                  const costPerM2 = UNIT_COSTS_PER_M2[unitType] || 900;
+                  const rentMonthly = UNIT_RENTS_MONTHLY[unitType] || 400;
+
+                  totalBuildArea += buildArea * count;
+                  totalCosts += buildArea * costPerM2 * count;
+                  totalRevenue += rentMonthly * 12 * DEFAULT_LEASE_YEARS * count;
+                });
+              }
+            }
+          });
+        }
       });
     });
 
@@ -103,7 +132,13 @@ export default function ScenarioScreen() {
         }}
       />
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.content}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+        }
+      >
         <View style={styles.summaryCard}>
           <Text style={styles.summaryTitle}>Scenario Summary</Text>
 

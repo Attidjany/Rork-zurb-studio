@@ -90,6 +90,17 @@ export const UTILITY_OPTIONS: UtilityOption[] = [
   { id: 'maintenance', name: 'Maintenance Depot' },
 ];
 
+export const UNIT_BUILD_AREAS: { [key: string]: number } = {
+  XM: 50,
+  AMS: 75,
+  AML: 100,
+  AH: 120,
+  villa_200: 150,
+  villa_300: 200,
+  villa_500: 300,
+  villa_1000: 500,
+};
+
 export const UNIT_COSTS_PER_M2: { [key: string]: number } = {
   XM: 800,
   AMS: 900,
