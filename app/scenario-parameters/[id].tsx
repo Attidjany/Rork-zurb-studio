@@ -85,10 +85,12 @@ export default function ScenarioParametersScreen() {
   }, [getScenarioCostParamsByScenarioId, scenario]);
 
   const mergedParams = useMemo(() => {
-    return projectParams.map(pp => {
+    const merged = projectParams.map(pp => {
       const override = scenarioParams.find(sp => sp.unit_type === pp.unit_type);
       return override || pp;
     });
+    console.log('[ScenarioParameters] Merged params:', merged.length);
+    return merged;
   }, [projectParams, scenarioParams]);
 
   const handleRefresh = useCallback(async () => {
@@ -201,6 +203,14 @@ export default function ScenarioParametersScreen() {
           <Text style={styles.sectionDesc}>
             Configure costs and rents specific to this scenario
           </Text>
+
+          {mergedParams.length === 0 && (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyStateText}>
+                No cost parameters found. Pull down to refresh or check your project setup.
+              </Text>
+            </View>
+          )}
 
           {mergedParams.map(param => {
             const isEditing = editingParam === param.unit_type;
@@ -601,5 +611,19 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600' as const,
     color: '#FFFFFF',
+  },
+  emptyState: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 16,
+  },
+  emptyStateText: {
+    fontSize: 15,
+    color: '#6C757D',
+    textAlign: 'center',
+    lineHeight: 22,
   },
 });

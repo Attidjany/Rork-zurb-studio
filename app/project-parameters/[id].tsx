@@ -54,10 +54,13 @@ export default function ProjectParametersScreen() {
   }, [projects, id]);
 
   const costParams = useMemo(() => {
-    return getProjectCostParamsByProjectId(id || '');
+    const params = getProjectCostParamsByProjectId(id || '');
+    console.log('[ProjectParameters] Cost params for project', id, ':', params.length);
+    return params;
   }, [getProjectCostParamsByProjectId, id]);
 
   const handleRefresh = useCallback(async () => {
+    console.log('[ProjectParameters] Refreshing...');
     setRefreshing(true);
     await loadProjectCostParams();
     setRefreshing(false);
@@ -184,6 +187,14 @@ export default function ProjectParametersScreen() {
           <Text style={styles.sectionDesc}>
             Configure default costs and rents for each unit type
           </Text>
+
+          {costParams.length === 0 && (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyStateText}>
+                No cost parameters found. Pull down to refresh or check your project setup.
+              </Text>
+            </View>
+          )}
 
           {costParams.map(param => {
             const isEditing = editingParam === param.id;
@@ -564,5 +575,19 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600' as const,
     color: '#FFFFFF',
+  },
+  emptyState: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 16,
+  },
+  emptyStateText: {
+    fontSize: 15,
+    color: '#6C757D',
+    textAlign: 'center',
+    lineHeight: 22,
   },
 });
