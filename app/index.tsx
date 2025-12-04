@@ -1,6 +1,6 @@
 import { Stack, useRouter } from 'expo-router';
 import { Settings, Plus } from 'lucide-react-native';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -14,6 +14,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { trpc } from '@/lib/trpc';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/contexts/AuthContext';
 
 type Project = {
   id: string;
@@ -26,11 +28,11 @@ type Project = {
 
 export default function ProjectsScreen() {
   const router = useRouter();
+  const { user } = useAuth();
   const projectsQuery = trpc.projects.list.useQuery();
   const createProjectMutation = trpc.projects.create.useMutation({
     onSuccess: () => {
       console.log('[Projects] Project created successfully');
-      projectsQuery.refetch();
       setNewProjectName('');
       setNewProjectDesc('');
       setModalVisible(false);
@@ -43,6 +45,36 @@ export default function ProjectsScreen() {
   const [modalVisible, setModalVisible] = useState<boolean>(false);
   const [newProjectName, setNewProjectName] = useState<string>('');
   const [newProjectDesc, setNewProjectDesc] = useState<string>('');
+
+  useEffect(() => {
+    if (!user) return;
+
+    console.log('[Projects] Setting up realtime subscription for user:', user.id);
+    
+    const channel = supabase
+      .channel('projects-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'projects',
+          filter: `owner_id=eq.${user.id}`,
+        },
+        (payload) => {
+          console.log('[Projects] Realtime update:', payload);
+          projectsQuery.refetch();
+        }
+      )
+      .subscribe((status) => {
+        console.log('[Projects] Realtime subscription status:', status);
+      });
+
+    return () => {
+      console.log('[Projects] Cleaning up realtime subscription');
+      supabase.removeChannel(channel);
+    };
+  }, [user, projectsQuery]);
 
   const handleCreateProject = () => {
     if (newProjectName.trim()) {
