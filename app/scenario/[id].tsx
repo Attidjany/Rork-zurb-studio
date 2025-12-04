@@ -12,7 +12,7 @@ import {
   VILLA_LAYOUTS,
   HOUSING_TYPES,
 } from '@/constants/typologies';
-import { DbBlock, DbHalfBlock, DbUnit } from '@/types';
+import { DbBlock, DbHalfBlock } from '@/types';
 
 export default function ScenarioScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -106,28 +106,27 @@ export default function ScenarioScreen() {
               totalRevenue += rentMonthly * 12 * DEFAULT_LEASE_YEARS * plot.count;
             });
           }
-        } else if (hb.type === 'apartments') {
-          units.forEach((unit: DbUnit) => {
-            if (unit.building_type && ['AB1', 'AB2', 'ABH'].includes(unit.building_type)) {
-              const buildingConfig = BUILDING_TYPES.find(bt => bt.id === unit.building_type);
-              if (buildingConfig?.units) {
-                Object.entries(buildingConfig.units).forEach(([unitType, count]) => {
-                  totalResidentialUnits += count;
-                  unitsByType[unitType] = (unitsByType[unitType] || 0) + count;
+        } else if (hb.type === 'apartments' && hb.apartment_layout) {
+          const buildingConfig = BUILDING_TYPES.find(bt => bt.id === hb.apartment_layout);
+          if (buildingConfig?.units) {
+            Object.entries(buildingConfig.units).forEach(([unitType, count]) => {
+              const numBuildings = units.filter(u => u.unit_type === 'apartment').length;
+              const totalCount = count * numBuildings;
+              
+              totalResidentialUnits += totalCount;
+              unitsByType[unitType] = (unitsByType[unitType] || 0) + totalCount;
 
-                  const costParam = costParams.find(cp => cp.unit_type === unitType);
-                  const housingConfig = HOUSING_TYPES[unitType];
-                  const buildArea = costParam ? costParam.build_area_m2 : (housingConfig?.defaultArea || 80);
-                  const costPerM2 = costParam ? costParam.cost_per_m2 : 900;
-                  const rentMonthly = costParam ? costParam.rent_monthly : (housingConfig?.defaultRent || 400);
+              const costParam = costParams.find(cp => cp.unit_type === unitType);
+              const housingConfig = HOUSING_TYPES[unitType];
+              const buildArea = costParam ? costParam.build_area_m2 : (housingConfig?.defaultArea || 80);
+              const costPerM2 = costParam ? costParam.cost_per_m2 : 900;
+              const rentMonthly = costParam ? costParam.rent_monthly : (housingConfig?.defaultRent || 400);
 
-                  totalBuildArea += buildArea * count;
-                  totalCosts += buildArea * costPerM2 * count;
-                  totalRevenue += rentMonthly * 12 * DEFAULT_LEASE_YEARS * count;
-                });
-              }
-            }
-          });
+              totalBuildArea += buildArea * totalCount;
+              totalCosts += buildArea * costPerM2 * totalCount;
+              totalRevenue += rentMonthly * 12 * DEFAULT_LEASE_YEARS * totalCount;
+            });
+          }
         }
       });
     });

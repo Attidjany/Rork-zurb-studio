@@ -37,12 +37,35 @@ export const VILLA_LAYOUTS: VillaLayoutConfig[] = [
   },
 ];
 
-export const APARTMENT_LAYOUT: ApartmentLayoutConfig = {
-  totalBuildings: 13,
-  apartmentBuildings: 10,
-  equipmentSpots: 2,
-  utilitySpots: 1,
-};
+export const APARTMENT_LAYOUTS: ApartmentLayoutConfig[] = [
+  {
+    id: 'AB1',
+    name: 'Apartment Building Type AB1',
+    description: '10x AB1 buildings (18 AMS + 4 AML + 6 XM each) + 2 equipment + 1 utility',
+    totalBuildings: 13,
+    apartmentBuildings: 10,
+    equipmentSpots: 2,
+    utilitySpots: 1,
+  },
+  {
+    id: 'AB2',
+    name: 'Apartment Building Type AB2',
+    description: '10x AB2 buildings (16 AML + 6 XM each) + 2 equipment + 1 utility',
+    totalBuildings: 13,
+    apartmentBuildings: 10,
+    equipmentSpots: 2,
+    utilitySpots: 1,
+  },
+  {
+    id: 'ABH',
+    name: 'Apartment Building Type ABH',
+    description: '10x ABH buildings (12 AH + 6 XH each) + 2 equipment + 1 utility',
+    totalBuildings: 13,
+    apartmentBuildings: 10,
+    equipmentSpots: 2,
+    utilitySpots: 1,
+  },
+];
 
 export const BUILDING_TYPES: BuildingTypeConfig[] = [
   {

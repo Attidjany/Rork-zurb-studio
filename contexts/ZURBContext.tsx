@@ -13,6 +13,7 @@ import {
   DbProjectCostParam,
   DbScenarioCostParam,
   VillaLayout,
+  ApartmentLayout,
   HalfBlockType,
   BuildingType,
 } from '@/types';
@@ -543,7 +544,8 @@ export const [ZURBContext, useZURB] = createContextHook(() => {
     async (
       halfBlockId: string,
       type: HalfBlockType,
-      villaLayout?: VillaLayout
+      villaLayout?: VillaLayout,
+      apartmentLayout?: ApartmentLayout
     ) => {
       try {
         const { error } = await supabase
@@ -551,6 +553,7 @@ export const [ZURBContext, useZURB] = createContextHook(() => {
           .update({
             type,
             villa_layout: villaLayout || null,
+            apartment_layout: apartmentLayout || null,
           })
           .eq('id', halfBlockId);
 

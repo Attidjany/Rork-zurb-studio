@@ -15,12 +15,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useZURB } from '@/contexts/ZURBContext';
 import {
   VILLA_LAYOUTS,
-  APARTMENT_LAYOUT,
+  APARTMENT_LAYOUTS,
   BUILDING_TYPES,
   EQUIPMENT_OPTIONS,
   UTILITY_OPTIONS,
 } from '@/constants/typologies';
-import { DbBlock, DbHalfBlock, VillaLayout, HalfBlockType, BuildingType } from '@/types';
+import { DbBlock, DbHalfBlock, VillaLayout, ApartmentLayout, HalfBlockType, BuildingType } from '@/types';
 
 export default function SiteScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -63,53 +63,13 @@ export default function SiteScreen() {
   const openHalfBlockConfig = useCallback((halfBlock: DbHalfBlock, block: DbBlock) => {
     setSelectedHalfBlock(halfBlock);
     setSelectedBlock(block);
-    
-    if (halfBlock.type === 'apartments') {
-      setBuildingAssignModalVisible(true);
-    } else {
-      setConfigModalVisible(true);
-    }
+    setConfigModalVisible(true);
   }, []);
 
   const handleSelectType = useCallback(async (type: HalfBlockType) => {
     if (!selectedHalfBlock) return;
-
     await updateHalfBlock(selectedHalfBlock.id, type);
-    
-    if (type === 'apartments') {
-      const units = getUnitsByHalfBlockId(selectedHalfBlock.id);
-      if (units.length === 0) {
-        for (let i = 0; i < APARTMENT_LAYOUT.totalBuildings; i++) {
-          let unitType = 'apartment';
-          let buildingType: BuildingType | undefined = undefined;
-          
-          if (i < APARTMENT_LAYOUT.apartmentBuildings) {
-            unitType = 'apartment';
-          } else if (i < APARTMENT_LAYOUT.apartmentBuildings + APARTMENT_LAYOUT.equipmentSpots) {
-            unitType = 'equipment';
-            buildingType = 'equipment';
-          } else {
-            unitType = 'utility';
-            buildingType = 'utility';
-          }
-          
-          await createUnit(
-            selectedHalfBlock.id,
-            i + 1,
-            unitType,
-            undefined,
-            buildingType,
-            undefined,
-            undefined
-          );
-        }
-      }
-    }
-    
-    setConfigModalVisible(false);
-    setSelectedHalfBlock(null);
-    setSelectedBlock(null);
-  }, [selectedHalfBlock, updateHalfBlock, getUnitsByHalfBlockId, createUnit]);
+  }, [selectedHalfBlock, updateHalfBlock]);
 
   const handleSelectVillaLayout = useCallback(async (layout: VillaLayout) => {
     if (!selectedHalfBlock) return;
@@ -118,6 +78,43 @@ export default function SiteScreen() {
     setSelectedHalfBlock(null);
     setSelectedBlock(null);
   }, [selectedHalfBlock, updateHalfBlock]);
+
+  const handleSelectApartmentLayout = useCallback(async (layout: ApartmentLayout) => {
+    if (!selectedHalfBlock) return;
+    await updateHalfBlock(selectedHalfBlock.id, 'apartments', undefined, layout);
+    
+    const units = getUnitsByHalfBlockId(selectedHalfBlock.id);
+    const apartmentConfig = APARTMENT_LAYOUTS.find(l => l.id === layout);
+    
+    if (units.length === 0 && apartmentConfig) {
+      for (let i = 0; i < apartmentConfig.totalBuildings; i++) {
+        let unitType = 'apartment';
+        let buildingType: BuildingType = layout;
+        
+        if (i >= apartmentConfig.apartmentBuildings && i < apartmentConfig.apartmentBuildings + apartmentConfig.equipmentSpots) {
+          unitType = 'equipment';
+          buildingType = 'equipment';
+        } else if (i >= apartmentConfig.apartmentBuildings + apartmentConfig.equipmentSpots) {
+          unitType = 'utility';
+          buildingType = 'utility';
+        }
+        
+        await createUnit(
+          selectedHalfBlock.id,
+          i + 1,
+          unitType,
+          undefined,
+          buildingType,
+          undefined,
+          undefined
+        );
+      }
+    }
+    
+    setConfigModalVisible(false);
+    setSelectedHalfBlock(null);
+    setSelectedBlock(null);
+  }, [selectedHalfBlock, updateHalfBlock, getUnitsByHalfBlockId, createUnit]);
 
   const toggleBulkSelect = useCallback((halfBlockId: string) => {
     setSelectedHalfBlocks(prev => {
@@ -275,6 +272,11 @@ export default function SiteScreen() {
                                     {VILLA_LAYOUTS.find(l => l.id === northHB.villa_layout)?.name}
                                   </Text>
                                 )}
+                                {northHB.apartment_layout && (
+                                  <Text style={styles.halfBlockSubtype}>
+                                    {APARTMENT_LAYOUTS.find(l => l.id === northHB.apartment_layout)?.name}
+                                  </Text>
+                                )}
                               </>
                             ) : (
                               <Text style={styles.halfBlockPlaceholder}>Tap to configure</Text>
@@ -326,6 +328,11 @@ export default function SiteScreen() {
                                 {southHB.villa_layout && (
                                   <Text style={styles.halfBlockSubtype}>
                                     {VILLA_LAYOUTS.find(l => l.id === southHB.villa_layout)?.name}
+                                  </Text>
+                                )}
+                                {southHB.apartment_layout && (
+                                  <Text style={styles.halfBlockSubtype}>
+                                    {APARTMENT_LAYOUTS.find(l => l.id === southHB.apartment_layout)?.name}
                                   </Text>
                                 )}
                               </>
@@ -401,6 +408,24 @@ export default function SiteScreen() {
                     <Text style={styles.layoutOptionTitle}>{layout.name}</Text>
                     <Text style={styles.layoutOptionDesc}>{layout.description}</Text>
                     <Text style={styles.layoutOptionUnits}>{layout.totalUnits} units</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            ) : selectedHalfBlock.type === 'apartments' ? (
+              <View style={styles.optionsContainer}>
+                {APARTMENT_LAYOUTS.map(layout => (
+                  <TouchableOpacity
+                    key={layout.id}
+                    style={[
+                      styles.layoutOption,
+                      selectedHalfBlock.apartment_layout === layout.id && styles.layoutOptionSelected,
+                    ]}
+                    onPress={() => handleSelectApartmentLayout(layout.id)}
+                    testID={`apartment-layout-${layout.id}`}
+                  >
+                    <Text style={styles.layoutOptionTitle}>{layout.name}</Text>
+                    <Text style={styles.layoutOptionDesc}>{layout.description}</Text>
+                    <Text style={styles.layoutOptionUnits}>{layout.totalBuildings} buildings</Text>
                   </TouchableOpacity>
                 ))}
               </View>
