@@ -1,5 +1,15 @@
 # ZURB Studio - Vercel Deployment Guide
 
+## Architecture Overview
+
+**Important**: Only the backend API is deployed to Vercel. The mobile app runs locally or on devices via Expo Go.
+
+- **Backend API**: Runs on Vercel at `https://zurbstudio.vercel.app`
+- **Mobile App**: Runs locally via `bun start`, connects to Vercel backend
+- **Development**: You develop locally, the app talks to your deployed Vercel backend
+
+# ZURB Studio - Vercel Deployment Guide
+
 ## Critical Environment Variables
 
 You MUST set these environment variables in Vercel for the app to work:
@@ -15,7 +25,7 @@ You MUST set these environment variables in Vercel for the app to work:
    - Environment: Production, Preview, Development
 
 3. **EXPO_PUBLIC_RORK_API_BASE_URL**
-   - Value: `https://your-app-name.vercel.app` (use your actual Vercel deployment URL)
+   - Value: `https://zurbstudio.vercel.app`
    - Environment: Production, Preview, Development
 
 ## Steps to Deploy
