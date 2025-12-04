@@ -213,12 +213,32 @@ export default function ScenarioScreen() {
 
         <View style={styles.breakdownCard}>
           <Text style={styles.breakdownTitle}>Units Breakdown</Text>
-          {Object.entries(summary.unitsByType).map(([type, count]) => (
-            <View key={type} style={styles.breakdownRow}>
-              <Text style={styles.breakdownLabel}>{type}</Text>
-              <Text style={styles.breakdownValue}>{count} units</Text>
-            </View>
-          ))}
+          {Object.entries(summary.unitsByType).length === 0 ? (
+            <Text style={styles.emptyText}>No units configured yet</Text>
+          ) : (
+            Object.entries(summary.unitsByType).map(([type, count]) => {
+              const housingConfig = HOUSING_TYPES[type];
+              const costParam = costParams.find(cp => cp.unit_type === type);
+              return (
+                <View key={type} style={styles.breakdownRow}>
+                  <View style={styles.breakdownLabelContainer}>
+                    <Text style={styles.breakdownLabel}>{type}</Text>
+                    {housingConfig && (
+                      <Text style={styles.breakdownSubLabel}>{housingConfig.name}</Text>
+                    )}
+                  </View>
+                  <View style={styles.breakdownValueContainer}>
+                    <Text style={styles.breakdownValue}>{count} units</Text>
+                    {costParam && (
+                      <Text style={styles.breakdownSubValue}>
+                        {costParam.build_area_m2.toFixed(0)} m² each
+                      </Text>
+                    )}
+                  </View>
+                </View>
+              );
+            })
+          )}
         </View>
 
         {scenario.notes ? (
@@ -329,12 +349,36 @@ const styles = StyleSheet.create({
   },
   breakdownLabel: {
     fontSize: 14,
-    color: '#666666',
+    fontWeight: '600' as const,
+    color: '#000000',
   },
   breakdownValue: {
     fontSize: 14,
-    fontWeight: '500' as const,
+    fontWeight: '600' as const,
     color: '#007AFF',
+  },
+  emptyText: {
+    fontSize: 14,
+    color: '#999999',
+    fontStyle: 'italic' as const,
+    textAlign: 'center',
+    paddingVertical: 16,
+  },
+  breakdownLabelContainer: {
+    flex: 1,
+  },
+  breakdownSubLabel: {
+    fontSize: 12,
+    color: '#999999',
+    marginTop: 2,
+  },
+  breakdownValueContainer: {
+    alignItems: 'flex-end',
+  },
+  breakdownSubValue: {
+    fontSize: 12,
+    color: '#999999',
+    marginTop: 2,
   },
   notesCard: {
     backgroundColor: '#FFFFFF',

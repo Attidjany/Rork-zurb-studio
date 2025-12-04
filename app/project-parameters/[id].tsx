@@ -433,11 +433,14 @@ export default function ProjectParametersScreen() {
                         style={[styles.editButton, styles.saveButton]}
                         onPress={async () => {
                           const newGoldGrams = parseFloat(editCostValue);
-                          if (!isNaN(newGoldGrams)) {
+                          if (!isNaN(newGoldGrams) && param) {
                             CONSTRUCTION_COSTS[type].goldGramsPerM2 = newGoldGrams;
+                            const newCostPerM2 = newGoldGrams * goldPrice.pricePerGram;
+                            await updateProjectCostParam(param.id, {
+                              cost_per_m2: newCostPerM2,
+                            });
                             setEditingCostType(null);
                             setEditCostValue('');
-                            await loadProjectCostParams();
                           }
                         }}
                       >
