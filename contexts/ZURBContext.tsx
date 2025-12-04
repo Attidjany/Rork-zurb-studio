@@ -163,14 +163,14 @@ export const [ZURBContext, useZURB] = createContextHook(() => {
         .select('*');
 
       if (error) {
-        console.error('[ZURB] Error loading project cost params:', error);
+        console.error('[ZURB] Error loading project cost params:', JSON.stringify(error));
         return;
       }
 
       console.log('[ZURB] Loaded project cost params:', data?.length);
       setProjectCostParams(data || []);
-    } catch (error) {
-      console.error('[ZURB] Exception loading project cost params:', error);
+    } catch (error: any) {
+      console.error('[ZURB] Exception loading project cost params:', error?.message || JSON.stringify(error));
     }
   }, [user]);
 
@@ -183,14 +183,14 @@ export const [ZURBContext, useZURB] = createContextHook(() => {
         .select('*');
 
       if (error) {
-        console.error('[ZURB] Error loading scenario cost params:', error);
+        console.error('[ZURB] Error loading scenario cost params:', JSON.stringify(error));
         return;
       }
 
       console.log('[ZURB] Loaded scenario cost params:', data?.length);
       setScenarioCostParams(data || []);
-    } catch (error) {
-      console.error('[ZURB] Exception loading scenario cost params:', error);
+    } catch (error: any) {
+      console.error('[ZURB] Exception loading scenario cost params:', error?.message || JSON.stringify(error));
     }
   }, [user]);
 
