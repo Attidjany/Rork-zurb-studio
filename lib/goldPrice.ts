@@ -20,7 +20,7 @@ export async function fetchLiveGoldPrice(): Promise<GoldPriceData> {
   }
 
   try {
-    const response = await fetch('https://api.metals.live/v1/spot/gold');
+    const response = await fetch('https://api.gold-api.com/price/XAU');
     
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
@@ -28,7 +28,7 @@ export async function fetchLiveGoldPrice(): Promise<GoldPriceData> {
     
     const data = await response.json();
     
-    const pricePerOz = data[0]?.price || 0;
+    const pricePerOz = data.price || 0;
     const pricePerGram = pricePerOz / TROY_OZ_TO_GRAMS;
     
     cachedGoldPrice = {
@@ -42,6 +42,28 @@ export async function fetchLiveGoldPrice(): Promise<GoldPriceData> {
     return cachedGoldPrice;
   } catch (error) {
     console.error('[Gold] Error fetching gold price:', error);
+    
+    try {
+      const fallbackResponse = await fetch('https://www.goldapi.io/api/XAU/USD');
+      if (fallbackResponse.ok) {
+        const fallbackData = await fallbackResponse.json();
+        const pricePerOz = fallbackData.price || 0;
+        const pricePerGram = pricePerOz / TROY_OZ_TO_GRAMS;
+        
+        cachedGoldPrice = {
+          pricePerGram,
+          pricePerOz,
+          timestamp: Date.now(),
+          currency: 'USD',
+        };
+        
+        console.log('[Gold] Fallback API succeeded - per oz:', pricePerOz);
+        return cachedGoldPrice;
+      }
+    } catch (fallbackError) {
+      console.error('[Gold] Fallback API also failed:', fallbackError);
+    }
+    
     console.log('[Gold] Using default prices');
     return {
       pricePerGram: DEFAULT_GOLD_PRICE_PER_GRAM,

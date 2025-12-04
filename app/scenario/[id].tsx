@@ -1,6 +1,7 @@
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { Stack, useLocalSearchParams, router } from 'expo-router';
 import React, { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, RefreshControl } from 'react-native';
+import { Settings2 } from 'lucide-react-native';
+import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useZURB } from '@/contexts/ZURBContext';
 import {
@@ -139,6 +140,14 @@ export default function ScenarioScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
         }
       >
+        <TouchableOpacity
+          style={styles.parametersButton}
+          onPress={() => router.push(`/scenario-parameters/${id}`)}
+        >
+          <Settings2 size={20} color="#007AFF" />
+          <Text style={styles.parametersButtonText}>Configure Scenario Parameters</Text>
+        </TouchableOpacity>
+
         <View style={styles.summaryCard}>
           <Text style={styles.summaryTitle}>Scenario Summary</Text>
 
@@ -210,6 +219,24 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+  },
+  parametersButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#E3F2FD',
+    marginHorizontal: 16,
+    marginTop: 16,
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#90CAF9',
+    gap: 8,
+  },
+  parametersButtonText: {
+    fontSize: 15,
+    fontWeight: '600' as const,
+    color: '#007AFF',
   },
   summaryCard: {
     backgroundColor: '#FFFFFF',
