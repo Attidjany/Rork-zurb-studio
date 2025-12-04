@@ -175,3 +175,39 @@ export interface DbProjectEquipmentUtilityType {
   created_at: string;
   updated_at: string;
 }
+
+export interface DbScenarioConstructionCost {
+  id: string;
+  scenario_id: string;
+  code: string;
+  name: string;
+  gold_grams_per_m2: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DbScenarioHousingType {
+  id: string;
+  scenario_id: string;
+  code: string;
+  name: string;
+  category: 'apartment' | 'villa' | 'commercial';
+  default_area_m2: number;
+  default_cost_type: string;
+  default_rent_monthly: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DbScenarioEquipmentUtilityType {
+  id: string;
+  scenario_id: string;
+  code: string;
+  name: string;
+  category: 'equipment' | 'utility';
+  land_area_m2: number;
+  building_occupation_pct: number;
+  cost_type: string;
+  created_at: string;
+  updated_at: string;
+}
