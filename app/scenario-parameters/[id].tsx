@@ -7,18 +7,11 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  TextInput,
   RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useZURB } from '@/contexts/ZURBContext';
 import { fetchLiveGoldPrice, getCachedGoldPrice, getDefaultGoldPrice, GoldPriceData, USD_TO_XOF } from '@/lib/goldPrice';
-import { CONSTRUCTION_COSTS, HOUSING_TYPES } from '@/constants/typologies';
-
-const CONSTRUCTION_COST_TYPES = ['ZME', 'ZHE', 'ZOS', 'ZMER', 'ZHER'];
-const APARTMENT_TYPES = ['AMS', 'AML', 'AH'];
-const VILLA_TYPES = ['BMS', 'BML', 'BH', 'CH', 'CO'];
-const COMMERCIAL_TYPES = ['XM', 'XH'];
 
 export default function ScenarioParametersScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -26,25 +19,22 @@ export default function ScenarioParametersScreen() {
     scenarios,
     projects,
     sites,
-    getProjectCostParamsByProjectId,
-    getScenarioCostParamsByScenarioId,
-    upsertScenarioCostParam,
-    loadProjectCostParams,
-    loadScenarioCostParams,
+    getProjectConstructionCostsByProjectId,
+    getScenarioConstructionCostsByScenarioId,
+    getProjectHousingTypesByProjectId,
+    getScenarioHousingTypesByScenarioId,
+    getProjectEquipmentUtilityTypesByProjectId,
+    getScenarioEquipmentUtilityTypesByScenarioId,
+    loadProjectConstructionCosts,
+    loadScenarioConstructionCosts,
+    loadProjectHousingTypes,
+    loadScenarioHousingTypes,
+    loadProjectEquipmentUtilityTypes,
+    loadScenarioEquipmentUtilityTypes,
   } = useZURB();
 
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [goldPrice, setGoldPrice] = useState<GoldPriceData>(getCachedGoldPrice() || getDefaultGoldPrice());
-  const [editingParam, setEditingParam] = useState<string | null>(null);
-  const [editValues, setEditValues] = useState<{
-    build_area_m2: string;
-    cost_type: string;
-    rent_monthly: string;
-  }>({
-    build_area_m2: '',
-    cost_type: '',
-    rent_monthly: '',
-  });
 
   const scenario = useMemo(() => {
     return scenarios.find(s => s.id === id) || null;
@@ -60,30 +50,67 @@ export default function ScenarioParametersScreen() {
     return projects.find(p => p.id === site.project_id) || null;
   }, [projects, site]);
 
-  const projectParams = useMemo(() => {
+  const projectConstructionCosts = useMemo(() => {
     if (!project) return [];
-    return getProjectCostParamsByProjectId(project.id);
-  }, [getProjectCostParamsByProjectId, project]);
+    return getProjectConstructionCostsByProjectId(project.id);
+  }, [getProjectConstructionCostsByProjectId, project]);
 
-  const scenarioParams = useMemo(() => {
+  const scenarioConstructionCosts = useMemo(() => {
     if (!scenario) return [];
-    return getScenarioCostParamsByScenarioId(scenario.id);
-  }, [getScenarioCostParamsByScenarioId, scenario]);
+    return getScenarioConstructionCostsByScenarioId(scenario.id);
+  }, [getScenarioConstructionCostsByScenarioId, scenario]);
 
-  const mergedParams = useMemo(() => {
-    const merged = projectParams.map(pp => {
-      const override = scenarioParams.find(sp => sp.unit_type === pp.unit_type);
-      return override || pp;
-    });
-    console.log('[ScenarioParameters] Merged params:', merged.length);
-    return merged;
-  }, [projectParams, scenarioParams]);
+  const projectHousingTypes = useMemo(() => {
+    if (!project) return [];
+    return getProjectHousingTypesByProjectId(project.id);
+  }, [getProjectHousingTypesByProjectId, project]);
+
+  const scenarioHousingTypes = useMemo(() => {
+    if (!scenario) return [];
+    return getScenarioHousingTypesByScenarioId(scenario.id);
+  }, [getScenarioHousingTypesByScenarioId, scenario]);
+
+  const projectEquipmentUtilityTypes = useMemo(() => {
+    if (!project) return [];
+    return getProjectEquipmentUtilityTypesByProjectId(project.id);
+  }, [getProjectEquipmentUtilityTypesByProjectId, project]);
+
+  const scenarioEquipmentUtilityTypes = useMemo(() => {
+    if (!scenario) return [];
+    return getScenarioEquipmentUtilityTypesByScenarioId(scenario.id);
+  }, [getScenarioEquipmentUtilityTypesByScenarioId, scenario]);
+
+  const mergedConstructionCosts = useMemo(() => {
+    return scenarioConstructionCosts.length > 0 ? scenarioConstructionCosts : projectConstructionCosts;
+  }, [scenarioConstructionCosts, projectConstructionCosts]);
+
+  const mergedHousingTypes = useMemo(() => {
+    return scenarioHousingTypes.length > 0 ? scenarioHousingTypes : projectHousingTypes;
+  }, [scenarioHousingTypes, projectHousingTypes]);
+
+  const mergedEquipmentUtilityTypes = useMemo(() => {
+    return scenarioEquipmentUtilityTypes.length > 0 ? scenarioEquipmentUtilityTypes : projectEquipmentUtilityTypes;
+  }, [scenarioEquipmentUtilityTypes, projectEquipmentUtilityTypes]);
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
-    await Promise.all([loadProjectCostParams(), loadScenarioCostParams()]);
+    await Promise.all([
+      loadProjectConstructionCosts(),
+      loadScenarioConstructionCosts(),
+      loadProjectHousingTypes(),
+      loadScenarioHousingTypes(),
+      loadProjectEquipmentUtilityTypes(),
+      loadScenarioEquipmentUtilityTypes(),
+    ]);
     setRefreshing(false);
-  }, [loadProjectCostParams, loadScenarioCostParams]);
+  }, [
+    loadProjectConstructionCosts,
+    loadScenarioConstructionCosts,
+    loadProjectHousingTypes,
+    loadScenarioHousingTypes,
+    loadProjectEquipmentUtilityTypes,
+    loadScenarioEquipmentUtilityTypes,
+  ]);
 
   const fetchGoldPrice = useCallback(async () => {
     const price = await fetchLiveGoldPrice();
@@ -94,225 +121,6 @@ export default function ScenarioParametersScreen() {
     fetchGoldPrice();
   }, [fetchGoldPrice]);
 
-  const startEditing = useCallback((unitType: string, currentValues: {
-    build_area_m2: number;
-    rent_monthly: number;
-  }) => {
-    const config = HOUSING_TYPES[unitType];
-    setEditingParam(unitType);
-    setEditValues({
-      build_area_m2: currentValues.build_area_m2.toString(),
-      cost_type: config.defaultCostType,
-      rent_monthly: currentValues.rent_monthly.toString(),
-    });
-  }, []);
-
-  const cancelEditing = useCallback(() => {
-    setEditingParam(null);
-    setEditValues({
-      build_area_m2: '',
-      cost_type: '',
-      rent_monthly: '',
-    });
-  }, []);
-
-  const saveParam = useCallback(async (unitType: string) => {
-    if (!scenario) return;
-
-    const buildArea = parseFloat(editValues.build_area_m2);
-    const rentMonthly = parseFloat(editValues.rent_monthly);
-
-    if (isNaN(buildArea) || isNaN(rentMonthly) || !editValues.cost_type) {
-      return;
-    }
-
-    const costTypeConfig = CONSTRUCTION_COSTS[editValues.cost_type];
-    const costPerM2 = costTypeConfig.goldGramsPerM2 * goldPrice.pricePerGram;
-
-    await upsertScenarioCostParam(scenario.id, unitType, buildArea, costPerM2, rentMonthly);
-    cancelEditing();
-  }, [scenario, editValues, upsertScenarioCostParam, cancelEditing, goldPrice]);
-
-  const resetToProjectDefaults = useCallback(async (unitType: string) => {
-    if (!scenario) return;
-    
-    const projectParam = projectParams.find(pp => pp.unit_type === unitType);
-    if (!projectParam) return;
-
-    await upsertScenarioCostParam(
-      scenario.id, 
-      unitType, 
-      projectParam.build_area_m2, 
-      projectParam.cost_per_m2, 
-      projectParam.rent_monthly
-    );
-  }, [scenario, projectParams, upsertScenarioCostParam]);
-
-  const renderHousingTypeCard = useCallback((param: any, type: string) => {
-    const isEditing = editingParam === param.unit_type;
-    const config = HOUSING_TYPES[type];
-    const costTypeConfig = CONSTRUCTION_COSTS[config.defaultCostType];
-    const calculatedCostPerM2XOF = costTypeConfig.goldGramsPerM2 * goldPrice.pricePerGram * USD_TO_XOF;
-    const isOverridden = scenarioParams.some(sp => sp.unit_type === param.unit_type);
-
-    return (
-      <View key={param.unit_type} style={styles.paramCard}>
-        <View style={styles.paramHeader}>
-          <View style={styles.paramIcon}>
-            <DollarSign size={18} color={isOverridden ? '#34C759' : '#007AFF'} />
-          </View>
-          <View style={styles.paramHeaderText}>
-            <Text style={styles.paramTitle}>{type}</Text>
-            <Text style={styles.paramSubtitle}>{config.name}</Text>
-            <View style={styles.costTypeBadge}>
-              <Text style={styles.costTypeBadgeText}>Cost Type: {config.defaultCostType}</Text>
-            </View>
-            {isOverridden && (
-              <Text style={styles.overrideLabel}>Custom Override</Text>
-            )}
-            {!isOverridden && (
-              <Text style={styles.defaultLabel}>Using Project Default</Text>
-            )}
-          </View>
-        </View>
-
-        {isEditing ? (
-          <View style={styles.editForm}>
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Build Area (m²)</Text>
-              <TextInput
-                style={styles.input}
-                value={editValues.build_area_m2}
-                onChangeText={(text) => setEditValues(prev => ({ ...prev, build_area_m2: text }))}
-                keyboardType="decimal-pad"
-                placeholder="Build area"
-              />
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Cost Type</Text>
-              <View style={styles.costTypeOptions}>
-                {CONSTRUCTION_COST_TYPES.map(costType => {
-                  const costConfig = CONSTRUCTION_COSTS[costType];
-                  const costXOF = (costConfig.goldGramsPerM2 * goldPrice.pricePerGram * USD_TO_XOF).toLocaleString(undefined, {maximumFractionDigits: 0});
-                  return (
-                    <TouchableOpacity
-                      key={costType}
-                      style={[
-                        styles.costTypeOption,
-                        editValues.cost_type === costType && styles.costTypeOptionSelected,
-                      ]}
-                      onPress={() => setEditValues(prev => ({ ...prev, cost_type: costType }))}
-                    >
-                      <Text style={[
-                        styles.costTypeOptionCode,
-                        editValues.cost_type === costType && styles.costTypeOptionTextSelected,
-                      ]}>{costType}</Text>
-                      <Text style={[
-                        styles.costTypeOptionValue,
-                        editValues.cost_type === costType && styles.costTypeOptionTextSelected,
-                      ]}>{costXOF} XOF/m²</Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Monthly Rent (XOF)</Text>
-              <TextInput
-                style={styles.input}
-                value={editValues.rent_monthly}
-                onChangeText={(text) => setEditValues(prev => ({ ...prev, rent_monthly: text }))}
-                keyboardType="decimal-pad"
-                placeholder="Monthly rent"
-              />
-            </View>
-
-            <View style={styles.editButtons}>
-              <TouchableOpacity
-                style={[styles.editButton, styles.cancelButton]}
-                onPress={cancelEditing}
-              >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.editButton, styles.saveButton]}
-                onPress={() => saveParam(param.unit_type)}
-              >
-                <Text style={styles.saveButtonText}>Save Override</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        ) : (
-          <>
-            <View style={styles.paramGrid}>
-              <View style={styles.paramItem}>
-                <Text style={styles.paramItemLabel}>Build Area</Text>
-                <Text style={styles.paramItemValue}>
-                  {param.build_area_m2.toFixed(0)} m²
-                </Text>
-              </View>
-              <View style={styles.paramItem}>
-                <Text style={styles.paramItemLabel}>Cost/m²</Text>
-                <Text style={styles.paramItemValue}>
-                  {calculatedCostPerM2XOF.toLocaleString(undefined, {maximumFractionDigits: 0})} XOF
-                </Text>
-                {costTypeConfig && (
-                  <Text style={styles.paramItemSubtext}>
-                    {costTypeConfig.goldGramsPerM2.toFixed(2)} g Au/m²
-                  </Text>
-                )}
-              </View>
-              <View style={styles.paramItem}>
-                <Text style={styles.paramItemLabel}>Monthly Rent</Text>
-                <Text style={styles.paramItemValue}>
-                  {param.rent_monthly.toLocaleString(undefined, {maximumFractionDigits: 0})} XOF
-                </Text>
-              </View>
-            </View>
-
-            <View style={styles.paramSummary}>
-              <View style={styles.paramSummaryItem}>
-                <Text style={styles.paramSummaryLabel}>Total Build Cost</Text>
-                <Text style={styles.paramSummaryValue}>
-                  {(param.build_area_m2 * calculatedCostPerM2XOF).toLocaleString(undefined, {maximumFractionDigits: 0})} XOF
-                </Text>
-              </View>
-              <View style={styles.paramSummaryItem}>
-                <Text style={styles.paramSummaryLabel}>Yearly Revenue</Text>
-                <Text style={styles.paramSummaryValue}>
-                  {(param.rent_monthly * 12).toLocaleString(undefined, {maximumFractionDigits: 0})} XOF
-                </Text>
-              </View>
-            </View>
-
-            <View style={styles.actionButtons}>
-              <TouchableOpacity
-                style={styles.editTrigger}
-                onPress={() => startEditing(param.unit_type, {
-                  build_area_m2: param.build_area_m2,
-                  rent_monthly: param.rent_monthly,
-                })}
-              >
-                <Text style={styles.editTriggerText}>Edit Parameters</Text>
-              </TouchableOpacity>
-              
-              {isOverridden && (
-                <TouchableOpacity
-                  style={styles.resetButton}
-                  onPress={() => resetToProjectDefaults(param.unit_type)}
-                >
-                  <Text style={styles.resetButtonText}>Reset to Project Default</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          </>
-        )}
-      </View>
-    );
-  }, [editingParam, editValues, cancelEditing, saveParam, startEditing, scenarioParams, resetToProjectDefaults, goldPrice]);
-
   if (!scenario || !site || !project) {
     return (
       <View style={styles.centerContainer}>
@@ -320,6 +128,12 @@ export default function ScenarioParametersScreen() {
       </View>
     );
   }
+
+  const apartmentTypes = mergedHousingTypes.filter(h => h.category === 'apartment');
+  const villaTypes = mergedHousingTypes.filter(h => h.category === 'villa');
+  const commercialTypes = mergedHousingTypes.filter(h => h.category === 'commercial');
+  const equipmentTypes = mergedEquipmentUtilityTypes.filter(e => e.category === 'equipment');
+  const utilityTypes = mergedEquipmentUtilityTypes.filter(e => e.category === 'utility');
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
@@ -355,95 +169,432 @@ export default function ScenarioParametersScreen() {
             <Settings size={18} color="#007AFF" />
           </View>
           <Text style={styles.infoText}>
-            These parameters override project defaults for this scenario only. 
-            Leave unchanged to inherit from project settings.
+            These parameters are inherited from the project. Scenario-specific overrides can be configured via project settings.
           </Text>
         </View>
 
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Settings size={20} color="#007AFF" />
-            <Text style={styles.sectionTitle}>Construction Costs per m²</Text>
+        {mergedConstructionCosts.length === 0 && mergedHousingTypes.length === 0 && mergedEquipmentUtilityTypes.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Settings size={48} color="#CED4DA" />
+            <Text style={styles.emptyStateTitle}>No Parameters Found</Text>
+            <Text style={styles.emptyStateText}>
+              The project doesn&apos;t have any parameters configured yet.
+              {'\n'}
+              Please configure parameters in the project settings first.
+            </Text>
+            <TouchableOpacity
+              style={styles.emptyStateButton}
+              onPress={() => router.push(`/project-parameters/${project.id}`)}
+            >
+              <Text style={styles.emptyStateButtonText}>Go to Project Parameters</Text>
+            </TouchableOpacity>
           </View>
-          <Text style={styles.sectionDesc}>
-            Base construction costs (inherited from project)
-          </Text>
+        ) : null}
 
-          {CONSTRUCTION_COST_TYPES.map(type => {
-            const param = mergedParams.find(p => p.unit_type === type);
-            if (!param) return null;
+        {mergedConstructionCosts.length > 0 ? (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Settings size={20} color="#007AFF" />
+              <Text style={styles.sectionTitle}>Construction Costs per m²</Text>
+            </View>
+            <Text style={styles.sectionDesc}>
+              {scenarioConstructionCosts.length > 0
+                ? 'Scenario-specific construction costs'
+                : 'Inherited from project'}
+            </Text>
 
-            const config = CONSTRUCTION_COSTS[type];
-
-            return (
-              <View key={param.unit_type} style={styles.costCard}>
+            {mergedConstructionCosts.map(cost => (
+              <View key={cost.id} style={styles.costCard}>
                 <View style={styles.costHeader}>
-                  <Text style={styles.costCode}>{type}</Text>
-                  <Text style={styles.costName}>{config.name}</Text>
+                  <Text style={styles.costCode}>{cost.code}</Text>
+                  <Text style={styles.costName}>{cost.name}</Text>
                 </View>
 
                 <View style={styles.costDetails}>
                   <View style={styles.costDetailRow}>
                     <Text style={styles.costDetailLabel}>Gold Content:</Text>
-                    <Text style={styles.costDetailValue}>{config.goldGramsPerM2.toFixed(2)} g Au/m²</Text>
+                    <Text style={styles.costDetailValue}>{cost.gold_grams_per_m2.toFixed(2)} g Au/m²</Text>
                   </View>
                   <View style={styles.costDetailRow}>
                     <Text style={styles.costDetailLabel}>Cost per m²:</Text>
-                    <Text style={styles.costDetailValue}>{(config.goldGramsPerM2 * goldPrice.pricePerGram * USD_TO_XOF).toLocaleString(undefined, {maximumFractionDigits: 0})} XOF/m²</Text>
+                    <Text style={styles.costDetailValue}>
+                      {(cost.gold_grams_per_m2 * goldPrice.pricePerGram * USD_TO_XOF).toLocaleString(undefined, {maximumFractionDigits: 0})} XOF/m²
+                    </Text>
                   </View>
                 </View>
               </View>
-            );
-          })}
-        </View>
-
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Building2 size={20} color="#007AFF" />
-            <Text style={styles.sectionTitle}>Apartment Housing Types</Text>
+            ))}
           </View>
-          <Text style={styles.sectionDesc}>
-            Configure apartment unit types for this scenario
-          </Text>
+        ) : null}
 
-          {APARTMENT_TYPES.map(type => {
-            const param = mergedParams.find(p => p.unit_type === type);
-            if (!param) return null;
-            return renderHousingTypeCard(param, type);
-          })}
-        </View>
+        {apartmentTypes.length > 0 ? (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Building2 size={20} color="#007AFF" />
+              <Text style={styles.sectionTitle}>Apartment Housing Types</Text>
+            </View>
+            <Text style={styles.sectionDesc}>
+              {scenarioHousingTypes.some(h => h.category === 'apartment')
+                ? 'Scenario-specific apartment configurations'
+                : 'Inherited from project'}
+            </Text>
 
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Home size={20} color="#007AFF" />
-            <Text style={styles.sectionTitle}>Villa Housing Types</Text>
+            {apartmentTypes.map(type => {
+              const costConfig = mergedConstructionCosts.find(c => c.code === type.default_cost_type);
+              const costPerM2XOF = costConfig
+                ? costConfig.gold_grams_per_m2 * goldPrice.pricePerGram * USD_TO_XOF
+                : 0;
+              const totalCost = type.default_area_m2 * costPerM2XOF;
+              const yearlyRevenue = type.default_rent_monthly * 12;
+
+              return (
+                <View key={type.id} style={styles.paramCard}>
+                  <View style={styles.paramHeader}>
+                    <View style={styles.paramIcon}>
+                      <DollarSign size={18} color="#007AFF" />
+                    </View>
+                    <View style={styles.paramHeaderText}>
+                      <Text style={styles.paramTitle}>{type.code}</Text>
+                      <Text style={styles.paramSubtitle}>{type.name}</Text>
+                      <View style={styles.costTypeBadge}>
+                        <Text style={styles.costTypeBadgeText}>Cost Type: {type.default_cost_type}</Text>
+                      </View>
+                    </View>
+                  </View>
+
+                  <View style={styles.paramGrid}>
+                    <View style={styles.paramItem}>
+                      <Text style={styles.paramItemLabel}>Build Area</Text>
+                      <Text style={styles.paramItemValue}>
+                        {type.default_area_m2.toFixed(0)} m²
+                      </Text>
+                    </View>
+                    <View style={styles.paramItem}>
+                      <Text style={styles.paramItemLabel}>Cost/m²</Text>
+                      <Text style={styles.paramItemValue}>
+                        {costPerM2XOF.toLocaleString(undefined, {maximumFractionDigits: 0})} XOF
+                      </Text>
+                      {costConfig && (
+                        <Text style={styles.paramItemSubtext}>
+                          {costConfig.gold_grams_per_m2.toFixed(2)} g Au/m²
+                        </Text>
+                      )}
+                    </View>
+                    <View style={styles.paramItem}>
+                      <Text style={styles.paramItemLabel}>Monthly Rent</Text>
+                      <Text style={styles.paramItemValue}>
+                        {type.default_rent_monthly.toLocaleString(undefined, {maximumFractionDigits: 0})} XOF
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.paramSummary}>
+                    <View style={styles.paramSummaryItem}>
+                      <Text style={styles.paramSummaryLabel}>Total Build Cost</Text>
+                      <Text style={styles.paramSummaryValue}>
+                        {totalCost.toLocaleString(undefined, {maximumFractionDigits: 0})} XOF
+                      </Text>
+                    </View>
+                    <View style={styles.paramSummaryItem}>
+                      <Text style={styles.paramSummaryLabel}>Yearly Revenue</Text>
+                      <Text style={styles.paramSummaryValue}>
+                        {yearlyRevenue.toLocaleString(undefined, {maximumFractionDigits: 0})} XOF
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              );
+            })}
           </View>
-          <Text style={styles.sectionDesc}>
-            Configure villa unit types for this scenario
-          </Text>
+        ) : null}
 
-          {VILLA_TYPES.map(type => {
-            const param = mergedParams.find(p => p.unit_type === type);
-            if (!param) return null;
-            return renderHousingTypeCard(param, type);
-          })}
-        </View>
+        {villaTypes.length > 0 ? (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Home size={20} color="#007AFF" />
+              <Text style={styles.sectionTitle}>Villa Housing Types</Text>
+            </View>
+            <Text style={styles.sectionDesc}>
+              {scenarioHousingTypes.some(h => h.category === 'villa')
+                ? 'Scenario-specific villa configurations'
+                : 'Inherited from project'}
+            </Text>
 
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <ShoppingBag size={20} color="#007AFF" />
-            <Text style={styles.sectionTitle}>Commercial Housing Types</Text>
+            {villaTypes.map(type => {
+              const costConfig = mergedConstructionCosts.find(c => c.code === type.default_cost_type);
+              const costPerM2XOF = costConfig
+                ? costConfig.gold_grams_per_m2 * goldPrice.pricePerGram * USD_TO_XOF
+                : 0;
+              const totalCost = type.default_area_m2 * costPerM2XOF;
+              const yearlyRevenue = type.default_rent_monthly * 12;
+
+              return (
+                <View key={type.id} style={styles.paramCard}>
+                  <View style={styles.paramHeader}>
+                    <View style={styles.paramIcon}>
+                      <DollarSign size={18} color="#007AFF" />
+                    </View>
+                    <View style={styles.paramHeaderText}>
+                      <Text style={styles.paramTitle}>{type.code}</Text>
+                      <Text style={styles.paramSubtitle}>{type.name}</Text>
+                      <View style={styles.costTypeBadge}>
+                        <Text style={styles.costTypeBadgeText}>Cost Type: {type.default_cost_type}</Text>
+                      </View>
+                    </View>
+                  </View>
+
+                  <View style={styles.paramGrid}>
+                    <View style={styles.paramItem}>
+                      <Text style={styles.paramItemLabel}>Build Area</Text>
+                      <Text style={styles.paramItemValue}>
+                        {type.default_area_m2.toFixed(0)} m²
+                      </Text>
+                    </View>
+                    <View style={styles.paramItem}>
+                      <Text style={styles.paramItemLabel}>Cost/m²</Text>
+                      <Text style={styles.paramItemValue}>
+                        {costPerM2XOF.toLocaleString(undefined, {maximumFractionDigits: 0})} XOF
+                      </Text>
+                      {costConfig && (
+                        <Text style={styles.paramItemSubtext}>
+                          {costConfig.gold_grams_per_m2.toFixed(2)} g Au/m²
+                        </Text>
+                      )}
+                    </View>
+                    <View style={styles.paramItem}>
+                      <Text style={styles.paramItemLabel}>Monthly Rent</Text>
+                      <Text style={styles.paramItemValue}>
+                        {type.default_rent_monthly.toLocaleString(undefined, {maximumFractionDigits: 0})} XOF
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.paramSummary}>
+                    <View style={styles.paramSummaryItem}>
+                      <Text style={styles.paramSummaryLabel}>Total Build Cost</Text>
+                      <Text style={styles.paramSummaryValue}>
+                        {totalCost.toLocaleString(undefined, {maximumFractionDigits: 0})} XOF
+                      </Text>
+                    </View>
+                    <View style={styles.paramSummaryItem}>
+                      <Text style={styles.paramSummaryLabel}>Yearly Revenue</Text>
+                      <Text style={styles.paramSummaryValue}>
+                        {yearlyRevenue.toLocaleString(undefined, {maximumFractionDigits: 0})} XOF
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              );
+            })}
           </View>
-          <Text style={styles.sectionDesc}>
-            Configure commercial unit types for this scenario
-          </Text>
+        ) : null}
 
-          {COMMERCIAL_TYPES.map(type => {
-            const param = mergedParams.find(p => p.unit_type === type);
-            if (!param) return null;
-            return renderHousingTypeCard(param, type);
-          })}
-        </View>
+        {commercialTypes.length > 0 ? (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <ShoppingBag size={20} color="#007AFF" />
+              <Text style={styles.sectionTitle}>Commercial Housing Types</Text>
+            </View>
+            <Text style={styles.sectionDesc}>
+              {scenarioHousingTypes.some(h => h.category === 'commercial')
+                ? 'Scenario-specific commercial configurations'
+                : 'Inherited from project'}
+            </Text>
+
+            {commercialTypes.map(type => {
+              const costConfig = mergedConstructionCosts.find(c => c.code === type.default_cost_type);
+              const costPerM2XOF = costConfig
+                ? costConfig.gold_grams_per_m2 * goldPrice.pricePerGram * USD_TO_XOF
+                : 0;
+              const totalCost = type.default_area_m2 * costPerM2XOF;
+              const yearlyRevenue = type.default_rent_monthly * 12;
+
+              return (
+                <View key={type.id} style={styles.paramCard}>
+                  <View style={styles.paramHeader}>
+                    <View style={styles.paramIcon}>
+                      <DollarSign size={18} color="#007AFF" />
+                    </View>
+                    <View style={styles.paramHeaderText}>
+                      <Text style={styles.paramTitle}>{type.code}</Text>
+                      <Text style={styles.paramSubtitle}>{type.name}</Text>
+                      <View style={styles.costTypeBadge}>
+                        <Text style={styles.costTypeBadgeText}>Cost Type: {type.default_cost_type}</Text>
+                      </View>
+                    </View>
+                  </View>
+
+                  <View style={styles.paramGrid}>
+                    <View style={styles.paramItem}>
+                      <Text style={styles.paramItemLabel}>Build Area</Text>
+                      <Text style={styles.paramItemValue}>
+                        {type.default_area_m2.toFixed(0)} m²
+                      </Text>
+                    </View>
+                    <View style={styles.paramItem}>
+                      <Text style={styles.paramItemLabel}>Cost/m²</Text>
+                      <Text style={styles.paramItemValue}>
+                        {costPerM2XOF.toLocaleString(undefined, {maximumFractionDigits: 0})} XOF
+                      </Text>
+                      {costConfig && (
+                        <Text style={styles.paramItemSubtext}>
+                          {costConfig.gold_grams_per_m2.toFixed(2)} g Au/m²
+                        </Text>
+                      )}
+                    </View>
+                    <View style={styles.paramItem}>
+                      <Text style={styles.paramItemLabel}>Monthly Rent</Text>
+                      <Text style={styles.paramItemValue}>
+                        {type.default_rent_monthly.toLocaleString(undefined, {maximumFractionDigits: 0})} XOF
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.paramSummary}>
+                    <View style={styles.paramSummaryItem}>
+                      <Text style={styles.paramSummaryLabel}>Total Build Cost</Text>
+                      <Text style={styles.paramSummaryValue}>
+                        {totalCost.toLocaleString(undefined, {maximumFractionDigits: 0})} XOF
+                      </Text>
+                    </View>
+                    <View style={styles.paramSummaryItem}>
+                      <Text style={styles.paramSummaryLabel}>Yearly Revenue</Text>
+                      <Text style={styles.paramSummaryValue}>
+                        {yearlyRevenue.toLocaleString(undefined, {maximumFractionDigits: 0})} XOF
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        ) : null}
+
+        {(equipmentTypes.length > 0 || utilityTypes.length > 0) ? (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Settings size={20} color="#007AFF" />
+              <Text style={styles.sectionTitle}>Equipment & Utility Buildings</Text>
+            </View>
+            <Text style={styles.sectionDesc}>
+              {scenarioEquipmentUtilityTypes.length > 0
+                ? 'Scenario-specific equipment and utility configurations'
+                : 'Inherited from project'}
+            </Text>
+
+            {equipmentTypes.map(type => {
+              const costConfig = mergedConstructionCosts.find(c => c.code === type.cost_type);
+              const buildAreaM2 = type.land_area_m2 * (type.building_occupation_pct / 100);
+              const costPerM2XOF = costConfig
+                ? costConfig.gold_grams_per_m2 * goldPrice.pricePerGram * USD_TO_XOF
+                : 0;
+              const totalCost = buildAreaM2 * costPerM2XOF;
+
+              return (
+                <View key={type.id} style={styles.paramCard}>
+                  <View style={styles.paramHeader}>
+                    <View style={[styles.paramIcon, styles.equipmentIcon]}>
+                      <Settings size={18} color="#FF9500" />
+                    </View>
+                    <View style={styles.paramHeaderText}>
+                      <Text style={styles.paramTitle}>{type.code}</Text>
+                      <Text style={styles.paramSubtitle}>{type.name} (Equipment)</Text>
+                      <View style={styles.costTypeBadge}>
+                        <Text style={styles.costTypeBadgeText}>Cost Type: {type.cost_type}</Text>
+                      </View>
+                    </View>
+                  </View>
+
+                  <View style={styles.paramGrid}>
+                    <View style={styles.paramItem}>
+                      <Text style={styles.paramItemLabel}>Land Area</Text>
+                      <Text style={styles.paramItemValue}>
+                        {type.land_area_m2.toFixed(0)} m²
+                      </Text>
+                    </View>
+                    <View style={styles.paramItem}>
+                      <Text style={styles.paramItemLabel}>Occupation</Text>
+                      <Text style={styles.paramItemValue}>
+                        {type.building_occupation_pct.toFixed(0)}%
+                      </Text>
+                    </View>
+                    <View style={styles.paramItem}>
+                      <Text style={styles.paramItemLabel}>Build Area</Text>
+                      <Text style={styles.paramItemValue}>
+                        {buildAreaM2.toFixed(0)} m²
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.paramSummary}>
+                    <View style={styles.paramSummaryItem}>
+                      <Text style={styles.paramSummaryLabel}>Total Build Cost</Text>
+                      <Text style={styles.paramSummaryValue}>
+                        {totalCost.toLocaleString(undefined, {maximumFractionDigits: 0})} XOF
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              );
+            })}
+
+            {utilityTypes.map(type => {
+              const costConfig = mergedConstructionCosts.find(c => c.code === type.cost_type);
+              const buildAreaM2 = type.land_area_m2 * (type.building_occupation_pct / 100);
+              const costPerM2XOF = costConfig
+                ? costConfig.gold_grams_per_m2 * goldPrice.pricePerGram * USD_TO_XOF
+                : 0;
+              const totalCost = buildAreaM2 * costPerM2XOF;
+
+              return (
+                <View key={type.id} style={styles.paramCard}>
+                  <View style={styles.paramHeader}>
+                    <View style={[styles.paramIcon, styles.utilityIcon]}>
+                      <Settings size={18} color="#34C759" />
+                    </View>
+                    <View style={styles.paramHeaderText}>
+                      <Text style={styles.paramTitle}>{type.code}</Text>
+                      <Text style={styles.paramSubtitle}>{type.name} (Utility)</Text>
+                      <View style={styles.costTypeBadge}>
+                        <Text style={styles.costTypeBadgeText}>Cost Type: {type.cost_type}</Text>
+                      </View>
+                    </View>
+                  </View>
+
+                  <View style={styles.paramGrid}>
+                    <View style={styles.paramItem}>
+                      <Text style={styles.paramItemLabel}>Land Area</Text>
+                      <Text style={styles.paramItemValue}>
+                        {type.land_area_m2.toFixed(0)} m²
+                      </Text>
+                    </View>
+                    <View style={styles.paramItem}>
+                      <Text style={styles.paramItemLabel}>Occupation</Text>
+                      <Text style={styles.paramItemValue}>
+                        {type.building_occupation_pct.toFixed(0)}%
+                      </Text>
+                    </View>
+                    <View style={styles.paramItem}>
+                      <Text style={styles.paramItemLabel}>Build Area</Text>
+                      <Text style={styles.paramItemValue}>
+                        {buildAreaM2.toFixed(0)} m²
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.paramSummary}>
+                    <View style={styles.paramSummaryItem}>
+                      <Text style={styles.paramSummaryLabel}>Total Build Cost</Text>
+                      <Text style={styles.paramSummaryValue}>
+                        {totalCost.toLocaleString(undefined, {maximumFractionDigits: 0})} XOF
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        ) : null}
       </ScrollView>
     </SafeAreaView>
   );
@@ -524,6 +675,36 @@ const styles = StyleSheet.create({
     color: '#0D47A1',
     lineHeight: 18,
   },
+  emptyState: {
+    alignItems: 'center',
+    paddingVertical: 64,
+    paddingHorizontal: 32,
+  },
+  emptyStateTitle: {
+    fontSize: 20,
+    fontWeight: '700' as const,
+    color: '#212529',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  emptyStateText: {
+    fontSize: 14,
+    color: '#6C757D',
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 24,
+  },
+  emptyStateButton: {
+    backgroundColor: '#007AFF',
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+  },
+  emptyStateButtonText: {
+    fontSize: 15,
+    fontWeight: '600' as const,
+    color: '#FFFFFF',
+  },
   section: {
     marginTop: 24,
     paddingHorizontal: 16,
@@ -571,6 +752,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginRight: 12,
   },
+  equipmentIcon: {
+    backgroundColor: '#FFF3E0',
+  },
+  utilityIcon: {
+    backgroundColor: '#E8F5E9',
+  },
   paramHeaderText: {
     flex: 1,
   },
@@ -592,25 +779,12 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 6,
     marginTop: 6,
-    marginBottom: 6,
     alignSelf: 'flex-start',
   },
   costTypeBadgeText: {
     fontSize: 11,
     fontWeight: '600' as const,
     color: '#007AFF',
-  },
-  overrideLabel: {
-    fontSize: 12,
-    color: '#34C759',
-    fontWeight: '600' as const,
-    marginTop: 4,
-  },
-  defaultLabel: {
-    fontSize: 12,
-    color: '#6C757D',
-    fontWeight: '500' as const,
-    marginTop: 4,
   },
   paramGrid: {
     flexDirection: 'row',
@@ -641,7 +815,6 @@ const styles = StyleSheet.create({
   },
   paramSummary: {
     flexDirection: 'row',
-    marginBottom: 16,
     gap: 12,
   },
   paramSummaryItem: {
@@ -660,84 +833,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700' as const,
     color: '#007AFF',
-  },
-  actionButtons: {
-    gap: 12,
-  },
-  editTrigger: {
-    backgroundColor: '#F8F9FA',
-    borderRadius: 10,
-    paddingVertical: 12,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#E9ECEF',
-  },
-  editTriggerText: {
-    fontSize: 15,
-    fontWeight: '600' as const,
-    color: '#007AFF',
-  },
-  resetButton: {
-    backgroundColor: '#FFF8E1',
-    borderRadius: 10,
-    paddingVertical: 12,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#FFE082',
-  },
-  resetButtonText: {
-    fontSize: 15,
-    fontWeight: '600' as const,
-    color: '#8D6E00',
-  },
-  editForm: {
-    gap: 16,
-  },
-  inputGroup: {
-    gap: 8,
-  },
-  inputLabel: {
-    fontSize: 14,
-    fontWeight: '600' as const,
-    color: '#212529',
-  },
-  input: {
-    backgroundColor: '#F8F9FA',
-    borderRadius: 10,
-    padding: 14,
-    fontSize: 16,
-    color: '#212529',
-    borderWidth: 1,
-    borderColor: '#E9ECEF',
-  },
-  editButtons: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 8,
-  },
-  editButton: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  cancelButton: {
-    backgroundColor: '#F8F9FA',
-    borderWidth: 1,
-    borderColor: '#E9ECEF',
-  },
-  cancelButtonText: {
-    fontSize: 16,
-    fontWeight: '600' as const,
-    color: '#6C757D',
-  },
-  saveButton: {
-    backgroundColor: '#34C759',
-  },
-  saveButtonText: {
-    fontSize: 16,
-    fontWeight: '600' as const,
-    color: '#FFFFFF',
   },
   costCard: {
     backgroundColor: '#FFFFFF',
@@ -778,35 +873,5 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700' as const,
     color: '#212529',
-  },
-  costTypeOptions: {
-    gap: 8,
-  },
-  costTypeOption: {
-    backgroundColor: '#F8F9FA',
-    borderRadius: 10,
-    padding: 12,
-    borderWidth: 2,
-    borderColor: '#E9ECEF',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  costTypeOptionSelected: {
-    backgroundColor: '#E3F2FD',
-    borderColor: '#007AFF',
-  },
-  costTypeOptionCode: {
-    fontSize: 15,
-    fontWeight: '700' as const,
-    color: '#212529',
-  },
-  costTypeOptionValue: {
-    fontSize: 13,
-    fontWeight: '600' as const,
-    color: '#6C757D',
-  },
-  costTypeOptionTextSelected: {
-    color: '#007AFF',
   },
 });

@@ -10,8 +10,6 @@ import {
   DbHalfBlock,
   DbUnit,
   DbScenario,
-  DbProjectCostParam,
-  DbScenarioCostParam,
   DbProjectConstructionCost,
   DbProjectHousingType,
   DbProjectEquipmentUtilityType,
@@ -32,8 +30,7 @@ export const [ZURBContext, useZURB] = createContextHook(() => {
   const [halfBlocks, setHalfBlocks] = useState<DbHalfBlock[]>([]);
   const [units, setUnits] = useState<DbUnit[]>([]);
   const [scenarios, setScenarios] = useState<DbScenario[]>([]);
-  const [projectCostParams, setProjectCostParams] = useState<DbProjectCostParam[]>([]);
-  const [scenarioCostParams, setScenarioCostParams] = useState<DbScenarioCostParam[]>([]);
+
   const [projectConstructionCosts, setProjectConstructionCosts] = useState<DbProjectConstructionCost[]>([]);
   const [projectHousingTypes, setProjectHousingTypes] = useState<DbProjectHousingType[]>([]);
   const [projectEquipmentUtilityTypes, setProjectEquipmentUtilityTypes] = useState<DbProjectEquipmentUtilityType[]>([]);
@@ -167,45 +164,7 @@ export const [ZURBContext, useZURB] = createContextHook(() => {
     }
   }, [user]);
 
-  const loadProjectCostParams = useCallback(async () => {
-    if (!user) return;
 
-    try {
-      const { data, error } = await supabase
-        .from('project_cost_params')
-        .select('*');
-
-      if (error) {
-        console.error('[ZURB] Error loading project cost params:', JSON.stringify(error));
-        return;
-      }
-
-      console.log('[ZURB] Loaded project cost params:', data?.length);
-      setProjectCostParams(data || []);
-    } catch (error: any) {
-      console.error('[ZURB] Exception loading project cost params:', error?.message || JSON.stringify(error));
-    }
-  }, [user]);
-
-  const loadScenarioCostParams = useCallback(async () => {
-    if (!user) return;
-
-    try {
-      const { data, error } = await supabase
-        .from('scenario_cost_params')
-        .select('*');
-
-      if (error) {
-        console.error('[ZURB] Error loading scenario cost params:', JSON.stringify(error));
-        return;
-      }
-
-      console.log('[ZURB] Loaded scenario cost params:', data?.length);
-      setScenarioCostParams(data || []);
-    } catch (error: any) {
-      console.error('[ZURB] Exception loading scenario cost params:', error?.message || JSON.stringify(error));
-    }
-  }, [user]);
 
   const loadProjectConstructionCosts = useCallback(async () => {
     if (!user) return;
@@ -342,8 +301,6 @@ export const [ZURBContext, useZURB] = createContextHook(() => {
       loadHalfBlocks(),
       loadUnits(),
       loadScenarios(),
-      loadProjectCostParams(),
-      loadScenarioCostParams(),
       loadProjectConstructionCosts(),
       loadProjectHousingTypes(),
       loadProjectEquipmentUtilityTypes(),
@@ -352,7 +309,7 @@ export const [ZURBContext, useZURB] = createContextHook(() => {
       loadScenarioEquipmentUtilityTypes(),
     ]);
     setIsLoading(false);
-  }, [loadProjects, loadSites, loadBlocks, loadHalfBlocks, loadUnits, loadScenarios, loadProjectCostParams, loadScenarioCostParams, loadProjectConstructionCosts, loadProjectHousingTypes, loadProjectEquipmentUtilityTypes, loadScenarioConstructionCosts, loadScenarioHousingTypes, loadScenarioEquipmentUtilityTypes]);
+  }, [loadProjects, loadSites, loadBlocks, loadHalfBlocks, loadUnits, loadScenarios, loadProjectConstructionCosts, loadProjectHousingTypes, loadProjectEquipmentUtilityTypes, loadScenarioConstructionCosts, loadScenarioHousingTypes, loadScenarioEquipmentUtilityTypes]);
 
   useEffect(() => {
     if (!user) {
@@ -455,38 +412,9 @@ export const [ZURBContext, useZURB] = createContextHook(() => {
         () => {
           console.log('[ZURB] Scenarios changed, reloading');
           loadScenarios();
-        }
-      )
-      .subscribe();
-
-    const projectCostParamsChannel = supabase
-      .channel('project_cost_params-realtime')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'project_cost_params',
-        },
-        () => {
-          console.log('[ZURB] Project cost params changed, reloading');
-          loadProjectCostParams();
-        }
-      )
-      .subscribe();
-
-    const scenarioCostParamsChannel = supabase
-      .channel('scenario_cost_params-realtime')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'scenario_cost_params',
-        },
-        () => {
-          console.log('[ZURB] Scenario cost params changed, reloading');
-          loadScenarioCostParams();
+          loadScenarioConstructionCosts();
+          loadScenarioHousingTypes();
+          loadScenarioEquipmentUtilityTypes();
         }
       )
       .subscribe();
@@ -539,6 +467,54 @@ export const [ZURBContext, useZURB] = createContextHook(() => {
       )
       .subscribe();
 
+    const scenarioConstructionCostsChannel = supabase
+      .channel('scenario_construction_costs-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'scenario_construction_costs',
+        },
+        () => {
+          console.log('[ZURB] Scenario construction costs changed, reloading');
+          loadScenarioConstructionCosts();
+        }
+      )
+      .subscribe();
+
+    const scenarioHousingTypesChannel = supabase
+      .channel('scenario_housing_types-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'scenario_housing_types',
+        },
+        () => {
+          console.log('[ZURB] Scenario housing types changed, reloading');
+          loadScenarioHousingTypes();
+        }
+      )
+      .subscribe();
+
+    const scenarioEquipmentUtilityTypesChannel = supabase
+      .channel('scenario_equipment_utility_types-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'scenario_equipment_utility_types',
+        },
+        () => {
+          console.log('[ZURB] Scenario equipment utility types changed, reloading');
+          loadScenarioEquipmentUtilityTypes();
+        }
+      )
+      .subscribe();
+
     return () => {
       supabase.removeChannel(projectsChannel);
       supabase.removeChannel(sitesChannel);
@@ -546,13 +522,14 @@ export const [ZURBContext, useZURB] = createContextHook(() => {
       supabase.removeChannel(halfBlocksChannel);
       supabase.removeChannel(unitsChannel);
       supabase.removeChannel(scenariosChannel);
-      supabase.removeChannel(projectCostParamsChannel);
-      supabase.removeChannel(scenarioCostParamsChannel);
       supabase.removeChannel(projectConstructionCostsChannel);
+      supabase.removeChannel(scenarioConstructionCostsChannel);
+      supabase.removeChannel(scenarioHousingTypesChannel);
+      supabase.removeChannel(scenarioEquipmentUtilityTypesChannel);
       supabase.removeChannel(projectHousingTypesChannel);
       supabase.removeChannel(projectEquipmentUtilityTypesChannel);
     };
-  }, [user, loadData, loadProjects, loadSites, loadBlocks, loadHalfBlocks, loadUnits, loadScenarios, loadProjectCostParams, loadScenarioCostParams, loadProjectConstructionCosts, loadProjectHousingTypes, loadProjectEquipmentUtilityTypes]);
+  }, [user, loadData, loadProjects, loadSites, loadBlocks, loadHalfBlocks, loadUnits, loadScenarios, loadProjectConstructionCosts, loadProjectHousingTypes, loadProjectEquipmentUtilityTypes, loadScenarioConstructionCosts, loadScenarioHousingTypes, loadScenarioEquipmentUtilityTypes]);
 
   const createProject = useCallback(
     async (name: string, description?: string) => {
@@ -577,7 +554,6 @@ export const [ZURBContext, useZURB] = createContextHook(() => {
         console.log('[ZURB] Project created:', data);
         setProjects(prev => [data, ...prev]);
         await Promise.all([
-          loadProjectCostParams(),
           loadProjectConstructionCosts(),
           loadProjectHousingTypes(),
           loadProjectEquipmentUtilityTypes(),
@@ -589,7 +565,7 @@ export const [ZURBContext, useZURB] = createContextHook(() => {
         return null;
       }
     },
-    [user, loadProjectCostParams, loadProjectConstructionCosts, loadProjectHousingTypes, loadProjectEquipmentUtilityTypes]
+    [user, loadProjectConstructionCosts, loadProjectHousingTypes, loadProjectEquipmentUtilityTypes]
   );
 
   const updateProject = useCallback(
@@ -867,7 +843,11 @@ export const [ZURBContext, useZURB] = createContextHook(() => {
 
         console.log('[ZURB] Scenario created:', data);
         setScenarios(prev => [data, ...prev]);
-        await loadScenarioCostParams();
+        await Promise.all([
+          loadScenarioConstructionCosts(),
+          loadScenarioHousingTypes(),
+          loadScenarioEquipmentUtilityTypes(),
+        ]);
         return data;
       } catch (error: any) {
         console.error('[ZURB] Error creating scenario:', error);
@@ -875,7 +855,7 @@ export const [ZURBContext, useZURB] = createContextHook(() => {
         return null;
       }
     },
-    [user, loadScenarioCostParams]
+    [user, loadScenarioConstructionCosts, loadScenarioHousingTypes, loadScenarioEquipmentUtilityTypes]
   );
 
   const updateScenario = useCallback(
@@ -983,68 +963,7 @@ export const [ZURBContext, useZURB] = createContextHook(() => {
     [scenarios]
   );
 
-  const getProjectCostParamsByProjectId = useCallback(
-    (projectId: string) => {
-      return projectCostParams.filter(p => p.project_id === projectId);
-    },
-    [projectCostParams]
-  );
 
-  const getScenarioCostParamsByScenarioId = useCallback(
-    (scenarioId: string) => {
-      return scenarioCostParams.filter(s => s.scenario_id === scenarioId);
-    },
-    [scenarioCostParams]
-  );
-
-  const updateProjectCostParam = useCallback(
-    async (paramId: string, updates: { build_area_m2?: number; cost_per_m2?: number; rent_monthly?: number }) => {
-      try {
-        const { error } = await supabase
-          .from('project_cost_params')
-          .update(updates)
-          .eq('id', paramId);
-
-        if (error) throw error;
-
-        console.log('[ZURB] Project cost param updated');
-      } catch (error: any) {
-        console.error('[ZURB] Error updating project cost param:', error);
-        Alert.alert('Error', error.message || 'Failed to update cost parameter');
-      }
-    },
-    []
-  );
-
-  const upsertScenarioCostParam = useCallback(
-    async (scenarioId: string, unitType: string, buildAreaM2: number, costPerM2: number, rentMonthly: number) => {
-      try {
-        const { data, error } = await supabase
-          .from('scenario_cost_params')
-          .upsert({
-            scenario_id: scenarioId,
-            unit_type: unitType,
-            build_area_m2: buildAreaM2,
-            cost_per_m2: costPerM2,
-            rent_monthly: rentMonthly,
-          }, {
-            onConflict: 'scenario_id,unit_type',
-          })
-          .select()
-          .single();
-
-        if (error) throw error;
-
-        console.log('[ZURB] Scenario cost param upserted:', data);
-        return data;
-      } catch (error: any) {
-        console.error('[ZURB] Error upserting scenario cost param:', error);
-        Alert.alert('Error', error.message || 'Failed to update scenario cost parameter');
-        return null;
-      }
-    },
-    []
-  );
 
   const getProjectConstructionCostsByProjectId = useCallback(
     (projectId: string) => {
@@ -1357,8 +1276,6 @@ export const [ZURBContext, useZURB] = createContextHook(() => {
     halfBlocks,
     units,
     scenarios,
-    projectCostParams,
-    scenarioCostParams,
     projectConstructionCosts,
     projectHousingTypes,
     projectEquipmentUtilityTypes,
@@ -1385,16 +1302,12 @@ export const [ZURBContext, useZURB] = createContextHook(() => {
     getHalfBlocksByBlockId,
     getUnitsByHalfBlockId,
     getScenariosBySiteId,
-    getProjectCostParamsByProjectId,
-    getScenarioCostParamsByScenarioId,
     getProjectConstructionCostsByProjectId,
     getProjectHousingTypesByProjectId,
     getProjectEquipmentUtilityTypesByProjectId,
     getScenarioConstructionCostsByScenarioId,
     getScenarioHousingTypesByScenarioId,
     getScenarioEquipmentUtilityTypesByScenarioId,
-    updateProjectCostParam,
-    upsertScenarioCostParam,
     createProjectConstructionCost,
     updateProjectConstructionCost,
     deleteProjectConstructionCost,
@@ -1410,8 +1323,6 @@ export const [ZURBContext, useZURB] = createContextHook(() => {
     loadHalfBlocks,
     loadUnits,
     loadScenarios,
-    loadProjectCostParams,
-    loadScenarioCostParams,
     loadProjectConstructionCosts,
     loadProjectHousingTypes,
     loadProjectEquipmentUtilityTypes,

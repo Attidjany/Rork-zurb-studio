@@ -59,37 +59,47 @@ export default function ScenarioScreen() {
     return projects.find(p => p.id === site.project_id) || null;
   }, [projects, site]);
 
-  const scenarioCostParams = useMemo(() => {
-    if (!scenario) return [];
-    return getScenarioCostParamsByScenarioId(scenario.id);
-  }, [getScenarioCostParamsByScenarioId, scenario]);
-
-  const projectCostParams = useMemo(() => {
-    if (!project) return [];
-    return getProjectCostParamsByProjectId(project.id);
-  }, [getProjectCostParamsByProjectId, project]);
-
-  const costParams = useMemo(() => {
-    return projectCostParams.map(pp => {
-      const override = scenarioCostParams.find(sp => sp.unit_type === pp.unit_type);
-      return override || pp;
-    });
-  }, [projectCostParams, scenarioCostParams]);
-
   const projectConstructionCosts = useMemo(() => {
     if (!project) return [];
     return getProjectConstructionCostsByProjectId(project.id);
   }, [getProjectConstructionCostsByProjectId, project]);
+
+  const scenarioConstructionCosts = useMemo(() => {
+    if (!scenario) return [];
+    return getScenarioConstructionCostsByScenarioId(scenario.id);
+  }, [getScenarioConstructionCostsByScenarioId, scenario]);
 
   const projectHousingTypes = useMemo(() => {
     if (!project) return [];
     return getProjectHousingTypesByProjectId(project.id);
   }, [getProjectHousingTypesByProjectId, project]);
 
+  const scenarioHousingTypes = useMemo(() => {
+    if (!scenario) return [];
+    return getScenarioHousingTypesByScenarioId(scenario.id);
+  }, [getScenarioHousingTypesByScenarioId, scenario]);
+
   const projectEquipmentUtilityTypes = useMemo(() => {
     if (!project) return [];
     return getProjectEquipmentUtilityTypesByProjectId(project.id);
   }, [getProjectEquipmentUtilityTypesByProjectId, project]);
+
+  const scenarioEquipmentUtilityTypes = useMemo(() => {
+    if (!scenario) return [];
+    return getScenarioEquipmentUtilityTypesByScenarioId(scenario.id);
+  }, [getScenarioEquipmentUtilityTypesByScenarioId, scenario]);
+
+  const mergedConstructionCosts = useMemo(() => {
+    return scenarioConstructionCosts.length > 0 ? scenarioConstructionCosts : projectConstructionCosts;
+  }, [scenarioConstructionCosts, projectConstructionCosts]);
+
+  const mergedHousingTypes = useMemo(() => {
+    return scenarioHousingTypes.length > 0 ? scenarioHousingTypes : projectHousingTypes;
+  }, [scenarioHousingTypes, projectHousingTypes]);
+
+  const mergedEquipmentUtilityTypes = useMemo(() => {
+    return scenarioEquipmentUtilityTypes.length > 0 ? scenarioEquipmentUtilityTypes : projectEquipmentUtilityTypes;
+  }, [scenarioEquipmentUtilityTypes, projectEquipmentUtilityTypes]);
 
   const siteBlocks = useMemo(() => {
     if (!scenario) return [];
