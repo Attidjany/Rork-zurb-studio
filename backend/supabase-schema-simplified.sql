@@ -102,6 +102,34 @@ ALTER TABLE half_blocks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE units ENABLE ROW LEVEL SECURITY;
 ALTER TABLE scenarios ENABLE ROW LEVEL SECURITY;
 
+-- Drop existing policies (if any)
+DROP POLICY IF EXISTS "Users can read own profile" ON profiles;
+DROP POLICY IF EXISTS "Users can update own profile" ON profiles;
+DROP POLICY IF EXISTS "Users can read own projects" ON projects;
+DROP POLICY IF EXISTS "Users can create projects" ON projects;
+DROP POLICY IF EXISTS "Users can update own projects" ON projects;
+DROP POLICY IF EXISTS "Users can delete own projects" ON projects;
+DROP POLICY IF EXISTS "Users can read sites from own projects" ON sites;
+DROP POLICY IF EXISTS "Users can create sites in own projects" ON sites;
+DROP POLICY IF EXISTS "Users can update sites in own projects" ON sites;
+DROP POLICY IF EXISTS "Users can delete sites in own projects" ON sites;
+DROP POLICY IF EXISTS "Users can read blocks from own sites" ON blocks;
+DROP POLICY IF EXISTS "Users can create blocks in own sites" ON blocks;
+DROP POLICY IF EXISTS "Users can update blocks in own sites" ON blocks;
+DROP POLICY IF EXISTS "Users can delete blocks in own sites" ON blocks;
+DROP POLICY IF EXISTS "Users can read half_blocks" ON half_blocks;
+DROP POLICY IF EXISTS "Users can create half_blocks" ON half_blocks;
+DROP POLICY IF EXISTS "Users can update half_blocks" ON half_blocks;
+DROP POLICY IF EXISTS "Users can delete half_blocks" ON half_blocks;
+DROP POLICY IF EXISTS "Users can read units" ON units;
+DROP POLICY IF EXISTS "Users can create units" ON units;
+DROP POLICY IF EXISTS "Users can update units" ON units;
+DROP POLICY IF EXISTS "Users can delete units" ON units;
+DROP POLICY IF EXISTS "Users can read scenarios" ON scenarios;
+DROP POLICY IF EXISTS "Users can create scenarios" ON scenarios;
+DROP POLICY IF EXISTS "Users can update scenarios" ON scenarios;
+DROP POLICY IF EXISTS "Users can delete scenarios" ON scenarios;
+
 -- Profiles policies
 CREATE POLICY "Users can read own profile" ON profiles FOR SELECT USING (auth.uid() = id);
 CREATE POLICY "Users can update own profile" ON profiles FOR UPDATE USING (auth.uid() = id);
@@ -317,13 +345,13 @@ CREATE TRIGGER trigger_auto_generate_blocks
 
 -- Function to auto-generate half-blocks when block is created
 CREATE OR REPLACE FUNCTION auto_generate_half_blocks()
-RETURNS TRIGGER AS $
+RETURNS TRIGGER AS $$
 BEGIN
   INSERT INTO half_blocks (block_id, position) VALUES (NEW.id, 'north');
   INSERT INTO half_blocks (block_id, position) VALUES (NEW.id, 'south');
   RETURN NEW;
 END;
-$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql;
 
 DROP TRIGGER IF EXISTS trigger_auto_generate_half_blocks ON blocks;
 CREATE TRIGGER trigger_auto_generate_half_blocks
