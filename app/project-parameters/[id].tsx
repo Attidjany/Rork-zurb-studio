@@ -39,6 +39,7 @@ export default function ProjectParametersScreen() {
   const [goldPrice, setGoldPrice] = useState<GoldPriceData>(getCachedGoldPrice() || getDefaultGoldPrice());
   const [loadingGoldPrice, setLoadingGoldPrice] = useState<boolean>(false);
   const [editingParam, setEditingParam] = useState<string | null>(null);
+  const [isLoadingParams, setIsLoadingParams] = useState<boolean>(false);
   const [editValues, setEditValues] = useState<{
     build_area_m2: string;
     cost_per_m2: string;
@@ -75,7 +76,20 @@ export default function ProjectParametersScreen() {
 
   useEffect(() => {
     fetchGoldPrice();
-  }, [fetchGoldPrice]);
+  }, []);
+
+  useEffect(() => {
+    if (id && costParams.length === 0) {
+      const retryLoad = async () => {
+        console.log('[ProjectParameters] No parameters found, retrying in 1s...');
+        setIsLoadingParams(true);
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        await loadProjectCostParams();
+        setIsLoadingParams(false);
+      };
+      retryLoad();
+    }
+  }, [id, costParams.length, loadProjectCostParams]);
 
   const startEditing = useCallback((paramId: string, currentValues: {
     build_area_m2: number;
@@ -190,9 +204,18 @@ export default function ProjectParametersScreen() {
 
           {costParams.length === 0 && (
             <View style={styles.emptyState}>
-              <Text style={styles.emptyStateText}>
-                No cost parameters found. Pull down to refresh or check your project setup.
-              </Text>
+              {isLoadingParams ? (
+                <>
+                  <ActivityIndicator size="large" color="#007AFF" />
+                  <Text style={[styles.emptyStateText, { marginTop: 16 }]}>
+                    Loading parameters...
+                  </Text>
+                </>
+              ) : (
+                <Text style={styles.emptyStateText}>
+                  No cost parameters found. Pull down to refresh or check your project setup.
+                </Text>
+              )}
             </View>
           )}
 
