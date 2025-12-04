@@ -1353,6 +1353,78 @@ export const [ZURBContext, useZURB] = createContextHook(() => {
     [loadScenarioEquipmentUtilityTypes]
   );
 
+  const deleteScenarioConstructionCost = useCallback(
+    async (costId: string) => {
+      setScenarioConstructionCosts(prev => prev.filter(cost => cost.id !== costId));
+      
+      try {
+        const { error } = await supabase
+          .from('scenario_construction_costs')
+          .delete()
+          .eq('id', costId);
+
+        if (error) throw error;
+
+        console.log('[ZURB] Scenario construction cost deleted');
+        return true;
+      } catch (error: any) {
+        console.error('[ZURB] Error deleting scenario construction cost:', error);
+        Alert.alert('Error', error.message || 'Failed to delete construction cost');
+        await loadScenarioConstructionCosts();
+        return false;
+      }
+    },
+    [loadScenarioConstructionCosts]
+  );
+
+  const deleteScenarioHousingType = useCallback(
+    async (typeId: string) => {
+      setScenarioHousingTypes(prev => prev.filter(type => type.id !== typeId));
+      
+      try {
+        const { error } = await supabase
+          .from('scenario_housing_types')
+          .delete()
+          .eq('id', typeId);
+
+        if (error) throw error;
+
+        console.log('[ZURB] Scenario housing type deleted');
+        return true;
+      } catch (error: any) {
+        console.error('[ZURB] Error deleting scenario housing type:', error);
+        Alert.alert('Error', error.message || 'Failed to delete housing type');
+        await loadScenarioHousingTypes();
+        return false;
+      }
+    },
+    [loadScenarioHousingTypes]
+  );
+
+  const deleteScenarioEquipmentUtilityType = useCallback(
+    async (typeId: string) => {
+      setScenarioEquipmentUtilityTypes(prev => prev.filter(type => type.id !== typeId));
+      
+      try {
+        const { error } = await supabase
+          .from('scenario_equipment_utility_types')
+          .delete()
+          .eq('id', typeId);
+
+        if (error) throw error;
+
+        console.log('[ZURB] Scenario equipment utility type deleted');
+        return true;
+      } catch (error: any) {
+        console.error('[ZURB] Error deleting scenario equipment utility type:', error);
+        Alert.alert('Error', error.message || 'Failed to delete equipment/utility type');
+        await loadScenarioEquipmentUtilityTypes();
+        return false;
+      }
+    },
+    [loadScenarioEquipmentUtilityTypes]
+  );
+
   return {
     projects,
     sites,
@@ -1404,6 +1476,9 @@ export const [ZURBContext, useZURB] = createContextHook(() => {
     updateScenarioConstructionCost,
     updateScenarioHousingType,
     updateScenarioEquipmentUtilityType,
+    deleteScenarioConstructionCost,
+    deleteScenarioHousingType,
+    deleteScenarioEquipmentUtilityType,
     loadProjects,
     loadSites,
     loadBlocks,

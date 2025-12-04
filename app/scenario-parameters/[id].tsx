@@ -1,5 +1,5 @@
 import { Stack, useLocalSearchParams, router } from 'expo-router';
-import { Settings, DollarSign, Building2, Home, ShoppingBag } from 'lucide-react-native';
+import { Settings, DollarSign, Building2, Home, ShoppingBag, Edit2, Trash2 } from 'lucide-react-native';
 import React, { useMemo, useState, useCallback, useEffect } from 'react';
 import {
   View,
@@ -8,6 +8,8 @@ import {
   ScrollView,
   TouchableOpacity,
   RefreshControl,
+  TextInput,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useZURB } from '@/contexts/ZURBContext';
@@ -31,10 +33,18 @@ export default function ScenarioParametersScreen() {
     loadScenarioHousingTypes,
     loadProjectEquipmentUtilityTypes,
     loadScenarioEquipmentUtilityTypes,
+    updateScenarioConstructionCost,
+    updateScenarioHousingType,
+    updateScenarioEquipmentUtilityType,
+    deleteScenarioConstructionCost,
+    deleteScenarioHousingType,
+    deleteScenarioEquipmentUtilityType,
   } = useZURB();
 
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [goldPrice, setGoldPrice] = useState<GoldPriceData>(getCachedGoldPrice() || getDefaultGoldPrice());
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editValues, setEditValues] = useState<any>({});
 
   const scenario = useMemo(() => {
     return scenarios.find(s => s.id === id) || null;
@@ -213,27 +223,124 @@ export default function ScenarioParametersScreen() {
                 : `Inherited from project (${projectConstructionCosts.length} items) - Scenario has no custom costs yet`}
             </Text>
 
-            {mergedConstructionCosts.map(cost => (
-              <View key={cost.id} style={styles.costCard}>
-                <View style={styles.costHeader}>
-                  <Text style={styles.costCode}>{cost.code}</Text>
-                  <Text style={styles.costName}>{cost.name}</Text>
-                </View>
+            {mergedConstructionCosts.map(cost => {
+              const isEditing = editingId === cost.id;
+              const isScenarioCost = scenarioConstructionCosts.some(c => c.id === cost.id);
+              
+              return (
+                <View key={cost.id} style={styles.costCard}>
+                  <View style={[styles.costHeader, isScenarioCost && styles.costHeaderWithActions]}>
+                    <View style={styles.costHeaderContent}>
+                      {isEditing ? (
+                        <View style={styles.editForm}>
+                          <TextInput
+                            style={styles.input}
+                            value={editValues.code !== undefined ? editValues.code : cost.code}
+                            onChangeText={(text) => setEditValues({...editValues, code: text})}
+                            placeholder="Code"
+                          />
+                          <TextInput
+                            style={styles.input}
+                            value={editValues.name !== undefined ? editValues.name : cost.name}
+                            onChangeText={(text) => setEditValues({...editValues, name: text})}
+                            placeholder="Name"
+                          />
+                          <TextInput
+                            style={styles.input}
+                            value={String(editValues.gold_grams_per_m2 !== undefined ? editValues.gold_grams_per_m2 : cost.gold_grams_per_m2)}
+                            onChangeText={(text) => setEditValues({...editValues, gold_grams_per_m2: parseFloat(text) || 0})}
+                            placeholder="Gold g/m²"
+                            keyboardType="numeric"
+                          />
+                        </View>
+                      ) : (
+                        <View>
+                          <Text style={styles.costCode}>{cost.code}</Text>
+                          <Text style={styles.costName}>{cost.name}</Text>
+                        </View>
+                      )}
+                    </View>
+                    {isScenarioCost && (
+                      <View style={styles.actionButtons}>
+                        {isEditing ? (
+                          <>
+                            <TouchableOpacity
+                              style={styles.saveButton}
+                              onPress={async () => {
+                                await updateScenarioConstructionCost(cost.id, editValues);
+                                setEditingId(null);
+                                setEditValues({});
+                              }}
+                            >
+                              <Text style={styles.saveButtonText}>Save</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              style={styles.cancelButton}
+                              onPress={() => {
+                                setEditingId(null);
+                                setEditValues({});
+                              }}
+                            >
+                              <Text style={styles.cancelButtonText}>Cancel</Text>
+                            </TouchableOpacity>
+                          </>
+                        ) : (
+                          <>
+                            <TouchableOpacity
+                              style={styles.iconButton}
+                              onPress={() => {
+                                setEditingId(cost.id);
+                                setEditValues({
+                                  code: cost.code,
+                                  name: cost.name,
+                                  gold_grams_per_m2: cost.gold_grams_per_m2,
+                                });
+                              }}
+                            >
+                              <Edit2 size={18} color="#007AFF" />
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              style={styles.iconButton}
+                              onPress={() => {
+                                Alert.alert(
+                                  'Delete Construction Cost',
+                                  `Are you sure you want to delete ${cost.code}?`,
+                                  [
+                                    { text: 'Cancel', style: 'cancel' },
+                                    {
+                                      text: 'Delete',
+                                      style: 'destructive',
+                                      onPress: () => deleteScenarioConstructionCost(cost.id),
+                                    },
+                                  ]
+                                );
+                              }}
+                            >
+                              <Trash2 size={18} color="#FF3B30" />
+                            </TouchableOpacity>
+                          </>
+                        )}
+                      </View>
+                    )}
+                  </View>
 
-                <View style={styles.costDetails}>
-                  <View style={styles.costDetailRow}>
-                    <Text style={styles.costDetailLabel}>Gold Content:</Text>
-                    <Text style={styles.costDetailValue}>{cost.gold_grams_per_m2.toFixed(2)} g Au/m²</Text>
-                  </View>
-                  <View style={styles.costDetailRow}>
-                    <Text style={styles.costDetailLabel}>Cost per m²:</Text>
-                    <Text style={styles.costDetailValue}>
-                      {(cost.gold_grams_per_m2 * goldPrice.pricePerGram * USD_TO_XOF).toLocaleString(undefined, {maximumFractionDigits: 0})} XOF/m²
-                    </Text>
-                  </View>
+                  {!isEditing && (
+                    <View style={styles.costDetails}>
+                      <View style={styles.costDetailRow}>
+                        <Text style={styles.costDetailLabel}>Gold Content:</Text>
+                        <Text style={styles.costDetailValue}>{cost.gold_grams_per_m2.toFixed(2)} g Au/m²</Text>
+                      </View>
+                      <View style={styles.costDetailRow}>
+                        <Text style={styles.costDetailLabel}>Cost per m²:</Text>
+                        <Text style={styles.costDetailValue}>
+                          {(cost.gold_grams_per_m2 * goldPrice.pricePerGram * USD_TO_XOF).toLocaleString(undefined, {maximumFractionDigits: 0})} XOF/m²
+                        </Text>
+                      </View>
+                    </View>
+                  )}
                 </View>
-              </View>
-            ))}
+              );
+            })}
           </View>
         ) : null}
 
@@ -855,6 +962,14 @@ const styles = StyleSheet.create({
   costHeader: {
     marginBottom: 8,
   },
+  costHeaderWithActions: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+  },
+  costHeaderContent: {
+    flex: 1,
+  },
   costCode: {
     fontSize: 16,
     fontWeight: '700' as const,
@@ -883,5 +998,52 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700' as const,
     color: '#212529',
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    gap: 8,
+    marginLeft: 12,
+  },
+  iconButton: {
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: '#F8F9FA',
+  },
+  editForm: {
+    gap: 8,
+    width: '100%',
+  },
+  input: {
+    backgroundColor: '#F8F9FA',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 14,
+    color: '#212529',
+    borderWidth: 1,
+    borderColor: '#E9ECEF',
+  },
+  saveButton: {
+    backgroundColor: '#007AFF',
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+  },
+  saveButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600' as const,
+  },
+  cancelButton: {
+    backgroundColor: '#F8F9FA',
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderWidth: 1,
+    borderColor: '#E9ECEF',
+  },
+  cancelButtonText: {
+    color: '#6C757D',
+    fontSize: 14,
+    fontWeight: '600' as const,
   },
 });
