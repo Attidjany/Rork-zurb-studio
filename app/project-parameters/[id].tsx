@@ -1,5 +1,5 @@
 import { Stack, useLocalSearchParams } from 'expo-router';
-import { DollarSign, TrendingUp } from 'lucide-react-native';
+import { DollarSign, TrendingUp, Building2, Home, ShoppingBag, Settings } from 'lucide-react-native';
 import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import {
   View,
@@ -14,17 +14,12 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useZURB } from '@/contexts/ZURBContext';
 import { fetchLiveGoldPrice, getCachedGoldPrice, getDefaultGoldPrice, GoldPriceData } from '@/lib/goldPrice';
+import { CONSTRUCTION_COSTS, HOUSING_TYPES } from '@/constants/typologies';
 
-const UNIT_TYPE_LABELS: { [key: string]: string } = {
-  XM: 'Extra Small',
-  AMS: 'Small Apartment',
-  AML: 'Large Apartment',
-  AH: 'Apartment High-end',
-  villa_200: 'Villa 200m²',
-  villa_300: 'Villa 300m²',
-  villa_500: 'Villa 500m²',
-  villa_1000: 'Villa 1000m²',
-};
+const CONSTRUCTION_COST_TYPES = ['ZME', 'ZHE', 'ZOS', 'ZMER', 'ZHER'];
+const APARTMENT_TYPES = ['AMS', 'AML', 'AH'];
+const VILLA_TYPES = ['BMS', 'BML', 'BH', 'CH', 'CO'];
+const COMMERCIAL_TYPES = ['XM', 'XH'];
 
 export default function ProjectParametersScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -76,7 +71,7 @@ export default function ProjectParametersScreen() {
 
   useEffect(() => {
     fetchGoldPrice();
-  }, []);
+  }, [fetchGoldPrice]);
 
   useEffect(() => {
     if (id && costParams.length === 0) {
@@ -114,11 +109,16 @@ export default function ProjectParametersScreen() {
   }, []);
 
   const saveParam = useCallback(async (paramId: string) => {
-    const buildArea = parseFloat(editValues.build_area_m2);
-    const costPerM2 = parseFloat(editValues.cost_per_m2);
-    const rentMonthly = parseFloat(editValues.rent_monthly);
+    const param = costParams.find(p => p.id === paramId);
+    if (!param) return;
 
-    if (isNaN(buildArea) || isNaN(costPerM2) || isNaN(rentMonthly)) {
+    const isConstructionCost = CONSTRUCTION_COST_TYPES.includes(param.unit_type);
+
+    const buildArea = isConstructionCost ? 0 : parseFloat(editValues.build_area_m2);
+    const costPerM2 = parseFloat(editValues.cost_per_m2);
+    const rentMonthly = isConstructionCost ? 0 : parseFloat(editValues.rent_monthly);
+
+    if (isNaN(costPerM2) || (!isConstructionCost && (isNaN(buildArea) || isNaN(rentMonthly)))) {
       return;
     }
 
@@ -129,7 +129,127 @@ export default function ProjectParametersScreen() {
     });
 
     cancelEditing();
-  }, [editValues, updateProjectCostParam, cancelEditing]);
+  }, [editValues, updateProjectCostParam, cancelEditing, costParams]);
+
+  const renderHousingTypeCard = useCallback((param: any, type: string) => {
+    const isEditing = editingParam === param.id;
+    const config = HOUSING_TYPES[type];
+
+    return (
+      <View key={param.id} style={styles.paramCard}>
+        <View style={styles.paramHeader}>
+          <View style={styles.paramIcon}>
+            <DollarSign size={18} color="#007AFF" />
+          </View>
+          <View style={styles.paramHeaderText}>
+            <Text style={styles.paramTitle}>{type}</Text>
+            <Text style={styles.paramSubtitle}>{config.name}</Text>
+          </View>
+        </View>
+
+        {isEditing ? (
+          <View style={styles.editForm}>
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Build Area (m²)</Text>
+              <TextInput
+                style={styles.input}
+                value={editValues.build_area_m2}
+                onChangeText={(text) => setEditValues(prev => ({ ...prev, build_area_m2: text }))}
+                keyboardType="decimal-pad"
+                placeholder="Build area"
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Cost per m² ($)</Text>
+              <TextInput
+                style={styles.input}
+                value={editValues.cost_per_m2}
+                onChangeText={(text) => setEditValues(prev => ({ ...prev, cost_per_m2: text }))}
+                keyboardType="decimal-pad"
+                placeholder="Cost per m²"
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Monthly Rent ($)</Text>
+              <TextInput
+                style={styles.input}
+                value={editValues.rent_monthly}
+                onChangeText={(text) => setEditValues(prev => ({ ...prev, rent_monthly: text }))}
+                keyboardType="decimal-pad"
+                placeholder="Monthly rent"
+              />
+            </View>
+
+            <View style={styles.editButtons}>
+              <TouchableOpacity
+                style={[styles.editButton, styles.cancelButton]}
+                onPress={cancelEditing}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.editButton, styles.saveButton]}
+                onPress={() => saveParam(param.id)}
+              >
+                <Text style={styles.saveButtonText}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        ) : (
+          <>
+            <View style={styles.paramGrid}>
+              <View style={styles.paramItem}>
+                <Text style={styles.paramItemLabel}>Build Area</Text>
+                <Text style={styles.paramItemValue}>
+                  {param.build_area_m2.toFixed(0)} m²
+                </Text>
+              </View>
+              <View style={styles.paramItem}>
+                <Text style={styles.paramItemLabel}>Cost/m²</Text>
+                <Text style={styles.paramItemValue}>
+                  ${param.cost_per_m2.toLocaleString()}
+                </Text>
+              </View>
+              <View style={styles.paramItem}>
+                <Text style={styles.paramItemLabel}>Monthly Rent</Text>
+                <Text style={styles.paramItemValue}>
+                  ${param.rent_monthly.toLocaleString()}
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.paramSummary}>
+              <View style={styles.paramSummaryItem}>
+                <Text style={styles.paramSummaryLabel}>Total Build Cost</Text>
+                <Text style={styles.paramSummaryValue}>
+                  ${(param.build_area_m2 * param.cost_per_m2).toLocaleString()}
+                </Text>
+              </View>
+              <View style={styles.paramSummaryItem}>
+                <Text style={styles.paramSummaryLabel}>Yearly Revenue</Text>
+                <Text style={styles.paramSummaryValue}>
+                  ${(param.rent_monthly * 12).toLocaleString()}
+                </Text>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              style={styles.editTrigger}
+              onPress={() => startEditing(param.id, {
+                build_area_m2: param.build_area_m2,
+                cost_per_m2: param.cost_per_m2,
+                rent_monthly: param.rent_monthly,
+              })}
+            >
+              <Text style={styles.editTriggerText}>Edit Parameters</Text>
+            </TouchableOpacity>
+          </>
+        )}
+      </View>
+    );
+  }, [editingParam, editValues, cancelEditing, saveParam, startEditing]);
 
   if (!project) {
     return (
@@ -196,55 +316,48 @@ export default function ProjectParametersScreen() {
           </View>
         </View>
 
+        {costParams.length === 0 && (
+          <View style={styles.emptyState}>
+            {isLoadingParams ? (
+              <>
+                <ActivityIndicator size="large" color="#007AFF" />
+                <Text style={[styles.emptyStateText, { marginTop: 16 }]}>
+                  Loading parameters...
+                </Text>
+              </>
+            ) : (
+              <Text style={styles.emptyStateText}>
+                No cost parameters found. Pull down to refresh or check your project setup.
+              </Text>
+            )}
+          </View>
+        )}
+
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Cost Parameters</Text>
+          <View style={styles.sectionHeader}>
+            <Settings size={20} color="#007AFF" />
+            <Text style={styles.sectionTitle}>Construction Costs per m²</Text>
+          </View>
           <Text style={styles.sectionDesc}>
-            Configure default costs and rents for each unit type
+            Base construction costs used in housing types below
           </Text>
 
-          {costParams.length === 0 && (
-            <View style={styles.emptyState}>
-              {isLoadingParams ? (
-                <>
-                  <ActivityIndicator size="large" color="#007AFF" />
-                  <Text style={[styles.emptyStateText, { marginTop: 16 }]}>
-                    Loading parameters...
-                  </Text>
-                </>
-              ) : (
-                <Text style={styles.emptyStateText}>
-                  No cost parameters found. Pull down to refresh or check your project setup.
-                </Text>
-              )}
-            </View>
-          )}
+          {CONSTRUCTION_COST_TYPES.map(type => {
+            const param = costParams.find(p => p.unit_type === type);
+            if (!param) return null;
 
-          {costParams.map(param => {
             const isEditing = editingParam === param.id;
-            const unitLabel = UNIT_TYPE_LABELS[param.unit_type] || param.unit_type;
+            const config = CONSTRUCTION_COSTS[type];
 
             return (
-              <View key={param.id} style={styles.paramCard}>
-                <View style={styles.paramHeader}>
-                  <View style={styles.paramIcon}>
-                    <DollarSign size={18} color="#007AFF" />
-                  </View>
-                  <Text style={styles.paramTitle}>{unitLabel}</Text>
+              <View key={param.id} style={styles.costCard}>
+                <View style={styles.costHeader}>
+                  <Text style={styles.costCode}>{type}</Text>
+                  <Text style={styles.costName}>{config.name}</Text>
                 </View>
 
                 {isEditing ? (
                   <View style={styles.editForm}>
-                    <View style={styles.inputGroup}>
-                      <Text style={styles.inputLabel}>Build Area (m²)</Text>
-                      <TextInput
-                        style={styles.input}
-                        value={editValues.build_area_m2}
-                        onChangeText={(text) => setEditValues(prev => ({ ...prev, build_area_m2: text }))}
-                        keyboardType="decimal-pad"
-                        placeholder="Build area"
-                      />
-                    </View>
-
                     <View style={styles.inputGroup}>
                       <Text style={styles.inputLabel}>Cost per m² ($)</Text>
                       <TextInput
@@ -253,17 +366,6 @@ export default function ProjectParametersScreen() {
                         onChangeText={(text) => setEditValues(prev => ({ ...prev, cost_per_m2: text }))}
                         keyboardType="decimal-pad"
                         placeholder="Cost per m²"
-                      />
-                    </View>
-
-                    <View style={styles.inputGroup}>
-                      <Text style={styles.inputLabel}>Monthly Rent ($)</Text>
-                      <TextInput
-                        style={styles.input}
-                        value={editValues.rent_monthly}
-                        onChangeText={(text) => setEditValues(prev => ({ ...prev, rent_monthly: text }))}
-                        keyboardType="decimal-pad"
-                        placeholder="Monthly rent"
                       />
                     </View>
 
@@ -284,56 +386,69 @@ export default function ProjectParametersScreen() {
                   </View>
                 ) : (
                   <>
-                    <View style={styles.paramGrid}>
-                      <View style={styles.paramItem}>
-                        <Text style={styles.paramItemLabel}>Build Area</Text>
-                        <Text style={styles.paramItemValue}>
-                          {param.build_area_m2.toFixed(0)} m²
-                        </Text>
-                      </View>
-                      <View style={styles.paramItem}>
-                        <Text style={styles.paramItemLabel}>Cost/m²</Text>
-                        <Text style={styles.paramItemValue}>
-                          ${param.cost_per_m2.toLocaleString()}
-                        </Text>
-                      </View>
-                      <View style={styles.paramItem}>
-                        <Text style={styles.paramItemLabel}>Monthly Rent</Text>
-                        <Text style={styles.paramItemValue}>
-                          ${param.rent_monthly.toLocaleString()}
-                        </Text>
-                      </View>
-                    </View>
-
-                    <View style={styles.paramSummary}>
-                      <View style={styles.paramSummaryItem}>
-                        <Text style={styles.paramSummaryLabel}>Total Build Cost</Text>
-                        <Text style={styles.paramSummaryValue}>
-                          ${(param.build_area_m2 * param.cost_per_m2).toLocaleString()}
-                        </Text>
-                      </View>
-                      <View style={styles.paramSummaryItem}>
-                        <Text style={styles.paramSummaryLabel}>Yearly Revenue</Text>
-                        <Text style={styles.paramSummaryValue}>
-                          ${(param.rent_monthly * 12).toLocaleString()}
-                        </Text>
-                      </View>
-                    </View>
-
+                    <Text style={styles.costValue}>${param.cost_per_m2.toLocaleString()}/m²</Text>
                     <TouchableOpacity
-                      style={styles.editTrigger}
+                      style={styles.editTriggerSmall}
                       onPress={() => startEditing(param.id, {
                         build_area_m2: param.build_area_m2,
                         cost_per_m2: param.cost_per_m2,
                         rent_monthly: param.rent_monthly,
                       })}
                     >
-                      <Text style={styles.editTriggerText}>Edit Parameters</Text>
+                      <Text style={styles.editTriggerTextSmall}>Edit</Text>
                     </TouchableOpacity>
                   </>
                 )}
               </View>
             );
+          })}
+        </View>
+
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Building2 size={20} color="#007AFF" />
+            <Text style={styles.sectionTitle}>Apartment Housing Types</Text>
+          </View>
+          <Text style={styles.sectionDesc}>
+            Configure apartment unit types with area, cost type, and rental revenue
+          </Text>
+
+          {APARTMENT_TYPES.map(type => {
+            const param = costParams.find(p => p.unit_type === type);
+            if (!param) return null;
+            return renderHousingTypeCard(param, type);
+          })}
+        </View>
+
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Home size={20} color="#007AFF" />
+            <Text style={styles.sectionTitle}>Villa Housing Types</Text>
+          </View>
+          <Text style={styles.sectionDesc}>
+            Configure villa unit types with area, cost type, and rental revenue
+          </Text>
+
+          {VILLA_TYPES.map(type => {
+            const param = costParams.find(p => p.unit_type === type);
+            if (!param) return null;
+            return renderHousingTypeCard(param, type);
+          })}
+        </View>
+
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <ShoppingBag size={20} color="#007AFF" />
+            <Text style={styles.sectionTitle}>Commercial Housing Types</Text>
+          </View>
+          <Text style={styles.sectionDesc}>
+            Configure commercial unit types with area, cost type, and rental revenue
+          </Text>
+
+          {COMMERCIAL_TYPES.map(type => {
+            const param = costParams.find(p => p.unit_type === type);
+            if (!param) return null;
+            return renderHousingTypeCard(param, type);
           })}
         </View>
       </ScrollView>
@@ -451,11 +566,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingBottom: 32,
   },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
   sectionTitle: {
     fontSize: 20,
     fontWeight: '700' as const,
     color: '#212529',
-    marginBottom: 8,
   },
   sectionDesc: {
     fontSize: 14,
@@ -612,5 +732,55 @@ const styles = StyleSheet.create({
     color: '#6C757D',
     textAlign: 'center',
     lineHeight: 22,
+  },
+  costCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#E9ECEF',
+  },
+  costHeader: {
+    marginBottom: 8,
+  },
+  costCode: {
+    fontSize: 16,
+    fontWeight: '700' as const,
+    color: '#212529',
+    marginBottom: 4,
+  },
+  costName: {
+    fontSize: 13,
+    color: '#6C757D',
+    lineHeight: 18,
+  },
+  costValue: {
+    fontSize: 18,
+    fontWeight: '700' as const,
+    color: '#007AFF',
+    marginBottom: 8,
+  },
+  editTriggerSmall: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    backgroundColor: '#F8F9FA',
+    borderWidth: 1,
+    borderColor: '#E9ECEF',
+  },
+  editTriggerTextSmall: {
+    fontSize: 13,
+    fontWeight: '600' as const,
+    color: '#007AFF',
+  },
+  paramHeaderText: {
+    flex: 1,
+  },
+  paramSubtitle: {
+    fontSize: 13,
+    color: '#6C757D',
+    marginTop: 2,
   },
 });

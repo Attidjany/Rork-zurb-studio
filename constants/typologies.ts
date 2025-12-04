@@ -46,31 +46,31 @@ export const APARTMENT_LAYOUT: ApartmentLayoutConfig = {
 
 export const BUILDING_TYPES: BuildingTypeConfig[] = [
   {
-    id: 'AM1',
-    name: 'Apartment Type AM1',
+    id: 'AB1',
+    name: 'Apartment Building Type AB1',
     category: 'apartment',
     units: {
-      XM: 10,
-      AMS: 15,
-      AML: 5,
+      AMS: 18,
+      AML: 4,
+      XM: 6,
     },
   },
   {
-    id: 'AM2',
-    name: 'Apartment Type AM2',
+    id: 'AB2',
+    name: 'Apartment Building Type AB2',
     category: 'apartment',
     units: {
-      XM: 8,
-      AMS: 20,
-      AML: 2,
+      AML: 16,
+      XM: 6,
     },
   },
   {
-    id: 'AH',
-    name: 'Apartment Type AH',
+    id: 'ABH',
+    name: 'Apartment Building Type ABH',
     category: 'apartment',
     units: {
-      AH: 25,
+      AH: 12,
+      XH: 6,
     },
   },
 ];
@@ -89,6 +89,27 @@ export const UTILITY_OPTIONS: UtilityOption[] = [
   { id: 'waste_management', name: 'Waste Management Facility' },
   { id: 'maintenance', name: 'Maintenance Depot' },
 ];
+
+export const CONSTRUCTION_COSTS: { [key: string]: { name: string; defaultCostPerM2: number } } = {
+  ZME: { name: 'Zone Moyenne Entièrement équipée', defaultCostPerM2: 1000 },
+  ZHE: { name: 'Zone Haut standing Entièrement équipée', defaultCostPerM2: 1200 },
+  ZOS: { name: 'Zone Ordinaire Semi-équipée', defaultCostPerM2: 900 },
+  ZMER: { name: 'Zone Moyenne Équipée Renforcée', defaultCostPerM2: 1100 },
+  ZHER: { name: 'Zone Haut standing Équipée Renforcée', defaultCostPerM2: 1300 },
+};
+
+export const HOUSING_TYPES: { [key: string]: { name: string; defaultArea: number; defaultCostType: string; defaultRent: number; category: string } } = {
+  AMS: { name: 'Apartment Small', defaultArea: 75, defaultCostType: 'ZME', defaultRent: 500, category: 'apartment' },
+  AML: { name: 'Apartment Medium/Large', defaultArea: 100, defaultCostType: 'ZME', defaultRent: 600, category: 'apartment' },
+  AH: { name: 'Apartment High-end', defaultArea: 120, defaultCostType: 'ZHE', defaultRent: 850, category: 'apartment' },
+  BMS: { name: 'Villa Small', defaultArea: 130, defaultCostType: 'ZME', defaultRent: 750, category: 'villa' },
+  BML: { name: 'Villa Medium/Large', defaultArea: 180, defaultCostType: 'ZME', defaultRent: 950, category: 'villa' },
+  BH: { name: 'Villa High-end', defaultArea: 220, defaultCostType: 'ZHE', defaultRent: 1200, category: 'villa' },
+  CH: { name: 'Chalet High-end', defaultArea: 250, defaultCostType: 'ZHE', defaultRent: 1400, category: 'villa' },
+  CO: { name: 'Chalet Ordinary', defaultArea: 160, defaultCostType: 'ZOS', defaultRent: 900, category: 'villa' },
+  XM: { name: 'Commercial Medium', defaultArea: 50, defaultCostType: 'ZME', defaultRent: 300, category: 'commercial' },
+  XH: { name: 'Commercial High-end', defaultArea: 80, defaultCostType: 'ZHE', defaultRent: 450, category: 'commercial' },
+};
 
 export const UNIT_BUILD_AREAS: { [key: string]: number } = {
   XM: 50,

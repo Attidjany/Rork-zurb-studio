@@ -90,7 +90,7 @@ CREATE TABLE IF NOT EXISTS units (
   unit_number INT NOT NULL,
   unit_type TEXT NOT NULL,
   size_m2 NUMERIC,
-  building_type TEXT CHECK (building_type IN ('AM1', 'AM2', 'AH', 'equipment', 'utility')),
+  building_type TEXT CHECK (building_type IN ('AB1', 'AB2', 'ABH', 'equipment', 'utility')),
   equipment_name TEXT,
   utility_name TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -463,25 +463,25 @@ CREATE OR REPLACE FUNCTION auto_generate_project_cost_params()
 RETURNS TRIGGER AS $$
 BEGIN
   INSERT INTO project_cost_params (project_id, unit_type, build_area_m2, cost_per_m2, rent_monthly) VALUES
-    (NEW.id, 'XM', 50, 800, 300),
-    (NEW.id, 'XH', 80, 1000, 450),
-    (NEW.id, 'AMS', 75, 900, 500),
+    (NEW.id, 'ZME', 0, 1000, 0),
+    (NEW.id, 'ZHE', 0, 1200, 0),
+    (NEW.id, 'ZOS', 0, 900, 0),
+    (NEW.id, 'ZMER', 0, 1100, 0),
+    (NEW.id, 'ZHER', 0, 1300, 0),
+    (NEW.id, 'AMS', 75, 1000, 500),
     (NEW.id, 'AML', 100, 1000, 600),
     (NEW.id, 'AH', 120, 1200, 850),
     (NEW.id, 'BMS', 130, 1100, 750),
     (NEW.id, 'BML', 180, 1200, 950),
     (NEW.id, 'BH', 220, 1400, 1200),
     (NEW.id, 'CH', 250, 1500, 1400),
-    (NEW.id, 'CO', 160, 1150, 900),
+    (NEW.id, 'CO', 160, 900, 900),
+    (NEW.id, 'XM', 50, 1000, 300),
+    (NEW.id, 'XH', 80, 1200, 450),
     (NEW.id, 'villa_200', 150, 1100, 800),
     (NEW.id, 'villa_300', 200, 1200, 1000),
     (NEW.id, 'villa_500', 300, 1300, 1200),
-    (NEW.id, 'villa_1000', 500, 1500, 2000),
-    (NEW.id, 'ZME', 0, 1000, 0),
-    (NEW.id, 'ZHE', 0, 1200, 0),
-    (NEW.id, 'ZOS', 0, 900, 0),
-    (NEW.id, 'ZMER', 0, 1100, 0),
-    (NEW.id, 'ZHER', 0, 1300, 0);
+    (NEW.id, 'villa_1000', 500, 1500, 2000);
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
