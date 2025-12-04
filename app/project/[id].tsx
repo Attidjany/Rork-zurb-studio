@@ -1,6 +1,6 @@
 import { Stack, useRouter, useLocalSearchParams } from 'expo-router';
-import { Plus, MapPin, Trash2 } from 'lucide-react-native';
-import React, { useState, useMemo } from 'react';
+import { Plus, MapPin } from 'lucide-react-native';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -13,8 +13,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { trpc } from '@/lib/trpc';
-import { calculatePolygonArea, getPolygonCenter } from '@/utils/geometry';
+import { useZURB } from '@/contexts/ZURBContext';
 
 type Site = {
   id: string;
@@ -28,109 +27,37 @@ type Site = {
 export default function ProjectScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const projectQuery = trpc.projects.get.useQuery({ projectId: id as string }, { enabled: !!id });
-  const sitesQuery = trpc.sites.list.useQuery({ projectId: id as string }, { enabled: !!id });
-  const createSiteMutation = trpc.sites.create.useMutation({
-    onSuccess: () => {
-      console.log('[Site] Site created successfully');
-      sitesQuery.refetch();
-      resetForm();
-    },
-    onError: (error) => {
-      console.error('[Site] Error creating site:', error);
-    },
-  });
+  const { projects, getSitesByProjectId, createSite, isLoading } = useZURB();
   const [modalVisible, setModalVisible] = useState<boolean>(false);
   const [siteName, setSiteName] = useState<string>('');
-  const [usePolygon, setUsePolygon] = useState<boolean>(false);
-  const [polygonCoords, setPolygonCoords] = useState<{ latitude: string; longitude: string }[]>([{ latitude: '14.6937', longitude: '-17.4441' }]);
   const [siteArea, setSiteArea] = useState<string>('');
-  const [latitude, setLatitude] = useState<string>('14.6937');
-  const [longitude, setLongitude] = useState<string>('-17.4441');
+  const [isCreating, setIsCreating] = useState<boolean>(false);
 
-  const handleCreateSite = () => {
-    if (!siteName.trim() || !id) return;
+  const project = projects.find(p => p.id === id);
+  const projectSites = getSitesByProjectId(id || '');
 
-    console.log('[Site] Creating site:', siteName);
+  const handleCreateSite = async () => {
+    if (!siteName.trim() || !siteArea.trim() || !id) return;
 
-    if (usePolygon) {
-      const coords = polygonCoords
-        .map(c => ({
-          latitude: parseFloat(c.latitude),
-          longitude: parseFloat(c.longitude),
-        }))
-        .filter(c => !isNaN(c.latitude) && !isNaN(c.longitude));
+    const area = parseFloat(siteArea);
+    if (isNaN(area)) return;
 
-      if (coords.length >= 3) {
-        const area = calculatePolygonArea(coords);
-        const center = getPolygonCenter(coords);
-        createSiteMutation.mutate({
-          projectId: id,
-          name: siteName.trim(),
-          areaHa: area,
-          latitude: center.latitude,
-          longitude: center.longitude,
-          polygon: coords,
-        });
+    setIsCreating(true);
+    try {
+      const result = await createSite(id, siteName.trim(), area);
+      if (result) {
+        resetForm();
       }
-    } else {
-      if (siteArea.trim()) {
-        const area = parseFloat(siteArea);
-        const lat = parseFloat(latitude);
-        const lng = parseFloat(longitude);
-        if (!isNaN(area) && !isNaN(lat) && !isNaN(lng)) {
-          createSiteMutation.mutate({
-            projectId: id,
-            name: siteName.trim(),
-            areaHa: area,
-            latitude: lat,
-            longitude: lng,
-          });
-        }
-      }
+    } finally {
+      setIsCreating(false);
     }
   };
 
   const resetForm = () => {
     setSiteName('');
     setSiteArea('');
-    setLatitude('14.6937');
-    setLongitude('-17.4441');
-    setUsePolygon(false);
-    setPolygonCoords([{ latitude: '14.6937', longitude: '-17.4441' }]);
     setModalVisible(false);
   };
-
-  const addPolygonPoint = () => {
-    setPolygonCoords([...polygonCoords, { latitude: '', longitude: '' }]);
-  };
-
-  const removePolygonPoint = (index: number) => {
-    if (polygonCoords.length > 1) {
-      setPolygonCoords(polygonCoords.filter((_, i) => i !== index));
-    }
-  };
-
-  const updatePolygonPoint = (index: number, field: 'latitude' | 'longitude', value: string) => {
-    const updated = [...polygonCoords];
-    updated[index][field] = value;
-    setPolygonCoords(updated);
-  };
-
-  const calculatedArea = useMemo(() => {
-    if (!usePolygon) return null;
-    const coords = polygonCoords
-      .map(c => ({
-        latitude: parseFloat(c.latitude),
-        longitude: parseFloat(c.longitude),
-      }))
-      .filter(c => !isNaN(c.latitude) && !isNaN(c.longitude));
-    
-    if (coords.length >= 3) {
-      return calculatePolygonArea(coords).toFixed(2);
-    }
-    return null;
-  }, [usePolygon, polygonCoords]);
 
   const renderSite = ({ item }: { item: Site }) => (
     <TouchableOpacity
@@ -150,7 +77,7 @@ export default function ProjectScreen() {
     </TouchableOpacity>
   );
 
-  if (projectQuery.isLoading || sitesQuery.isLoading) {
+  if (isLoading) {
     return (
       <View style={styles.centerContainer}>
         <ActivityIndicator size="large" color="#007AFF" />
@@ -158,16 +85,13 @@ export default function ProjectScreen() {
     );
   }
 
-  if (!projectQuery.data) {
+  if (!project) {
     return (
       <View style={styles.centerContainer}>
         <Text style={styles.errorText}>Project not found</Text>
       </View>
     );
   }
-
-  const project = projectQuery.data;
-  const sites = sitesQuery.data || [];
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
@@ -189,13 +113,13 @@ export default function ProjectScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Sites</Text>
 
-          {sites.length === 0 ? (
+          {projectSites.length === 0 ? (
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyText}>No sites yet. Create your first site.</Text>
             </View>
           ) : (
             <FlatList
-              data={sites}
+              data={projectSites}
               renderItem={renderSite}
               keyExtractor={item => item.id}
               scrollEnabled={false}
@@ -231,89 +155,14 @@ export default function ProjectScreen() {
               testID="site-name-input"
             />
 
-            <View style={styles.toggleContainer}>
-              <TouchableOpacity
-                style={[styles.toggleButton, !usePolygon && styles.toggleButtonActive]}
-                onPress={() => setUsePolygon(false)}
-              >
-                <Text style={[styles.toggleButtonText, !usePolygon && styles.toggleButtonTextActive]}>Single Point</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.toggleButton, usePolygon && styles.toggleButtonActive]}
-                onPress={() => setUsePolygon(true)}
-              >
-                <Text style={[styles.toggleButtonText, usePolygon && styles.toggleButtonTextActive]}>Polygon</Text>
-              </TouchableOpacity>
-            </View>
-
-            {!usePolygon ? (
-              <>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Area (hectares)"
-                  value={siteArea}
-                  onChangeText={setSiteArea}
-                  keyboardType="decimal-pad"
-                  testID="site-area-input"
-                />
-                <TextInput
-                  style={styles.input}
-                  placeholder="Latitude"
-                  value={latitude}
-                  onChangeText={setLatitude}
-                  keyboardType="decimal-pad"
-                  testID="latitude-input"
-                />
-                <TextInput
-                  style={styles.input}
-                  placeholder="Longitude"
-                  value={longitude}
-                  onChangeText={setLongitude}
-                  keyboardType="decimal-pad"
-                  testID="longitude-input"
-                />
-              </>
-            ) : (
-              <ScrollView style={styles.polygonContainer} showsVerticalScrollIndicator={false}>
-                <Text style={styles.polygonLabel}>Coordinates (min 3 points)</Text>
-                {polygonCoords.map((coord, index) => (
-                  <View key={index} style={styles.coordRow}>
-                    <TextInput
-                      style={[styles.input, styles.coordInput]}
-                      placeholder="Latitude"
-                      value={coord.latitude}
-                      onChangeText={(val) => updatePolygonPoint(index, 'latitude', val)}
-                      keyboardType="decimal-pad"
-                    />
-                    <TextInput
-                      style={[styles.input, styles.coordInput]}
-                      placeholder="Longitude"
-                      value={coord.longitude}
-                      onChangeText={(val) => updatePolygonPoint(index, 'longitude', val)}
-                      keyboardType="decimal-pad"
-                    />
-                    {polygonCoords.length > 1 && (
-                      <TouchableOpacity
-                        onPress={() => removePolygonPoint(index)}
-                        style={styles.removeButton}
-                      >
-                        <Trash2 size={18} color="#FF3B30" />
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                ))}
-                <TouchableOpacity style={styles.addButton} onPress={addPolygonPoint}>
-                  <Plus size={16} color="#007AFF" />
-                  <Text style={styles.addButtonText}>Add Point</Text>
-                </TouchableOpacity>
-                {calculatedArea && (
-                  <View style={styles.areaDisplay}>
-                    <Text style={styles.areaDisplayLabel}>Calculated Area:</Text>
-                    <Text style={styles.areaDisplayValue}>{calculatedArea} ha</Text>
-                  </View>
-                )}
-              </ScrollView>
-            )}
+            <TextInput
+              style={styles.input}
+              placeholder="Area (hectares)"
+              value={siteArea}
+              onChangeText={setSiteArea}
+              keyboardType="decimal-pad"
+              testID="site-area-input"
+            />
 
             <View style={styles.modalButtons}>
               <TouchableOpacity
@@ -327,10 +176,10 @@ export default function ProjectScreen() {
               <TouchableOpacity
                 style={[styles.modalButton, styles.createButton]}
                 onPress={handleCreateSite}
-                disabled={!siteName.trim() || (!usePolygon && !siteArea.trim()) || (usePolygon && polygonCoords.filter(c => c.latitude && c.longitude).length < 3) || createSiteMutation.isPending}
+                disabled={!siteName.trim() || !siteArea.trim() || isCreating}
                 testID="confirm-create-button"
               >
-                {createSiteMutation.isPending ? (
+                {isCreating ? (
                   <ActivityIndicator size="small" color="#FFFFFF" />
                 ) : (
                   <Text style={styles.createButtonText}>Create</Text>

@@ -1,6 +1,6 @@
 import { Stack, useRouter } from 'expo-router';
 import { Settings, Plus } from 'lucide-react-native';
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -10,12 +10,9 @@ import {
   Modal,
   TextInput,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { trpc } from '@/lib/trpc';
-import { supabase } from '@/lib/supabase';
-import { useAuth } from '@/contexts/AuthContext';
+import { useZURB } from '@/contexts/ZURBContext';
 
 type Project = {
   id: string;
@@ -28,74 +25,25 @@ type Project = {
 
 export default function ProjectsScreen() {
   const router = useRouter();
-  const { user } = useAuth();
-  const projectsQuery = trpc.projects.list.useQuery(undefined, {
-    retry: 2,
-    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000),
-    staleTime: 30000,
-    refetchOnWindowFocus: false,
-    refetchOnMount: false,
-  });
-  const utils = trpc.useUtils();
-  const createProjectMutation = trpc.projects.create.useMutation({
-    onSuccess: () => {
-      console.log('[Projects] Project created successfully');
-      setNewProjectName('');
-      setNewProjectDesc('');
-      setModalVisible(false);
-      utils.projects.list.invalidate();
-    },
-    onError: (error) => {
-      console.error('[Projects] Failed to create project:', error);
-      const message = error.message.includes('Rate limit') 
-        ? 'Too many requests. Please wait a moment and try again.'
-        : `Failed to create project: ${error.message}`;
-      Alert.alert('Error', message);
-    },
-    retry: 1,
-    retryDelay: 2000,
-  });
+  const { projects, isLoading, createProject } = useZURB();
   const [modalVisible, setModalVisible] = useState<boolean>(false);
   const [newProjectName, setNewProjectName] = useState<string>('');
   const [newProjectDesc, setNewProjectDesc] = useState<string>('');
+  const [isCreating, setIsCreating] = useState<boolean>(false);
 
-  useEffect(() => {
-    if (!user) return;
-
-    console.log('[Projects] Setting up realtime subscription for user:', user.id);
-    
-    const channel = supabase
-      .channel('projects-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'projects',
-          filter: `owner_id=eq.${user.id}`,
-        },
-        (payload) => {
-          console.log('[Projects] Realtime update:', payload);
-          utils.projects.list.invalidate();
-        }
-      )
-      .subscribe((status) => {
-        console.log('[Projects] Realtime subscription status:', status);
-      });
-
-    return () => {
-      console.log('[Projects] Cleaning up realtime subscription');
-      supabase.removeChannel(channel);
-    };
-  }, [user, utils]);
-
-  const handleCreateProject = () => {
+  const handleCreateProject = async () => {
     if (newProjectName.trim()) {
-      console.log('[Projects] Creating project:', newProjectName);
-      createProjectMutation.mutate({
-        name: newProjectName.trim(),
-        description: newProjectDesc.trim() || undefined,
-      });
+      setIsCreating(true);
+      try {
+        const result = await createProject(newProjectName.trim(), newProjectDesc.trim() || undefined);
+        if (result) {
+          setNewProjectName('');
+          setNewProjectDesc('');
+          setModalVisible(false);
+        }
+      } finally {
+        setIsCreating(false);
+      }
     }
   };
 
@@ -119,15 +67,13 @@ export default function ProjectsScreen() {
     </TouchableOpacity>
   );
 
-  if (projectsQuery.isLoading) {
+  if (isLoading) {
     return (
       <View style={styles.centerContainer}>
         <ActivityIndicator size="large" color="#007AFF" />
       </View>
     );
   }
-
-  const projects = projectsQuery.data || [];
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -219,10 +165,10 @@ export default function ProjectsScreen() {
               <TouchableOpacity
                 style={[styles.modalButton, styles.createButton]}
                 onPress={handleCreateProject}
-                disabled={!newProjectName.trim() || createProjectMutation.isPending}
+                disabled={!newProjectName.trim() || isCreating}
                 testID="confirm-create-button"
               >
-                {createProjectMutation.isPending ? (
+                {isCreating ? (
                   <ActivityIndicator size="small" color="#FFFFFF" />
                 ) : (
                   <Text style={styles.createButtonText}>Create</Text>

@@ -1,10 +1,9 @@
 import createContextHook from '@nkzw/create-context-hook';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useState, useEffect, useCallback } from 'react';
+import { Alert } from 'react-native';
+import { supabase } from '@/lib/supabase';
+import { useAuth } from './AuthContext';
 import {
-  Project,
-  Site,
-  Scenario,
   CostParams,
   MixRule,
   RentConfig,
@@ -17,231 +16,253 @@ import {
   DEFAULT_OVERHEADS,
 } from '@/constants/costs';
 
-const STORAGE_KEYS = {
-  PROJECTS: 'zurb_projects',
-  SCENARIOS: 'zurb_scenarios',
-  COST_PARAMS: 'zurb_cost_params',
-  MIX_RULES: 'zurb_mix_rules',
-  RENTS: 'zurb_rents',
-  OVERHEADS: 'zurb_overheads',
+type DbProject = {
+  id: string;
+  name: string;
+  description: string | null;
+  created_at: string;
+  updated_at: string;
+  owner_id: string;
+};
+
+type DbSite = {
+  id: string;
+  project_id: string;
+  name: string;
+  area_ha: number | null;
+  created_at: string;
+  updated_at: string;
 };
 
 export const [ZURBContext, useZURB] = createContextHook(() => {
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [scenarios, setScenarios] = useState<{ [siteId: string]: Scenario[] }>({});
+  const { user } = useAuth();
+  const [projects, setProjects] = useState<DbProject[]>([]);
+  const [sites, setSites] = useState<DbSite[]>([]);
   const [costParams, setCostParams] = useState<CostParams>(DEFAULT_COST_PARAMS);
   const [mixRules, setMixRules] = useState<MixRule[]>(DEFAULT_MIX_RULES);
   const [rents, setRents] = useState<RentConfig[]>(DEFAULT_RENTS);
   const [overheads, setOverheads] = useState<OverheadConfig>(DEFAULT_OVERHEADS);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  useEffect(() => {
-    loadData();
-  }, []);
+  const loadProjects = useCallback(async () => {
+    if (!user) return;
 
-  useEffect(() => {
-    if (!isLoading) {
-      saveScenarios(scenarios);
-    }
-  }, [scenarios, isLoading]);
-
-  const loadData = async () => {
     try {
-      setIsLoading(true);
-      const [projectsData, scenariosData, costParamsData, mixRulesData, rentsData, overheadsData] =
-        await Promise.all([
-          AsyncStorage.getItem(STORAGE_KEYS.PROJECTS),
-          AsyncStorage.getItem(STORAGE_KEYS.SCENARIOS),
-          AsyncStorage.getItem(STORAGE_KEYS.COST_PARAMS),
-          AsyncStorage.getItem(STORAGE_KEYS.MIX_RULES),
-          AsyncStorage.getItem(STORAGE_KEYS.RENTS),
-          AsyncStorage.getItem(STORAGE_KEYS.OVERHEADS),
-        ]);
+      const { data, error } = await supabase
+        .from('projects')
+        .select('*')
+        .order('created_at', { ascending: false });
 
-      if (projectsData) {
-        const parsedProjects = JSON.parse(projectsData);
-        setProjects(
-          parsedProjects.map((p: Project) => ({
-            ...p,
-            createdAt: new Date(p.createdAt),
-          }))
-        );
+      if (error) {
+        console.error('[ZURB] Error loading projects:', error);
+        return;
       }
-      if (scenariosData) {
-        const parsedScenarios = JSON.parse(scenariosData);
-        const scenariosWithDates: { [siteId: string]: Scenario[] } = {};
-        Object.keys(parsedScenarios).forEach(siteId => {
-          scenariosWithDates[siteId] = parsedScenarios[siteId].map((s: Scenario) => ({
-            ...s,
-            createdAt: new Date(s.createdAt),
-          }));
-        });
-        setScenarios(scenariosWithDates);
-      }
-      if (costParamsData) setCostParams(JSON.parse(costParamsData));
-      if (mixRulesData) setMixRules(JSON.parse(mixRulesData));
-      if (rentsData) setRents(JSON.parse(rentsData));
-      if (overheadsData) setOverheads(JSON.parse(overheadsData));
+
+      console.log('[ZURB] Loaded projects:', data?.length);
+      setProjects(data || []);
     } catch (error) {
-      console.error('Error loading data:', error);
-    } finally {
+      console.error('[ZURB] Exception loading projects:', error);
+    }
+  }, [user]);
+
+  const loadSites = useCallback(async () => {
+    if (!user) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('sites')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('[ZURB] Error loading sites:', error);
+        return;
+      }
+
+      console.log('[ZURB] Loaded sites:', data?.length);
+      setSites(data || []);
+    } catch (error) {
+      console.error('[ZURB] Exception loading sites:', error);
+    }
+  }, [user]);
+
+  const loadData = useCallback(async () => {
+    setIsLoading(true);
+    await Promise.all([loadProjects(), loadSites()]);
+    setIsLoading(false);
+  }, [loadProjects, loadSites]);
+
+  useEffect(() => {
+    if (!user) {
       setIsLoading(false);
+      return;
     }
-  };
 
-  const saveProjects = async (newProjects: Project[]) => {
-    try {
-      await AsyncStorage.setItem(STORAGE_KEYS.PROJECTS, JSON.stringify(newProjects));
-      setProjects(newProjects);
-    } catch (error) {
-      console.error('Error saving projects:', error);
-    }
-  };
+    loadData();
+
+    const projectsChannel = supabase
+      .channel('projects-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'projects',
+          filter: `owner_id=eq.${user.id}`,
+        },
+        () => {
+          console.log('[ZURB] Projects changed, reloading');
+          loadProjects();
+        }
+      )
+      .subscribe();
+
+    const sitesChannel = supabase
+      .channel('sites-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'sites',
+        },
+        () => {
+          console.log('[ZURB] Sites changed, reloading');
+          loadSites();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(projectsChannel);
+      supabase.removeChannel(sitesChannel);
+    };
+  }, [user, loadData, loadProjects, loadSites]);
+
+
 
   const createProject = useCallback(
-    (name: string, description: string) => {
-      const newProject: Project = {
-        id: Date.now().toString(),
-        name,
-        description,
-        createdAt: new Date(),
-        sites: [],
-      };
-      const updated = [...projects, newProject];
-      saveProjects(updated);
-      return newProject;
+    async (name: string, description?: string) => {
+      if (!user) {
+        Alert.alert('Error', 'You must be logged in');
+        return null;
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from('projects')
+          .insert({
+            name,
+            description: description || null,
+            owner_id: user.id,
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        console.log('[ZURB] Project created:', data);
+        return data;
+      } catch (error: any) {
+        console.error('[ZURB] Error creating project:', error);
+        Alert.alert('Error', error.message || 'Failed to create project');
+        return null;
+      }
     },
-    [projects]
+    [user]
   );
 
   const updateProject = useCallback(
-    (projectId: string, updates: Partial<Project>) => {
-      const updated = projects.map(p =>
-        p.id === projectId ? { ...p, ...updates } : p
-      );
-      saveProjects(updated);
+    async (projectId: string, updates: { name?: string; description?: string }) => {
+      try {
+        const { error } = await supabase
+          .from('projects')
+          .update(updates)
+          .eq('id', projectId);
+
+        if (error) throw error;
+
+        console.log('[ZURB] Project updated');
+      } catch (error: any) {
+        console.error('[ZURB] Error updating project:', error);
+        Alert.alert('Error', error.message || 'Failed to update project');
+      }
     },
-    [projects]
+    []
   );
 
   const deleteProject = useCallback(
-    (projectId: string) => {
-      const updated = projects.filter(p => p.id !== projectId);
-      saveProjects(updated);
+    async (projectId: string) => {
+      try {
+        const { error } = await supabase
+          .from('projects')
+          .delete()
+          .eq('id', projectId);
+
+        if (error) throw error;
+
+        console.log('[ZURB] Project deleted');
+      } catch (error: any) {
+        console.error('[ZURB] Error deleting project:', error);
+        Alert.alert('Error', error.message || 'Failed to delete project');
+      }
     },
-    [projects]
+    []
   );
 
   const createSite = useCallback(
-    (projectId: string, name: string, areaHa: number, latitude: number, longitude: number, polygon?: { latitude: number; longitude: number }[]) => {
-      const newSite: Site = {
-        id: Date.now().toString(),
-        projectId,
-        name,
-        areaHa,
-        location: { latitude, longitude },
-        polygon,
-        blocks: [],
-      };
-      const updated = projects.map(p =>
-        p.id === projectId ? { ...p, sites: [...p.sites, newSite] } : p
-      );
-      saveProjects(updated);
-      return newSite;
-    },
-    [projects]
-  );
+    async (projectId: string, name: string, areaHa: number) => {
+      if (!user) {
+        Alert.alert('Error', 'You must be logged in');
+        return null;
+      }
 
-  const saveScenarios = async (scenariosToSave: { [siteId: string]: Scenario[] }) => {
-    try {
-      await AsyncStorage.setItem(STORAGE_KEYS.SCENARIOS, JSON.stringify(scenariosToSave));
-    } catch (error) {
-      console.error('Error saving scenarios:', error);
-    }
-  };
+      try {
+        const { data, error } = await supabase
+          .from('sites')
+          .insert({
+            project_id: projectId,
+            name,
+            area_ha: areaHa,
+          })
+          .select()
+          .single();
 
-  const createScenario = useCallback(
-    (siteId: string, name: string, notes: string = '') => {
-      const newScenario: Scenario = {
-        id: Date.now().toString(),
-        siteId,
-        name,
-        notes,
-        createdAt: new Date(),
-        items: [],
-      };
-      setScenarios(prev => ({
-        ...prev,
-        [siteId]: [...(prev[siteId] || []), newScenario],
-      }));
-      return newScenario;
-    },
-    []
-  );
+        if (error) throw error;
 
-  const updateScenario = useCallback(
-    (scenarioId: string, updates: Partial<Scenario>) => {
-      setScenarios(prev => {
-        const newScenarios = { ...prev };
-        Object.keys(newScenarios).forEach(siteId => {
-          newScenarios[siteId] = newScenarios[siteId].map(s =>
-            s.id === scenarioId ? { ...s, ...updates } : s
-          );
-        });
-        return newScenarios;
-      });
+        console.log('[ZURB] Site created:', data);
+        return data;
+      } catch (error: any) {
+        console.error('[ZURB] Error creating site:', error);
+        Alert.alert('Error', error.message || 'Failed to create site');
+        return null;
+      }
     },
-    []
-  );
-
-  const deleteScenario = useCallback(
-    (scenarioId: string) => {
-      setScenarios(prev => {
-        const newScenarios = { ...prev };
-        Object.keys(newScenarios).forEach(siteId => {
-          newScenarios[siteId] = newScenarios[siteId].filter(s => s.id !== scenarioId);
-        });
-        return newScenarios;
-      });
-    },
-    []
+    [user]
   );
 
   const updateCostParams = useCallback(async (newParams: CostParams) => {
-    try {
-      await AsyncStorage.setItem(STORAGE_KEYS.COST_PARAMS, JSON.stringify(newParams));
-      setCostParams(newParams);
-    } catch (error) {
-      console.error('Error updating cost params:', error);
-    }
+    setCostParams(newParams);
   }, []);
 
   const updateMixRules = useCallback(async (newRules: MixRule[]) => {
-    try {
-      await AsyncStorage.setItem(STORAGE_KEYS.MIX_RULES, JSON.stringify(newRules));
-      setMixRules(newRules);
-    } catch (error) {
-      console.error('Error updating mix rules:', error);
-    }
+    setMixRules(newRules);
   }, []);
 
   const updateRents = useCallback(async (newRents: RentConfig[]) => {
-    try {
-      await AsyncStorage.setItem(STORAGE_KEYS.RENTS, JSON.stringify(newRents));
-      setRents(newRents);
-    } catch (error) {
-      console.error('Error updating rents:', error);
-    }
+    setRents(newRents);
   }, []);
 
   const updateOverheads = useCallback(async (newOverheads: OverheadConfig) => {
-    try {
-      await AsyncStorage.setItem(STORAGE_KEYS.OVERHEADS, JSON.stringify(newOverheads));
-      setOverheads(newOverheads);
-    } catch (error) {
-      console.error('Error updating overheads:', error);
-    }
+    setOverheads(newOverheads);
   }, []);
+
+  const getSitesByProjectId = useCallback(
+    (projectId: string) => {
+      return sites.filter(s => s.project_id === projectId);
+    },
+    [sites]
+  );
 
   const getRentsMap = useCallback((): { [code: string]: number } => {
     return rents.reduce((acc, rent) => {
@@ -252,7 +273,7 @@ export const [ZURBContext, useZURB] = createContextHook(() => {
 
   return {
     projects,
-    scenarios,
+    sites,
     costParams,
     mixRules,
     rents,
@@ -262,9 +283,7 @@ export const [ZURBContext, useZURB] = createContextHook(() => {
     updateProject,
     deleteProject,
     createSite,
-    createScenario,
-    updateScenario,
-    deleteScenario,
+    getSitesByProjectId,
     updateCostParams,
     updateMixRules,
     updateRents,
