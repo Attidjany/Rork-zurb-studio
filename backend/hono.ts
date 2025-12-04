@@ -27,6 +27,18 @@ app.get("/api", (c) => {
   return c.json({ status: "ok", message: "ZURB API is running" });
 });
 
+app.get("/api/health", (c) => {
+  return c.json({ 
+    status: "ok", 
+    message: "ZURB API is healthy",
+    timestamp: new Date().toISOString(),
+    env: {
+      hasSupabaseUrl: !!process.env.EXPO_PUBLIC_SUPABASE_URL,
+      hasSupabaseKey: !!process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
+    }
+  });
+});
+
 app.onError((err, c) => {
   console.error('[Hono Error]', err);
   return c.json({ error: err.message }, 500);
