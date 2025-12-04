@@ -12,6 +12,9 @@ import {
   DbScenario,
   DbProjectCostParam,
   DbScenarioCostParam,
+  DbProjectConstructionCost,
+  DbProjectHousingType,
+  DbProjectEquipmentUtilityType,
   VillaLayout,
   ApartmentLayout,
   HalfBlockType,
@@ -28,6 +31,9 @@ export const [ZURBContext, useZURB] = createContextHook(() => {
   const [scenarios, setScenarios] = useState<DbScenario[]>([]);
   const [projectCostParams, setProjectCostParams] = useState<DbProjectCostParam[]>([]);
   const [scenarioCostParams, setScenarioCostParams] = useState<DbScenarioCostParam[]>([]);
+  const [projectConstructionCosts, setProjectConstructionCosts] = useState<DbProjectConstructionCost[]>([]);
+  const [projectHousingTypes, setProjectHousingTypes] = useState<DbProjectHousingType[]>([]);
+  const [projectEquipmentUtilityTypes, setProjectEquipmentUtilityTypes] = useState<DbProjectEquipmentUtilityType[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   const loadProjects = useCallback(async () => {
@@ -195,6 +201,69 @@ export const [ZURBContext, useZURB] = createContextHook(() => {
     }
   }, [user]);
 
+  const loadProjectConstructionCosts = useCallback(async () => {
+    if (!user) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('project_construction_costs')
+        .select('*')
+        .order('code', { ascending: true });
+
+      if (error) {
+        console.error('[ZURB] Error loading project construction costs:', JSON.stringify(error));
+        return;
+      }
+
+      console.log('[ZURB] Loaded project construction costs:', data?.length);
+      setProjectConstructionCosts(data || []);
+    } catch (error: any) {
+      console.error('[ZURB] Exception loading project construction costs:', error?.message || JSON.stringify(error));
+    }
+  }, [user]);
+
+  const loadProjectHousingTypes = useCallback(async () => {
+    if (!user) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('project_housing_types')
+        .select('*')
+        .order('code', { ascending: true });
+
+      if (error) {
+        console.error('[ZURB] Error loading project housing types:', JSON.stringify(error));
+        return;
+      }
+
+      console.log('[ZURB] Loaded project housing types:', data?.length);
+      setProjectHousingTypes(data || []);
+    } catch (error: any) {
+      console.error('[ZURB] Exception loading project housing types:', error?.message || JSON.stringify(error));
+    }
+  }, [user]);
+
+  const loadProjectEquipmentUtilityTypes = useCallback(async () => {
+    if (!user) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('project_equipment_utility_types')
+        .select('*')
+        .order('code', { ascending: true });
+
+      if (error) {
+        console.error('[ZURB] Error loading project equipment utility types:', JSON.stringify(error));
+        return;
+      }
+
+      console.log('[ZURB] Loaded project equipment utility types:', data?.length);
+      setProjectEquipmentUtilityTypes(data || []);
+    } catch (error: any) {
+      console.error('[ZURB] Exception loading project equipment utility types:', error?.message || JSON.stringify(error));
+    }
+  }, [user]);
+
   const loadData = useCallback(async () => {
     setIsLoading(true);
     await Promise.all([
@@ -206,9 +275,12 @@ export const [ZURBContext, useZURB] = createContextHook(() => {
       loadScenarios(),
       loadProjectCostParams(),
       loadScenarioCostParams(),
+      loadProjectConstructionCosts(),
+      loadProjectHousingTypes(),
+      loadProjectEquipmentUtilityTypes(),
     ]);
     setIsLoading(false);
-  }, [loadProjects, loadSites, loadBlocks, loadHalfBlocks, loadUnits, loadScenarios, loadProjectCostParams, loadScenarioCostParams]);
+  }, [loadProjects, loadSites, loadBlocks, loadHalfBlocks, loadUnits, loadScenarios, loadProjectCostParams, loadScenarioCostParams, loadProjectConstructionCosts, loadProjectHousingTypes, loadProjectEquipmentUtilityTypes]);
 
   useEffect(() => {
     if (!user) {
@@ -347,6 +419,54 @@ export const [ZURBContext, useZURB] = createContextHook(() => {
       )
       .subscribe();
 
+    const projectConstructionCostsChannel = supabase
+      .channel('project_construction_costs-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'project_construction_costs',
+        },
+        () => {
+          console.log('[ZURB] Project construction costs changed, reloading');
+          loadProjectConstructionCosts();
+        }
+      )
+      .subscribe();
+
+    const projectHousingTypesChannel = supabase
+      .channel('project_housing_types-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'project_housing_types',
+        },
+        () => {
+          console.log('[ZURB] Project housing types changed, reloading');
+          loadProjectHousingTypes();
+        }
+      )
+      .subscribe();
+
+    const projectEquipmentUtilityTypesChannel = supabase
+      .channel('project_equipment_utility_types-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'project_equipment_utility_types',
+        },
+        () => {
+          console.log('[ZURB] Project equipment utility types changed, reloading');
+          loadProjectEquipmentUtilityTypes();
+        }
+      )
+      .subscribe();
+
     return () => {
       supabase.removeChannel(projectsChannel);
       supabase.removeChannel(sitesChannel);
@@ -356,8 +476,11 @@ export const [ZURBContext, useZURB] = createContextHook(() => {
       supabase.removeChannel(scenariosChannel);
       supabase.removeChannel(projectCostParamsChannel);
       supabase.removeChannel(scenarioCostParamsChannel);
+      supabase.removeChannel(projectConstructionCostsChannel);
+      supabase.removeChannel(projectHousingTypesChannel);
+      supabase.removeChannel(projectEquipmentUtilityTypesChannel);
     };
-  }, [user, loadData, loadProjects, loadSites, loadBlocks, loadHalfBlocks, loadUnits, loadScenarios, loadProjectCostParams, loadScenarioCostParams]);
+  }, [user, loadData, loadProjects, loadSites, loadBlocks, loadHalfBlocks, loadUnits, loadScenarios, loadProjectCostParams, loadScenarioCostParams, loadProjectConstructionCosts, loadProjectHousingTypes, loadProjectEquipmentUtilityTypes]);
 
   const createProject = useCallback(
     async (name: string, description?: string) => {
@@ -832,6 +955,262 @@ export const [ZURBContext, useZURB] = createContextHook(() => {
     []
   );
 
+  const getProjectConstructionCostsByProjectId = useCallback(
+    (projectId: string) => {
+      return projectConstructionCosts.filter(c => c.project_id === projectId);
+    },
+    [projectConstructionCosts]
+  );
+
+  const getProjectHousingTypesByProjectId = useCallback(
+    (projectId: string) => {
+      return projectHousingTypes.filter(h => h.project_id === projectId);
+    },
+    [projectHousingTypes]
+  );
+
+  const getProjectEquipmentUtilityTypesByProjectId = useCallback(
+    (projectId: string) => {
+      return projectEquipmentUtilityTypes.filter(e => e.project_id === projectId);
+    },
+    [projectEquipmentUtilityTypes]
+  );
+
+  const createProjectConstructionCost = useCallback(
+    async (projectId: string, code: string, name: string, goldGramsPerM2: number) => {
+      try {
+        const { data, error } = await supabase
+          .from('project_construction_costs')
+          .insert({
+            project_id: projectId,
+            code,
+            name,
+            gold_grams_per_m2: goldGramsPerM2,
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        console.log('[ZURB] Project construction cost created:', data);
+        return data;
+      } catch (error: any) {
+        console.error('[ZURB] Error creating project construction cost:', error);
+        Alert.alert('Error', error.message || 'Failed to create construction cost type');
+        return null;
+      }
+    },
+    []
+  );
+
+  const updateProjectConstructionCost = useCallback(
+    async (costId: string, updates: { code?: string; name?: string; gold_grams_per_m2?: number }) => {
+      try {
+        const { error } = await supabase
+          .from('project_construction_costs')
+          .update(updates)
+          .eq('id', costId);
+
+        if (error) throw error;
+
+        console.log('[ZURB] Project construction cost updated');
+      } catch (error: any) {
+        console.error('[ZURB] Error updating project construction cost:', error);
+        Alert.alert('Error', error.message || 'Failed to update construction cost type');
+      }
+    },
+    []
+  );
+
+  const deleteProjectConstructionCost = useCallback(
+    async (costId: string) => {
+      try {
+        const { error } = await supabase
+          .from('project_construction_costs')
+          .delete()
+          .eq('id', costId);
+
+        if (error) throw error;
+
+        console.log('[ZURB] Project construction cost deleted');
+        return true;
+      } catch (error: any) {
+        console.error('[ZURB] Error deleting project construction cost:', error);
+        Alert.alert('Error', error.message || 'Failed to delete construction cost type');
+        return false;
+      }
+    },
+    []
+  );
+
+  const createProjectHousingType = useCallback(
+    async (
+      projectId: string,
+      code: string,
+      name: string,
+      category: 'apartment' | 'villa' | 'commercial',
+      defaultAreaM2: number,
+      defaultCostType: string,
+      defaultRentMonthly: number
+    ) => {
+      try {
+        const { data, error } = await supabase
+          .from('project_housing_types')
+          .insert({
+            project_id: projectId,
+            code,
+            name,
+            category,
+            default_area_m2: defaultAreaM2,
+            default_cost_type: defaultCostType,
+            default_rent_monthly: defaultRentMonthly,
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        console.log('[ZURB] Project housing type created:', data);
+        return data;
+      } catch (error: any) {
+        console.error('[ZURB] Error creating project housing type:', error);
+        Alert.alert('Error', error.message || 'Failed to create housing type');
+        return null;
+      }
+    },
+    []
+  );
+
+  const updateProjectHousingType = useCallback(
+    async (typeId: string, updates: {
+      code?: string;
+      name?: string;
+      default_area_m2?: number;
+      default_cost_type?: string;
+      default_rent_monthly?: number;
+    }) => {
+      try {
+        const { error } = await supabase
+          .from('project_housing_types')
+          .update(updates)
+          .eq('id', typeId);
+
+        if (error) throw error;
+
+        console.log('[ZURB] Project housing type updated');
+      } catch (error: any) {
+        console.error('[ZURB] Error updating project housing type:', error);
+        Alert.alert('Error', error.message || 'Failed to update housing type');
+      }
+    },
+    []
+  );
+
+  const deleteProjectHousingType = useCallback(
+    async (typeId: string) => {
+      try {
+        const { error } = await supabase
+          .from('project_housing_types')
+          .delete()
+          .eq('id', typeId);
+
+        if (error) throw error;
+
+        console.log('[ZURB] Project housing type deleted');
+        return true;
+      } catch (error: any) {
+        console.error('[ZURB] Error deleting project housing type:', error);
+        Alert.alert('Error', error.message || 'Failed to delete housing type');
+        return false;
+      }
+    },
+    []
+  );
+
+  const createProjectEquipmentUtilityType = useCallback(
+    async (
+      projectId: string,
+      code: string,
+      name: string,
+      category: 'equipment' | 'utility',
+      landAreaM2: number,
+      buildingOccupationPct: number,
+      costType: string
+    ) => {
+      try {
+        const { data, error } = await supabase
+          .from('project_equipment_utility_types')
+          .insert({
+            project_id: projectId,
+            code,
+            name,
+            category,
+            land_area_m2: landAreaM2,
+            building_occupation_pct: buildingOccupationPct,
+            cost_type: costType,
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        console.log('[ZURB] Project equipment utility type created:', data);
+        return data;
+      } catch (error: any) {
+        console.error('[ZURB] Error creating project equipment utility type:', error);
+        Alert.alert('Error', error.message || 'Failed to create equipment/utility type');
+        return null;
+      }
+    },
+    []
+  );
+
+  const updateProjectEquipmentUtilityType = useCallback(
+    async (typeId: string, updates: {
+      code?: string;
+      name?: string;
+      land_area_m2?: number;
+      building_occupation_pct?: number;
+      cost_type?: string;
+    }) => {
+      try {
+        const { error } = await supabase
+          .from('project_equipment_utility_types')
+          .update(updates)
+          .eq('id', typeId);
+
+        if (error) throw error;
+
+        console.log('[ZURB] Project equipment utility type updated');
+      } catch (error: any) {
+        console.error('[ZURB] Error updating project equipment utility type:', error);
+        Alert.alert('Error', error.message || 'Failed to update equipment/utility type');
+      }
+    },
+    []
+  );
+
+  const deleteProjectEquipmentUtilityType = useCallback(
+    async (typeId: string) => {
+      try {
+        const { error } = await supabase
+          .from('project_equipment_utility_types')
+          .delete()
+          .eq('id', typeId);
+
+        if (error) throw error;
+
+        console.log('[ZURB] Project equipment utility type deleted');
+        return true;
+      } catch (error: any) {
+        console.error('[ZURB] Error deleting project equipment utility type:', error);
+        Alert.alert('Error', error.message || 'Failed to delete equipment/utility type');
+        return false;
+      }
+    },
+    []
+  );
+
   return {
     projects,
     sites,
@@ -841,6 +1220,9 @@ export const [ZURBContext, useZURB] = createContextHook(() => {
     scenarios,
     projectCostParams,
     scenarioCostParams,
+    projectConstructionCosts,
+    projectHousingTypes,
+    projectEquipmentUtilityTypes,
     isLoading,
     createProject,
     updateProject,
@@ -863,8 +1245,20 @@ export const [ZURBContext, useZURB] = createContextHook(() => {
     getScenariosBySiteId,
     getProjectCostParamsByProjectId,
     getScenarioCostParamsByScenarioId,
+    getProjectConstructionCostsByProjectId,
+    getProjectHousingTypesByProjectId,
+    getProjectEquipmentUtilityTypesByProjectId,
     updateProjectCostParam,
     upsertScenarioCostParam,
+    createProjectConstructionCost,
+    updateProjectConstructionCost,
+    deleteProjectConstructionCost,
+    createProjectHousingType,
+    updateProjectHousingType,
+    deleteProjectHousingType,
+    createProjectEquipmentUtilityType,
+    updateProjectEquipmentUtilityType,
+    deleteProjectEquipmentUtilityType,
     loadProjects,
     loadSites,
     loadBlocks,
@@ -873,5 +1267,8 @@ export const [ZURBContext, useZURB] = createContextHook(() => {
     loadScenarios,
     loadProjectCostParams,
     loadScenarioCostParams,
+    loadProjectConstructionCosts,
+    loadProjectHousingTypes,
+    loadProjectEquipmentUtilityTypes,
   };
 });

@@ -1,5 +1,5 @@
 import { Stack, useLocalSearchParams } from 'expo-router';
-import { DollarSign, TrendingUp, Building2, Home, ShoppingBag, Settings } from 'lucide-react-native';
+import { TrendingUp, Building2, Home, ShoppingBag, Factory, Plus, Trash2, Settings } from 'lucide-react-native';
 import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import {
   View,
@@ -10,59 +10,80 @@ import {
   TextInput,
   RefreshControl,
   ActivityIndicator,
+  Alert,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useZURB } from '@/contexts/ZURBContext';
 import { fetchLiveGoldPrice, getCachedGoldPrice, getDefaultGoldPrice, GoldPriceData, USD_TO_XOF } from '@/lib/goldPrice';
-import { CONSTRUCTION_COSTS, HOUSING_TYPES } from '@/constants/typologies';
-
-const CONSTRUCTION_COST_TYPES = ['ZME', 'ZHE', 'ZOS', 'ZMER', 'ZHER'];
-const APARTMENT_TYPES = ['AMS', 'AML', 'AH'];
-const VILLA_TYPES = ['BMS', 'BML', 'BH', 'CH', 'CO'];
-const COMMERCIAL_TYPES = ['XM', 'XH'];
 
 export default function ProjectParametersScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const {
     projects,
-    getProjectCostParamsByProjectId,
-    updateProjectCostParam,
-    loadProjectCostParams,
+    getProjectConstructionCostsByProjectId,
+    getProjectHousingTypesByProjectId,
+    getProjectEquipmentUtilityTypesByProjectId,
+    createProjectConstructionCost,
+    deleteProjectConstructionCost,
+    createProjectHousingType,
+    deleteProjectHousingType,
+    createProjectEquipmentUtilityType,
+    deleteProjectEquipmentUtilityType,
   } = useZURB();
 
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [goldPrice, setGoldPrice] = useState<GoldPriceData>(getCachedGoldPrice() || getDefaultGoldPrice());
   const [loadingGoldPrice, setLoadingGoldPrice] = useState<boolean>(false);
-  const [editingParam, setEditingParam] = useState<string | null>(null);
-  const [editingCostType, setEditingCostType] = useState<string | null>(null);
-  const [isLoadingParams, setIsLoadingParams] = useState<boolean>(false);
-  const [editValues, setEditValues] = useState<{
-    build_area_m2: string;
-    cost_type: string;
-    rent_monthly: string;
-  }>({
-    build_area_m2: '',
-    cost_type: '',
-    rent_monthly: '',
-  });
-  const [editCostValue, setEditCostValue] = useState<string>('');
+  
+  const [addCostModalVisible, setAddCostModalVisible] = useState<boolean>(false);
+  const [addHousingModalVisible, setAddHousingModalVisible] = useState<boolean>(false);
+  const [addEquipmentModalVisible, setAddEquipmentModalVisible] = useState<boolean>(false);
+  
+  const [newCostCode, setNewCostCode] = useState<string>('');
+  const [newCostName, setNewCostName] = useState<string>('');
+  const [newCostGoldGrams, setNewCostGoldGrams] = useState<string>('');
+  
+  const [newHousingCode, setNewHousingCode] = useState<string>('');
+  const [newHousingName, setNewHousingName] = useState<string>('');
+  const [newHousingCategory, setNewHousingCategory] = useState<'apartment' | 'villa' | 'commercial'>('apartment');
+  const [newHousingArea, setNewHousingArea] = useState<string>('');
+  const [newHousingCostType, setNewHousingCostType] = useState<string>('');
+  const [newHousingRent, setNewHousingRent] = useState<string>('');
+  
+  const [newEquipmentCode, setNewEquipmentCode] = useState<string>('');
+  const [newEquipmentName, setNewEquipmentName] = useState<string>('');
+  const [newEquipmentCategory, setNewEquipmentCategory] = useState<'equipment' | 'utility'>('equipment');
+  const [newEquipmentLandArea, setNewEquipmentLandArea] = useState<string>('1800');
+  const [newEquipmentOccupation, setNewEquipmentOccupation] = useState<string>('0.3');
+  const [newEquipmentCostType, setNewEquipmentCostType] = useState<string>('ZMER');
 
   const project = useMemo(() => {
     return projects.find(p => p.id === id) || null;
   }, [projects, id]);
 
-  const costParams = useMemo(() => {
-    const params = getProjectCostParamsByProjectId(id || '');
-    console.log('[ProjectParameters] Cost params for project', id, ':', params.length);
-    return params;
-  }, [getProjectCostParamsByProjectId, id]);
+  const constructionCosts = useMemo(() => {
+    return getProjectConstructionCostsByProjectId(id || '');
+  }, [getProjectConstructionCostsByProjectId, id]);
+
+  const housingTypes = useMemo(() => {
+    return getProjectHousingTypesByProjectId(id || '');
+  }, [getProjectHousingTypesByProjectId, id]);
+
+  const equipmentUtilityTypes = useMemo(() => {
+    return getProjectEquipmentUtilityTypesByProjectId(id || '');
+  }, [getProjectEquipmentUtilityTypesByProjectId, id]);
+
+  const apartmentTypes = useMemo(() => housingTypes.filter(h => h.category === 'apartment'), [housingTypes]);
+  const villaTypes = useMemo(() => housingTypes.filter(h => h.category === 'villa'), [housingTypes]);
+  const commercialTypes = useMemo(() => housingTypes.filter(h => h.category === 'commercial'), [housingTypes]);
 
   const handleRefresh = useCallback(async () => {
-    console.log('[ProjectParameters] Refreshing...');
     setRefreshing(true);
-    await loadProjectCostParams();
+    const price = await fetchLiveGoldPrice();
+    setGoldPrice(price);
     setRefreshing(false);
-  }, [loadProjectCostParams]);
+  }, []);
 
   const fetchGoldPrice = useCallback(async () => {
     setLoadingGoldPrice(true);
@@ -75,210 +96,117 @@ export default function ProjectParametersScreen() {
     fetchGoldPrice();
   }, [fetchGoldPrice]);
 
-  useEffect(() => {
-    if (id && costParams.length === 0) {
-      const retryLoad = async () => {
-        console.log('[ProjectParameters] No parameters found, retrying in 1s...');
-        setIsLoadingParams(true);
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        await loadProjectCostParams();
-        setIsLoadingParams(false);
-      };
-      retryLoad();
-    }
-  }, [id, costParams.length, loadProjectCostParams]);
+  const handleDeleteCost = useCallback(async (costId: string, code: string) => {
+    Alert.alert(
+      'Delete Construction Cost',
+      `Are you sure you want to delete "${code}"? This action cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            await deleteProjectConstructionCost(costId);
+          },
+        },
+      ]
+    );
+  }, [deleteProjectConstructionCost]);
 
-  const startEditing = useCallback((paramId: string, unitType: string, currentValues: {
-    build_area_m2: number;
-    rent_monthly: number;
-  }) => {
-    const config = HOUSING_TYPES[unitType];
-    setEditingParam(paramId);
-    setEditValues({
-      build_area_m2: currentValues.build_area_m2.toString(),
-      cost_type: config.defaultCostType,
-      rent_monthly: currentValues.rent_monthly.toString(),
-    });
-  }, []);
+  const handleDeleteHousing = useCallback(async (housingId: string, code: string) => {
+    Alert.alert(
+      'Delete Housing Type',
+      `Are you sure you want to delete "${code}"? This action cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            await deleteProjectHousingType(housingId);
+          },
+        },
+      ]
+    );
+  }, [deleteProjectHousingType]);
 
-  const cancelEditing = useCallback(() => {
-    setEditingParam(null);
-    setEditValues({
-      build_area_m2: '',
-      cost_type: '',
-      rent_monthly: '',
-    });
-  }, []);
+  const handleDeleteEquipment = useCallback(async (equipmentId: string, code: string) => {
+    Alert.alert(
+      'Delete Equipment/Utility Type',
+      `Are you sure you want to delete "${code}"? This action cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            await deleteProjectEquipmentUtilityType(equipmentId);
+          },
+        },
+      ]
+    );
+  }, [deleteProjectEquipmentUtilityType]);
 
-  const saveParam = useCallback(async (paramId: string) => {
-    const param = costParams.find(p => p.id === paramId);
-    if (!param) return;
-
-    const buildArea = parseFloat(editValues.build_area_m2);
-    const rentMonthly = parseFloat(editValues.rent_monthly);
-
-    if (isNaN(buildArea) || isNaN(rentMonthly) || !editValues.cost_type) {
+  const handleAddCost = useCallback(async () => {
+    if (!id || !newCostCode || !newCostName || !newCostGoldGrams) {
+      Alert.alert('Error', 'Please fill in all fields');
       return;
     }
 
-    const costTypeConfig = CONSTRUCTION_COSTS[editValues.cost_type];
-    const costPerM2 = costTypeConfig.goldGramsPerM2 * goldPrice.pricePerGram;
+    const goldGrams = parseFloat(newCostGoldGrams);
+    if (isNaN(goldGrams) || goldGrams <= 0) {
+      Alert.alert('Error', 'Please enter a valid gold content value');
+      return;
+    }
 
-    await updateProjectCostParam(paramId, {
-      build_area_m2: buildArea,
-      cost_per_m2: costPerM2,
-      rent_monthly: rentMonthly,
-    });
+    await createProjectConstructionCost(id, newCostCode.toUpperCase(), newCostName, goldGrams);
+    setAddCostModalVisible(false);
+    setNewCostCode('');
+    setNewCostName('');
+    setNewCostGoldGrams('');
+  }, [id, newCostCode, newCostName, newCostGoldGrams, createProjectConstructionCost]);
 
-    cancelEditing();
-  }, [editValues, updateProjectCostParam, cancelEditing, costParams, goldPrice]);
+  const handleAddHousing = useCallback(async () => {
+    if (!id || !newHousingCode || !newHousingName || !newHousingArea || !newHousingCostType || !newHousingRent) {
+      Alert.alert('Error', 'Please fill in all fields');
+      return;
+    }
 
-  const renderHousingTypeCard = useCallback((param: any, type: string) => {
-    const isEditing = editingParam === param.id;
-    const config = HOUSING_TYPES[type];
-    const costTypeConfig = CONSTRUCTION_COSTS[config.defaultCostType];
-    const calculatedCostPerM2XOF = costTypeConfig.goldGramsPerM2 * goldPrice.pricePerGram * USD_TO_XOF;
+    const area = parseFloat(newHousingArea);
+    const rent = parseFloat(newHousingRent);
+    if (isNaN(area) || area <= 0 || isNaN(rent) || rent <= 0) {
+      Alert.alert('Error', 'Please enter valid numeric values');
+      return;
+    }
 
-    return (
-      <View key={param.id} style={styles.paramCard}>
-        <View style={styles.paramHeader}>
-          <View style={styles.paramIcon}>
-            <DollarSign size={18} color="#007AFF" />
-          </View>
-          <View style={styles.paramHeaderText}>
-            <Text style={styles.paramTitle}>{type}</Text>
-            <Text style={styles.paramSubtitle}>{config.name}</Text>
-            <View style={styles.costTypeBadge}>
-              <Text style={styles.costTypeBadgeText}>Cost Type: {config.defaultCostType}</Text>
-            </View>
-          </View>
-        </View>
+    await createProjectHousingType(id, newHousingCode.toUpperCase(), newHousingName, newHousingCategory, area, newHousingCostType, rent);
+    setAddHousingModalVisible(false);
+    setNewHousingCode('');
+    setNewHousingName('');
+    setNewHousingArea('');
+    setNewHousingRent('');
+  }, [id, newHousingCode, newHousingName, newHousingCategory, newHousingArea, newHousingCostType, newHousingRent, createProjectHousingType]);
 
-        {isEditing ? (
-          <View style={styles.editForm}>
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Build Area (m²)</Text>
-              <TextInput
-                style={styles.input}
-                value={editValues.build_area_m2}
-                onChangeText={(text) => setEditValues(prev => ({ ...prev, build_area_m2: text }))}
-                keyboardType="decimal-pad"
-                placeholder="Build area"
-              />
-            </View>
+  const handleAddEquipment = useCallback(async () => {
+    if (!id || !newEquipmentCode || !newEquipmentName || !newEquipmentLandArea || !newEquipmentOccupation) {
+      Alert.alert('Error', 'Please fill in all fields');
+      return;
+    }
 
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Cost Type</Text>
-              <View style={styles.costTypeOptions}>
-                {CONSTRUCTION_COST_TYPES.map(costType => {
-                  const costConfig = CONSTRUCTION_COSTS[costType];
-                  const costXOF = (costConfig.goldGramsPerM2 * goldPrice.pricePerGram * USD_TO_XOF).toLocaleString(undefined, {maximumFractionDigits: 0});
-                  return (
-                    <TouchableOpacity
-                      key={costType}
-                      style={[
-                        styles.costTypeOption,
-                        editValues.cost_type === costType && styles.costTypeOptionSelected,
-                      ]}
-                      onPress={() => setEditValues(prev => ({ ...prev, cost_type: costType }))}
-                    >
-                      <Text style={[
-                        styles.costTypeOptionCode,
-                        editValues.cost_type === costType && styles.costTypeOptionTextSelected,
-                      ]}>{costType}</Text>
-                      <Text style={[
-                        styles.costTypeOptionValue,
-                        editValues.cost_type === costType && styles.costTypeOptionTextSelected,
-                      ]}>{costXOF} XOF/m²</Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </View>
+    const landArea = parseFloat(newEquipmentLandArea);
+    const occupation = parseFloat(newEquipmentOccupation);
+    if (isNaN(landArea) || landArea <= 0 || isNaN(occupation) || occupation <= 0 || occupation > 1) {
+      Alert.alert('Error', 'Please enter valid values (occupation must be between 0 and 1)');
+      return;
+    }
 
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Monthly Rent (XOF)</Text>
-              <TextInput
-                style={styles.input}
-                value={editValues.rent_monthly}
-                onChangeText={(text) => setEditValues(prev => ({ ...prev, rent_monthly: text }))}
-                keyboardType="decimal-pad"
-                placeholder="Monthly rent"
-              />
-            </View>
-
-            <View style={styles.editButtons}>
-              <TouchableOpacity
-                style={[styles.editButton, styles.cancelButton]}
-                onPress={cancelEditing}
-              >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.editButton, styles.saveButton]}
-                onPress={() => saveParam(param.id)}
-              >
-                <Text style={styles.saveButtonText}>Save</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        ) : (
-          <>
-            <View style={styles.paramGrid}>
-              <View style={styles.paramItem}>
-                <Text style={styles.paramItemLabel}>Build Area</Text>
-                <Text style={styles.paramItemValue}>
-                  {param.build_area_m2.toFixed(0)} m²
-                </Text>
-              </View>
-              <View style={styles.paramItem}>
-                <Text style={styles.paramItemLabel}>Cost/m²</Text>
-                <Text style={styles.paramItemValue}>
-                  {calculatedCostPerM2XOF.toLocaleString(undefined, {maximumFractionDigits: 0})} XOF
-                </Text>
-                {costTypeConfig && (
-                  <Text style={styles.paramItemSubtext}>
-                    {costTypeConfig.goldGramsPerM2.toFixed(2)} g Au/m²
-                  </Text>
-                )}
-              </View>
-              <View style={styles.paramItem}>
-                <Text style={styles.paramItemLabel}>Monthly Rent</Text>
-                <Text style={styles.paramItemValue}>
-                  {(param.rent_monthly).toLocaleString(undefined, {maximumFractionDigits: 0})} XOF
-                </Text>
-              </View>
-            </View>
-
-            <View style={styles.paramSummary}>
-              <View style={styles.paramSummaryItem}>
-                <Text style={styles.paramSummaryLabel}>Total Build Cost</Text>
-                <Text style={styles.paramSummaryValue}>
-                  {(param.build_area_m2 * calculatedCostPerM2XOF).toLocaleString(undefined, {maximumFractionDigits: 0})} XOF
-                </Text>
-              </View>
-              <View style={styles.paramSummaryItem}>
-                <Text style={styles.paramSummaryLabel}>Yearly Revenue</Text>
-                <Text style={styles.paramSummaryValue}>
-                  {(param.rent_monthly * 12).toLocaleString(undefined, {maximumFractionDigits: 0})} XOF
-                </Text>
-              </View>
-            </View>
-
-            <TouchableOpacity
-              style={styles.editTrigger}
-              onPress={() => startEditing(param.id, type, {
-                build_area_m2: param.build_area_m2,
-                rent_monthly: param.rent_monthly,
-              })}
-            >
-              <Text style={styles.editTriggerText}>Edit Parameters</Text>
-            </TouchableOpacity>
-          </>
-        )}
-      </View>
-    );
-  }, [editingParam, editValues, cancelEditing, saveParam, startEditing, goldPrice]);
+    await createProjectEquipmentUtilityType(id, newEquipmentCode.toUpperCase(), newEquipmentName, newEquipmentCategory, landArea, occupation, newEquipmentCostType);
+    setAddEquipmentModalVisible(false);
+    setNewEquipmentCode('');
+    setNewEquipmentName('');
+    setNewEquipmentLandArea('1800');
+    setNewEquipmentOccupation('0.3');
+  }, [id, newEquipmentCode, newEquipmentName, newEquipmentCategory, newEquipmentLandArea, newEquipmentOccupation, newEquipmentCostType, createProjectEquipmentUtilityType]);
 
   if (!project) {
     return (
@@ -292,7 +220,7 @@ export default function ProjectParametersScreen() {
     <SafeAreaView style={styles.container} edges={['bottom']}>
       <Stack.Screen
         options={{
-          title: 'Project Parameters',
+          title: 'Project Settings',
           headerShown: true,
         }}
       />
@@ -367,169 +295,544 @@ export default function ProjectParametersScreen() {
           </View>
         </View>
 
-        {costParams.length === 0 && (
-          <View style={styles.emptyState}>
-            {isLoadingParams ? (
-              <>
-                <ActivityIndicator size="large" color="#007AFF" />
-                <Text style={[styles.emptyStateText, { marginTop: 16 }]}>
-                  Loading parameters...
-                </Text>
-              </>
-            ) : (
-              <Text style={styles.emptyStateText}>
-                No cost parameters found. Pull down to refresh or check your project setup.
-              </Text>
-            )}
-          </View>
-        )}
-
         <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Settings size={20} color="#007AFF" />
-            <Text style={styles.sectionTitle}>Construction Costs per m²</Text>
+          <View style={styles.sectionHeaderRow}>
+            <View style={styles.sectionHeader}>
+              <Settings size={20} color="#007AFF" />
+              <Text style={styles.sectionTitle}>Construction Cost Types</Text>
+            </View>
+            <TouchableOpacity
+              style={styles.addButton}
+              onPress={() => setAddCostModalVisible(true)}
+            >
+              <Plus size={18} color="#007AFF" />
+              <Text style={styles.addButtonText}>Add</Text>
+            </TouchableOpacity>
           </View>
           <Text style={styles.sectionDesc}>
-            Base construction costs used in housing types below
+            Define construction costs based on gold content per m²
           </Text>
 
-          {CONSTRUCTION_COST_TYPES.map(type => {
-            const param = costParams.find(p => p.unit_type === type);
-            if (!param) return null;
-
-            const config = CONSTRUCTION_COSTS[type];
-            const isEditing = editingCostType === type;
-
+          {constructionCosts.map((cost) => {
+            const costPerM2XOF = cost.gold_grams_per_m2 * goldPrice.pricePerGram * USD_TO_XOF;
             return (
-              <View key={param.id} style={styles.costCard}>
-                <View style={styles.costHeader}>
-                  <Text style={styles.costCode}>{type}</Text>
-                  <Text style={styles.costName}>{config.name}</Text>
-                </View>
-
-                {isEditing ? (
-                  <View style={styles.editForm}>
-                    <View style={styles.inputGroup}>
-                      <Text style={styles.inputLabel}>Gold Content (g Au/m²)</Text>
-                      <TextInput
-                        style={styles.input}
-                        value={editCostValue}
-                        onChangeText={setEditCostValue}
-                        keyboardType="decimal-pad"
-                        placeholder="Gold grams per m²"
-                      />
-                    </View>
-                    <View style={styles.editButtons}>
-                      <TouchableOpacity
-                        style={[styles.editButton, styles.cancelButton]}
-                        onPress={() => {
-                          setEditingCostType(null);
-                          setEditCostValue('');
-                        }}
-                      >
-                        <Text style={styles.cancelButtonText}>Cancel</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={[styles.editButton, styles.saveButton]}
-                        onPress={async () => {
-                          const newGoldGrams = parseFloat(editCostValue);
-                          if (!isNaN(newGoldGrams) && param) {
-                            CONSTRUCTION_COSTS[type].goldGramsPerM2 = newGoldGrams;
-                            const newCostPerM2 = newGoldGrams * goldPrice.pricePerGram;
-                            await updateProjectCostParam(param.id, {
-                              cost_per_m2: newCostPerM2,
-                            });
-                            setEditingCostType(null);
-                            setEditCostValue('');
-                          }
-                        }}
-                      >
-                        <Text style={styles.saveButtonText}>Save</Text>
-                      </TouchableOpacity>
-                    </View>
+              <View key={cost.id} style={styles.costCard}>
+                <View style={styles.costCardHeader}>
+                  <View>
+                    <Text style={styles.costCode}>{cost.code}</Text>
+                    <Text style={styles.costName}>{cost.name}</Text>
                   </View>
-                ) : (
-                  <>
-                    <View style={styles.costDetails}>
-                      <View style={styles.costDetailRow}>
-                        <Text style={styles.costDetailLabel}>Gold Content:</Text>
-                        <Text style={styles.costDetailValue}>{config.goldGramsPerM2.toFixed(2)} g Au/m²</Text>
-                      </View>
-                      <View style={styles.costDetailRow}>
-                        <Text style={styles.costDetailLabel}>Cost per m²:</Text>
-                        <Text style={styles.costDetailValue}>{(config.goldGramsPerM2 * goldPrice.pricePerGram * USD_TO_XOF).toLocaleString(undefined, {maximumFractionDigits: 0})} XOF/m²</Text>
-                      </View>
-                      <View style={styles.costDetailRow}>
-                        <Text style={styles.costDetailLabel}>Calculated at:</Text>
-                        <Text style={styles.costDetailValueSmall}>
-                          {config.goldGramsPerM2.toFixed(2)} g × {(goldPrice.pricePerGram * USD_TO_XOF).toLocaleString(undefined, {maximumFractionDigits: 0})} XOF/g
-                        </Text>
-                      </View>
-                    </View>
-                    <TouchableOpacity
-                      style={styles.editTriggerSmall}
-                      onPress={() => {
-                        setEditingCostType(type);
-                        setEditCostValue(config.goldGramsPerM2.toString());
-                      }}
-                    >
-                      <Text style={styles.editTriggerTextSmall}>Edit Gold Content</Text>
-                    </TouchableOpacity>
-                  </>
-                )}
+                  <TouchableOpacity
+                    style={styles.deleteButton}
+                    onPress={() => handleDeleteCost(cost.id, cost.code)}
+                  >
+                    <Trash2 size={18} color="#DC3545" />
+                  </TouchableOpacity>
+                </View>
+                <View style={styles.costDetails}>
+                  <View style={styles.costDetailRow}>
+                    <Text style={styles.costDetailLabel}>Gold Content:</Text>
+                    <Text style={styles.costDetailValue}>{cost.gold_grams_per_m2.toFixed(2)} g Au/m²</Text>
+                  </View>
+                  <View style={styles.costDetailRow}>
+                    <Text style={styles.costDetailLabel}>Cost per m²:</Text>
+                    <Text style={styles.costDetailValue}>{costPerM2XOF.toLocaleString(undefined, {maximumFractionDigits: 0})} XOF/m²</Text>
+                  </View>
+                </View>
               </View>
             );
           })}
         </View>
 
         <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Building2 size={20} color="#007AFF" />
-            <Text style={styles.sectionTitle}>Apartment Housing Types</Text>
+          <View style={styles.sectionHeaderRow}>
+            <View style={styles.sectionHeader}>
+              <Building2 size={20} color="#007AFF" />
+              <Text style={styles.sectionTitle}>Apartment Housing Types</Text>
+            </View>
+            <TouchableOpacity
+              style={styles.addButton}
+              onPress={() => {
+                setNewHousingCategory('apartment');
+                setNewHousingCostType(constructionCosts[0]?.code || '');
+                setAddHousingModalVisible(true);
+              }}
+            >
+              <Plus size={18} color="#007AFF" />
+              <Text style={styles.addButtonText}>Add</Text>
+            </TouchableOpacity>
           </View>
-          <Text style={styles.sectionDesc}>
-            Configure apartment unit types with area, cost type, and rental revenue
-          </Text>
 
-          {APARTMENT_TYPES.map(type => {
-            const param = costParams.find(p => p.unit_type === type);
-            if (!param) return null;
-            return renderHousingTypeCard(param, type);
+          {apartmentTypes.map((type) => {
+            const costType = constructionCosts.find(c => c.code === type.default_cost_type);
+            const costPerM2XOF = costType ? costType.gold_grams_per_m2 * goldPrice.pricePerGram * USD_TO_XOF : 0;
+            return (
+              <View key={type.id} style={styles.housingCard}>
+                <View style={styles.housingCardHeader}>
+                  <View>
+                    <Text style={styles.housingCode}>{type.code}</Text>
+                    <Text style={styles.housingName}>{type.name}</Text>
+                  </View>
+                  <TouchableOpacity
+                    style={styles.deleteButton}
+                    onPress={() => handleDeleteHousing(type.id, type.code)}
+                  >
+                    <Trash2 size={18} color="#DC3545" />
+                  </TouchableOpacity>
+                </View>
+                <View style={styles.housingDetails}>
+                  <View style={styles.housingDetailRow}>
+                    <Text style={styles.housingDetailLabel}>Area:</Text>
+                    <Text style={styles.housingDetailValue}>{type.default_area_m2} m²</Text>
+                  </View>
+                  <View style={styles.housingDetailRow}>
+                    <Text style={styles.housingDetailLabel}>Cost Type:</Text>
+                    <Text style={styles.housingDetailValue}>{type.default_cost_type} ({costPerM2XOF.toLocaleString(undefined, {maximumFractionDigits: 0})} XOF/m²)</Text>
+                  </View>
+                  <View style={styles.housingDetailRow}>
+                    <Text style={styles.housingDetailLabel}>Monthly Rent:</Text>
+                    <Text style={styles.housingDetailValue}>{type.default_rent_monthly.toLocaleString(undefined, {maximumFractionDigits: 0})} XOF</Text>
+                  </View>
+                  <View style={styles.housingDetailRow}>
+                    <Text style={styles.housingDetailLabel}>Total Build Cost:</Text>
+                    <Text style={styles.housingDetailValueHighlight}>
+                      {(type.default_area_m2 * costPerM2XOF).toLocaleString(undefined, {maximumFractionDigits: 0})} XOF
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            );
           })}
         </View>
 
         <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Home size={20} color="#007AFF" />
-            <Text style={styles.sectionTitle}>Villa Housing Types</Text>
+          <View style={styles.sectionHeaderRow}>
+            <View style={styles.sectionHeader}>
+              <Home size={20} color="#007AFF" />
+              <Text style={styles.sectionTitle}>Villa Housing Types</Text>
+            </View>
+            <TouchableOpacity
+              style={styles.addButton}
+              onPress={() => {
+                setNewHousingCategory('villa');
+                setNewHousingCostType(constructionCosts[0]?.code || '');
+                setAddHousingModalVisible(true);
+              }}
+            >
+              <Plus size={18} color="#007AFF" />
+              <Text style={styles.addButtonText}>Add</Text>
+            </TouchableOpacity>
           </View>
-          <Text style={styles.sectionDesc}>
-            Configure villa unit types with area, cost type, and rental revenue
-          </Text>
 
-          {VILLA_TYPES.map(type => {
-            const param = costParams.find(p => p.unit_type === type);
-            if (!param) return null;
-            return renderHousingTypeCard(param, type);
+          {villaTypes.map((type) => {
+            const costType = constructionCosts.find(c => c.code === type.default_cost_type);
+            const costPerM2XOF = costType ? costType.gold_grams_per_m2 * goldPrice.pricePerGram * USD_TO_XOF : 0;
+            return (
+              <View key={type.id} style={styles.housingCard}>
+                <View style={styles.housingCardHeader}>
+                  <View>
+                    <Text style={styles.housingCode}>{type.code}</Text>
+                    <Text style={styles.housingName}>{type.name}</Text>
+                  </View>
+                  <TouchableOpacity
+                    style={styles.deleteButton}
+                    onPress={() => handleDeleteHousing(type.id, type.code)}
+                  >
+                    <Trash2 size={18} color="#DC3545" />
+                  </TouchableOpacity>
+                </View>
+                <View style={styles.housingDetails}>
+                  <View style={styles.housingDetailRow}>
+                    <Text style={styles.housingDetailLabel}>Area:</Text>
+                    <Text style={styles.housingDetailValue}>{type.default_area_m2} m²</Text>
+                  </View>
+                  <View style={styles.housingDetailRow}>
+                    <Text style={styles.housingDetailLabel}>Cost Type:</Text>
+                    <Text style={styles.housingDetailValue}>{type.default_cost_type} ({costPerM2XOF.toLocaleString(undefined, {maximumFractionDigits: 0})} XOF/m²)</Text>
+                  </View>
+                  <View style={styles.housingDetailRow}>
+                    <Text style={styles.housingDetailLabel}>Monthly Rent:</Text>
+                    <Text style={styles.housingDetailValue}>{type.default_rent_monthly.toLocaleString(undefined, {maximumFractionDigits: 0})} XOF</Text>
+                  </View>
+                  <View style={styles.housingDetailRow}>
+                    <Text style={styles.housingDetailLabel}>Total Build Cost:</Text>
+                    <Text style={styles.housingDetailValueHighlight}>
+                      {(type.default_area_m2 * costPerM2XOF).toLocaleString(undefined, {maximumFractionDigits: 0})} XOF
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            );
           })}
         </View>
 
         <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <ShoppingBag size={20} color="#007AFF" />
-            <Text style={styles.sectionTitle}>Commercial Housing Types</Text>
+          <View style={styles.sectionHeaderRow}>
+            <View style={styles.sectionHeader}>
+              <ShoppingBag size={20} color="#007AFF" />
+              <Text style={styles.sectionTitle}>Commercial Housing Types</Text>
+            </View>
+            <TouchableOpacity
+              style={styles.addButton}
+              onPress={() => {
+                setNewHousingCategory('commercial');
+                setNewHousingCostType(constructionCosts[0]?.code || '');
+                setAddHousingModalVisible(true);
+              }}
+            >
+              <Plus size={18} color="#007AFF" />
+              <Text style={styles.addButtonText}>Add</Text>
+            </TouchableOpacity>
           </View>
-          <Text style={styles.sectionDesc}>
-            Configure commercial unit types with area, cost type, and rental revenue
-          </Text>
 
-          {COMMERCIAL_TYPES.map(type => {
-            const param = costParams.find(p => p.unit_type === type);
-            if (!param) return null;
-            return renderHousingTypeCard(param, type);
+          {commercialTypes.map((type) => {
+            const costType = constructionCosts.find(c => c.code === type.default_cost_type);
+            const costPerM2XOF = costType ? costType.gold_grams_per_m2 * goldPrice.pricePerGram * USD_TO_XOF : 0;
+            return (
+              <View key={type.id} style={styles.housingCard}>
+                <View style={styles.housingCardHeader}>
+                  <View>
+                    <Text style={styles.housingCode}>{type.code}</Text>
+                    <Text style={styles.housingName}>{type.name}</Text>
+                  </View>
+                  <TouchableOpacity
+                    style={styles.deleteButton}
+                    onPress={() => handleDeleteHousing(type.id, type.code)}
+                  >
+                    <Trash2 size={18} color="#DC3545" />
+                  </TouchableOpacity>
+                </View>
+                <View style={styles.housingDetails}>
+                  <View style={styles.housingDetailRow}>
+                    <Text style={styles.housingDetailLabel}>Area:</Text>
+                    <Text style={styles.housingDetailValue}>{type.default_area_m2} m²</Text>
+                  </View>
+                  <View style={styles.housingDetailRow}>
+                    <Text style={styles.housingDetailLabel}>Cost Type:</Text>
+                    <Text style={styles.housingDetailValue}>{type.default_cost_type} ({costPerM2XOF.toLocaleString(undefined, {maximumFractionDigits: 0})} XOF/m²)</Text>
+                  </View>
+                  <View style={styles.housingDetailRow}>
+                    <Text style={styles.housingDetailLabel}>Monthly Rent:</Text>
+                    <Text style={styles.housingDetailValue}>{type.default_rent_monthly.toLocaleString(undefined, {maximumFractionDigits: 0})} XOF</Text>
+                  </View>
+                  <View style={styles.housingDetailRow}>
+                    <Text style={styles.housingDetailLabel}>Total Build Cost:</Text>
+                    <Text style={styles.housingDetailValueHighlight}>
+                      {(type.default_area_m2 * costPerM2XOF).toLocaleString(undefined, {maximumFractionDigits: 0})} XOF
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            );
+          })}
+        </View>
+
+        <View style={styles.section}>
+          <View style={styles.sectionHeaderRow}>
+            <View style={styles.sectionHeader}>
+              <Factory size={20} color="#007AFF" />
+              <Text style={styles.sectionTitle}>Equipment & Utility Types</Text>
+            </View>
+            <TouchableOpacity
+              style={styles.addButton}
+              onPress={() => {
+                setNewEquipmentCategory('equipment');
+                setNewEquipmentCostType(constructionCosts[0]?.code || 'ZMER');
+                setAddEquipmentModalVisible(true);
+              }}
+            >
+              <Plus size={18} color="#007AFF" />
+              <Text style={styles.addButtonText}>Add</Text>
+            </TouchableOpacity>
+          </View>
+
+          {equipmentUtilityTypes.map((type) => {
+            const costType = constructionCosts.find(c => c.code === type.cost_type);
+            const costPerM2XOF = costType ? costType.gold_grams_per_m2 * goldPrice.pricePerGram * USD_TO_XOF : 0;
+            const buildAreaM2 = type.land_area_m2 * type.building_occupation_pct;
+            return (
+              <View key={type.id} style={styles.equipmentCard}>
+                <View style={styles.equipmentCardHeader}>
+                  <View>
+                    <Text style={styles.equipmentCode}>{type.code}</Text>
+                    <Text style={styles.equipmentName}>{type.name}</Text>
+                    <View style={styles.categoryBadge}>
+                      <Text style={styles.categoryBadgeText}>{type.category.toUpperCase()}</Text>
+                    </View>
+                  </View>
+                  <TouchableOpacity
+                    style={styles.deleteButton}
+                    onPress={() => handleDeleteEquipment(type.id, type.code)}
+                  >
+                    <Trash2 size={18} color="#DC3545" />
+                  </TouchableOpacity>
+                </View>
+                <View style={styles.equipmentDetails}>
+                  <View style={styles.equipmentDetailRow}>
+                    <Text style={styles.equipmentDetailLabel}>Land Area:</Text>
+                    <Text style={styles.equipmentDetailValue}>{type.land_area_m2} m²</Text>
+                  </View>
+                  <View style={styles.equipmentDetailRow}>
+                    <Text style={styles.equipmentDetailLabel}>Building Occupation:</Text>
+                    <Text style={styles.equipmentDetailValue}>{(type.building_occupation_pct * 100).toFixed(0)}%</Text>
+                  </View>
+                  <View style={styles.equipmentDetailRow}>
+                    <Text style={styles.equipmentDetailLabel}>Build Area:</Text>
+                    <Text style={styles.equipmentDetailValue}>{buildAreaM2.toFixed(0)} m²</Text>
+                  </View>
+                  <View style={styles.equipmentDetailRow}>
+                    <Text style={styles.equipmentDetailLabel}>Cost Type:</Text>
+                    <Text style={styles.equipmentDetailValue}>{type.cost_type} ({costPerM2XOF.toLocaleString(undefined, {maximumFractionDigits: 0})} XOF/m²)</Text>
+                  </View>
+                  <View style={styles.equipmentDetailRow}>
+                    <Text style={styles.equipmentDetailLabel}>Total Build Cost:</Text>
+                    <Text style={styles.equipmentDetailValueHighlight}>
+                      {(buildAreaM2 * costPerM2XOF).toLocaleString(undefined, {maximumFractionDigits: 0})} XOF
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            );
           })}
         </View>
       </ScrollView>
+
+      <Modal
+        visible={addCostModalVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setAddCostModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Add Construction Cost Type</Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Code (e.g., ZME)"
+              value={newCostCode}
+              onChangeText={setNewCostCode}
+              autoCapitalize="characters"
+            />
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Description"
+              value={newCostName}
+              onChangeText={setNewCostName}
+            />
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Gold Content (g Au/m²)"
+              value={newCostGoldGrams}
+              onChangeText={setNewCostGoldGrams}
+              keyboardType="decimal-pad"
+            />
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalCancelButton]}
+                onPress={() => setAddCostModalVisible(false)}
+              >
+                <Text style={styles.modalCancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalSaveButton]}
+                onPress={handleAddCost}
+              >
+                <Text style={styles.modalSaveButtonText}>Add</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={addHousingModalVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setAddHousingModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Add Housing Type</Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Code (e.g., AMS)"
+              value={newHousingCode}
+              onChangeText={setNewHousingCode}
+              autoCapitalize="characters"
+            />
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Description"
+              value={newHousingName}
+              onChangeText={setNewHousingName}
+            />
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Default Area (m²)"
+              value={newHousingArea}
+              onChangeText={setNewHousingArea}
+              keyboardType="decimal-pad"
+            />
+            <View style={styles.pickerContainer}>
+              <Text style={styles.pickerLabel}>Cost Type:</Text>
+              <View style={styles.pickerOptions}>
+                {constructionCosts.map((cost) => (
+                  <TouchableOpacity
+                    key={cost.code}
+                    style={[
+                      styles.pickerOption,
+                      newHousingCostType === cost.code && styles.pickerOptionSelected,
+                    ]}
+                    onPress={() => setNewHousingCostType(cost.code)}
+                  >
+                    <Text
+                      style={[
+                        styles.pickerOptionText,
+                        newHousingCostType === cost.code && styles.pickerOptionTextSelected,
+                      ]}
+                    >
+                      {cost.code}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Default Monthly Rent (XOF)"
+              value={newHousingRent}
+              onChangeText={setNewHousingRent}
+              keyboardType="decimal-pad"
+            />
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalCancelButton]}
+                onPress={() => setAddHousingModalVisible(false)}
+              >
+                <Text style={styles.modalCancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalSaveButton]}
+                onPress={handleAddHousing}
+              >
+                <Text style={styles.modalSaveButtonText}>Add</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={addEquipmentModalVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setAddEquipmentModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Add Equipment/Utility Type</Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Code (e.g., EQS)"
+              value={newEquipmentCode}
+              onChangeText={setNewEquipmentCode}
+              autoCapitalize="characters"
+            />
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Description"
+              value={newEquipmentName}
+              onChangeText={setNewEquipmentName}
+            />
+            <View style={styles.categorySelector}>
+              <TouchableOpacity
+                style={[
+                  styles.categoryOption,
+                  newEquipmentCategory === 'equipment' && styles.categoryOptionSelected,
+                ]}
+                onPress={() => setNewEquipmentCategory('equipment')}
+              >
+                <Text
+                  style={[
+                    styles.categoryOptionText,
+                    newEquipmentCategory === 'equipment' && styles.categoryOptionTextSelected,
+                  ]}
+                >
+                  Equipment
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.categoryOption,
+                  newEquipmentCategory === 'utility' && styles.categoryOptionSelected,
+                ]}
+                onPress={() => setNewEquipmentCategory('utility')}
+              >
+                <Text
+                  style={[
+                    styles.categoryOptionText,
+                    newEquipmentCategory === 'utility' && styles.categoryOptionTextSelected,
+                  ]}
+                >
+                  Utility
+                </Text>
+              </TouchableOpacity>
+            </View>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Land Area (m²)"
+              value={newEquipmentLandArea}
+              onChangeText={setNewEquipmentLandArea}
+              keyboardType="decimal-pad"
+            />
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Building Occupation (0-1, e.g., 0.3 for 30%)"
+              value={newEquipmentOccupation}
+              onChangeText={setNewEquipmentOccupation}
+              keyboardType="decimal-pad"
+            />
+            <View style={styles.pickerContainer}>
+              <Text style={styles.pickerLabel}>Cost Type:</Text>
+              <View style={styles.pickerOptions}>
+                {constructionCosts.map((cost) => (
+                  <TouchableOpacity
+                    key={cost.code}
+                    style={[
+                      styles.pickerOption,
+                      newEquipmentCostType === cost.code && styles.pickerOptionSelected,
+                    ]}
+                    onPress={() => setNewEquipmentCostType(cost.code)}
+                  >
+                    <Text
+                      style={[
+                        styles.pickerOptionText,
+                        newEquipmentCostType === cost.code && styles.pickerOptionTextSelected,
+                      ]}
+                    >
+                      {cost.code}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalCancelButton]}
+                onPress={() => setAddEquipmentModalVisible(false)}
+              >
+                <Text style={styles.modalCancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalSaveButton]}
+                onPress={handleAddEquipment}
+              >
+                <Text style={styles.modalSaveButtonText}>Add</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -666,13 +969,18 @@ const styles = StyleSheet.create({
   section: {
     marginTop: 24,
     paddingHorizontal: 16,
-    paddingBottom: 32,
+    paddingBottom: 16,
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
   },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginBottom: 8,
   },
   sectionTitle: {
     fontSize: 20,
@@ -685,155 +993,19 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     lineHeight: 20,
   },
-  paramCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  paramHeader: {
+  addButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
-  },
-  paramIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
     backgroundColor: '#E3F2FD',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
   },
-  paramTitle: {
-    fontSize: 18,
-    fontWeight: '700' as const,
-    color: '#212529',
-  },
-  paramGrid: {
-    flexDirection: 'row',
-    marginBottom: 16,
-    gap: 12,
-  },
-  paramItem: {
-    flex: 1,
-    backgroundColor: '#F8F9FA',
-    borderRadius: 12,
-    padding: 12,
-  },
-  paramItemLabel: {
-    fontSize: 12,
-    color: '#6C757D',
-    marginBottom: 6,
-    fontWeight: '500' as const,
-  },
-  paramItemValue: {
-    fontSize: 16,
-    fontWeight: '700' as const,
-    color: '#212529',
-  },
-  paramSummary: {
-    flexDirection: 'row',
-    marginBottom: 16,
-    gap: 12,
-  },
-  paramSummaryItem: {
-    flex: 1,
-    borderTopWidth: 2,
-    borderTopColor: '#E9ECEF',
-    paddingTop: 12,
-  },
-  paramSummaryLabel: {
-    fontSize: 13,
-    color: '#6C757D',
-    marginBottom: 4,
-    fontWeight: '500' as const,
-  },
-  paramSummaryValue: {
-    fontSize: 18,
-    fontWeight: '700' as const,
-    color: '#007AFF',
-  },
-  editTrigger: {
-    backgroundColor: '#F8F9FA',
-    borderRadius: 10,
-    paddingVertical: 12,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#E9ECEF',
-  },
-  editTriggerText: {
-    fontSize: 15,
-    fontWeight: '600' as const,
-    color: '#007AFF',
-  },
-  editForm: {
-    gap: 16,
-  },
-  inputGroup: {
-    gap: 8,
-  },
-  inputLabel: {
+  addButtonText: {
     fontSize: 14,
     fontWeight: '600' as const,
-    color: '#212529',
-  },
-  input: {
-    backgroundColor: '#F8F9FA',
-    borderRadius: 10,
-    padding: 14,
-    fontSize: 16,
-    color: '#212529',
-    borderWidth: 1,
-    borderColor: '#E9ECEF',
-  },
-  editButtons: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 8,
-  },
-  editButton: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  cancelButton: {
-    backgroundColor: '#F8F9FA',
-    borderWidth: 1,
-    borderColor: '#E9ECEF',
-  },
-  cancelButtonText: {
-    fontSize: 16,
-    fontWeight: '600' as const,
-    color: '#6C757D',
-  },
-  saveButton: {
-    backgroundColor: '#007AFF',
-  },
-  saveButtonText: {
-    fontSize: 16,
-    fontWeight: '600' as const,
-    color: '#FFFFFF',
-  },
-  emptyState: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 16,
-  },
-  emptyStateText: {
-    fontSize: 15,
-    color: '#6C757D',
-    textAlign: 'center',
-    lineHeight: 22,
+    color: '#007AFF',
   },
   costCard: {
     backgroundColor: '#FFFFFF',
@@ -843,8 +1015,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E9ECEF',
   },
-  costHeader: {
-    marginBottom: 8,
+  costCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 12,
   },
   costCode: {
     fontSize: 16,
@@ -857,47 +1032,8 @@ const styles = StyleSheet.create({
     color: '#6C757D',
     lineHeight: 18,
   },
-  costValue: {
-    fontSize: 18,
-    fontWeight: '700' as const,
-    color: '#007AFF',
-    marginBottom: 8,
-  },
-  editTriggerSmall: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
-    backgroundColor: '#F8F9FA',
-    borderWidth: 1,
-    borderColor: '#E9ECEF',
-    marginTop: 12,
-  },
-  editTriggerTextSmall: {
-    fontSize: 13,
-    fontWeight: '600' as const,
-    color: '#007AFF',
-  },
-  paramHeaderText: {
-    flex: 1,
-  },
-  paramSubtitle: {
-    fontSize: 13,
-    color: '#6C757D',
-    marginTop: 2,
-  },
-  costTypeBadge: {
-    backgroundColor: '#E3F2FD',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    marginTop: 6,
-    alignSelf: 'flex-start',
-  },
-  costTypeBadgeText: {
-    fontSize: 11,
-    fontWeight: '600' as const,
-    color: '#007AFF',
+  deleteButton: {
+    padding: 4,
   },
   costDetails: {
     gap: 8,
@@ -917,44 +1053,232 @@ const styles = StyleSheet.create({
     fontWeight: '700' as const,
     color: '#212529',
   },
-  costDetailValueSmall: {
-    fontSize: 12,
-    fontWeight: '600' as const,
+  housingCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#E9ECEF',
+  },
+  housingCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+  },
+  housingCode: {
+    fontSize: 16,
+    fontWeight: '700' as const,
+    color: '#212529',
+    marginBottom: 4,
+  },
+  housingName: {
+    fontSize: 13,
     color: '#6C757D',
+    lineHeight: 18,
   },
-  paramItemSubtext: {
-    fontSize: 11,
-    color: '#007AFF',
-    marginTop: 2,
-  },
-  costTypeOptions: {
+  housingDetails: {
     gap: 8,
   },
-  costTypeOption: {
-    backgroundColor: '#F8F9FA',
-    borderRadius: 10,
-    padding: 12,
-    borderWidth: 2,
-    borderColor: '#E9ECEF',
+  housingDetailRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  costTypeOptionSelected: {
+  housingDetailLabel: {
+    fontSize: 13,
+    color: '#6C757D',
+    fontWeight: '500' as const,
+  },
+  housingDetailValue: {
+    fontSize: 14,
+    fontWeight: '600' as const,
+    color: '#212529',
+  },
+  housingDetailValueHighlight: {
+    fontSize: 15,
+    fontWeight: '700' as const,
+    color: '#007AFF',
+  },
+  equipmentCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#E9ECEF',
+  },
+  equipmentCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+  },
+  equipmentCode: {
+    fontSize: 16,
+    fontWeight: '700' as const,
+    color: '#212529',
+    marginBottom: 4,
+  },
+  equipmentName: {
+    fontSize: 13,
+    color: '#6C757D',
+    lineHeight: 18,
+    marginBottom: 6,
+  },
+  categoryBadge: {
+    backgroundColor: '#E3F2FD',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    alignSelf: 'flex-start',
+  },
+  categoryBadgeText: {
+    fontSize: 11,
+    fontWeight: '600' as const,
+    color: '#007AFF',
+  },
+  equipmentDetails: {
+    gap: 8,
+  },
+  equipmentDetailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  equipmentDetailLabel: {
+    fontSize: 13,
+    color: '#6C757D',
+    fontWeight: '500' as const,
+  },
+  equipmentDetailValue: {
+    fontSize: 14,
+    fontWeight: '600' as const,
+    color: '#212529',
+  },
+  equipmentDetailValueHighlight: {
+    fontSize: 15,
+    fontWeight: '700' as const,
+    color: '#007AFF',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+  },
+  modalContent: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 24,
+    width: '100%',
+    maxWidth: 400,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '700' as const,
+    color: '#212529',
+    marginBottom: 20,
+  },
+  modalInput: {
+    backgroundColor: '#F8F9FA',
+    borderRadius: 10,
+    padding: 14,
+    fontSize: 16,
+    color: '#212529',
+    borderWidth: 1,
+    borderColor: '#E9ECEF',
+    marginBottom: 12,
+  },
+  pickerContainer: {
+    marginBottom: 12,
+  },
+  pickerLabel: {
+    fontSize: 14,
+    fontWeight: '600' as const,
+    color: '#212529',
+    marginBottom: 8,
+  },
+  pickerOptions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  pickerOption: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: '#F8F9FA',
+    borderWidth: 1,
+    borderColor: '#E9ECEF',
+  },
+  pickerOptionSelected: {
     backgroundColor: '#E3F2FD',
     borderColor: '#007AFF',
   },
-  costTypeOptionCode: {
-    fontSize: 15,
-    fontWeight: '700' as const,
-    color: '#212529',
-  },
-  costTypeOptionValue: {
-    fontSize: 13,
+  pickerOptionText: {
+    fontSize: 14,
     fontWeight: '600' as const,
     color: '#6C757D',
   },
-  costTypeOptionTextSelected: {
+  pickerOptionTextSelected: {
     color: '#007AFF',
+  },
+  categorySelector: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 12,
+  },
+  categoryOption: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 10,
+    backgroundColor: '#F8F9FA',
+    borderWidth: 1,
+    borderColor: '#E9ECEF',
+    alignItems: 'center',
+  },
+  categoryOptionSelected: {
+    backgroundColor: '#E3F2FD',
+    borderColor: '#007AFF',
+  },
+  categoryOptionText: {
+    fontSize: 15,
+    fontWeight: '600' as const,
+    color: '#6C757D',
+  },
+  categoryOptionTextSelected: {
+    color: '#007AFF',
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 12,
+  },
+  modalButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  modalCancelButton: {
+    backgroundColor: '#F8F9FA',
+    borderWidth: 1,
+    borderColor: '#E9ECEF',
+  },
+  modalCancelButtonText: {
+    fontSize: 16,
+    fontWeight: '600' as const,
+    color: '#6C757D',
+  },
+  modalSaveButton: {
+    backgroundColor: '#007AFF',
+  },
+  modalSaveButtonText: {
+    fontSize: 16,
+    fontWeight: '600' as const,
+    color: '#FFFFFF',
   },
 });
