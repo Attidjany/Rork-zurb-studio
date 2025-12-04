@@ -1,5 +1,5 @@
 import { Stack, useLocalSearchParams, router } from 'expo-router';
-import { Settings, DollarSign } from 'lucide-react-native';
+import { Settings, DollarSign, Building2, Home, ShoppingBag } from 'lucide-react-native';
 import React, { useMemo, useState, useCallback } from 'react';
 import {
   View,
@@ -12,28 +12,13 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useZURB } from '@/contexts/ZURBContext';
+import { USD_TO_XOF } from '@/lib/goldPrice';
+import { CONSTRUCTION_COSTS, HOUSING_TYPES } from '@/constants/typologies';
 
-const UNIT_TYPE_LABELS: { [key: string]: string } = {
-  XM: 'Extra Small (Commercial)',
-  XH: 'Extra High (Commercial)',
-  AMS: 'Small Apartment',
-  AML: 'Large Apartment',
-  AH: 'Apartment High-end',
-  BMS: 'Villa Small',
-  BML: 'Villa Large',
-  BH: 'Villa High-end',
-  CH: 'Villa Chalet',
-  CO: 'Villa Cottage',
-  villa_200: 'Villa 200m²',
-  villa_300: 'Villa 300m²',
-  villa_500: 'Villa 500m²',
-  villa_1000: 'Villa 1000m²',
-  ZME: 'Cost Type ZME',
-  ZHE: 'Cost Type ZHE',
-  ZOS: 'Cost Type ZOS',
-  ZMER: 'Cost Type ZMER',
-  ZHER: 'Cost Type ZHER',
-};
+const CONSTRUCTION_COST_TYPES = ['ZME', 'ZHE', 'ZOS', 'ZMER', 'ZHER'];
+const APARTMENT_TYPES = ['AMS', 'AML', 'AH'];
+const VILLA_TYPES = ['BMS', 'BML', 'BH', 'CH', 'CO'];
+const COMMERCIAL_TYPES = ['XM', 'XH'];
 
 export default function ScenarioParametersScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -151,6 +136,153 @@ export default function ScenarioParametersScreen() {
     );
   }, [scenario, projectParams, upsertScenarioCostParam]);
 
+  const renderHousingTypeCard = useCallback((param: any, type: string) => {
+    const isEditing = editingParam === param.unit_type;
+    const config = HOUSING_TYPES[type];
+    const costTypeConfig = CONSTRUCTION_COSTS[config.defaultCostType];
+    const isOverridden = scenarioParams.some(sp => sp.unit_type === param.unit_type);
+
+    return (
+      <View key={param.unit_type} style={styles.paramCard}>
+        <View style={styles.paramHeader}>
+          <View style={styles.paramIcon}>
+            <DollarSign size={18} color={isOverridden ? '#34C759' : '#007AFF'} />
+          </View>
+          <View style={styles.paramHeaderText}>
+            <Text style={styles.paramTitle}>{type}</Text>
+            <Text style={styles.paramSubtitle}>{config.name}</Text>
+            <View style={styles.costTypeBadge}>
+              <Text style={styles.costTypeBadgeText}>Cost Type: {config.defaultCostType}</Text>
+            </View>
+            {isOverridden && (
+              <Text style={styles.overrideLabel}>Custom Override</Text>
+            )}
+            {!isOverridden && (
+              <Text style={styles.defaultLabel}>Using Project Default</Text>
+            )}
+          </View>
+        </View>
+
+        {isEditing ? (
+          <View style={styles.editForm}>
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Build Area (m²)</Text>
+              <TextInput
+                style={styles.input}
+                value={editValues.build_area_m2}
+                onChangeText={(text) => setEditValues(prev => ({ ...prev, build_area_m2: text }))}
+                keyboardType="decimal-pad"
+                placeholder="Build area"
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Cost per m² (XOF)</Text>
+              <TextInput
+                style={styles.input}
+                value={editValues.cost_per_m2}
+                onChangeText={(text) => setEditValues(prev => ({ ...prev, cost_per_m2: text }))}
+                keyboardType="decimal-pad"
+                placeholder="Cost per m²"
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Monthly Rent (XOF)</Text>
+              <TextInput
+                style={styles.input}
+                value={editValues.rent_monthly}
+                onChangeText={(text) => setEditValues(prev => ({ ...prev, rent_monthly: text }))}
+                keyboardType="decimal-pad"
+                placeholder="Monthly rent"
+              />
+            </View>
+
+            <View style={styles.editButtons}>
+              <TouchableOpacity
+                style={[styles.editButton, styles.cancelButton]}
+                onPress={cancelEditing}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.editButton, styles.saveButton]}
+                onPress={() => saveParam(param.unit_type)}
+              >
+                <Text style={styles.saveButtonText}>Save Override</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        ) : (
+          <>
+            <View style={styles.paramGrid}>
+              <View style={styles.paramItem}>
+                <Text style={styles.paramItemLabel}>Build Area</Text>
+                <Text style={styles.paramItemValue}>
+                  {param.build_area_m2.toFixed(0)} m²
+                </Text>
+              </View>
+              <View style={styles.paramItem}>
+                <Text style={styles.paramItemLabel}>Cost/m²</Text>
+                <Text style={styles.paramItemValue}>
+                  {(param.cost_per_m2 * USD_TO_XOF).toLocaleString(undefined, {maximumFractionDigits: 0})} XOF
+                </Text>
+                {costTypeConfig && (
+                  <Text style={styles.paramItemSubtext}>
+                    {costTypeConfig.goldGramsPerM2.toFixed(2)} g Au/m²
+                  </Text>
+                )}
+              </View>
+              <View style={styles.paramItem}>
+                <Text style={styles.paramItemLabel}>Monthly Rent</Text>
+                <Text style={styles.paramItemValue}>
+                  {param.rent_monthly.toLocaleString(undefined, {maximumFractionDigits: 0})} XOF
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.paramSummary}>
+              <View style={styles.paramSummaryItem}>
+                <Text style={styles.paramSummaryLabel}>Total Build Cost</Text>
+                <Text style={styles.paramSummaryValue}>
+                  {(param.build_area_m2 * param.cost_per_m2 * USD_TO_XOF).toLocaleString(undefined, {maximumFractionDigits: 0})} XOF
+                </Text>
+              </View>
+              <View style={styles.paramSummaryItem}>
+                <Text style={styles.paramSummaryLabel}>Yearly Revenue</Text>
+                <Text style={styles.paramSummaryValue}>
+                  {(param.rent_monthly * 12).toLocaleString(undefined, {maximumFractionDigits: 0})} XOF
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.actionButtons}>
+              <TouchableOpacity
+                style={styles.editTrigger}
+                onPress={() => startEditing(param.unit_type, {
+                  build_area_m2: param.build_area_m2,
+                  cost_per_m2: param.cost_per_m2,
+                  rent_monthly: param.rent_monthly,
+                })}
+              >
+                <Text style={styles.editTriggerText}>Edit Parameters</Text>
+              </TouchableOpacity>
+              
+              {isOverridden && (
+                <TouchableOpacity
+                  style={styles.resetButton}
+                  onPress={() => resetToProjectDefaults(param.unit_type)}
+                >
+                  <Text style={styles.resetButtonText}>Reset to Project Default</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </>
+        )}
+      </View>
+    );
+  }, [editingParam, editValues, cancelEditing, saveParam, startEditing, scenarioParams, resetToProjectDefaults]);
+
   if (!scenario || !site || !project) {
     return (
       <View style={styles.centerContainer}>
@@ -199,154 +331,87 @@ export default function ScenarioParametersScreen() {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Cost & Rent Parameters</Text>
+          <View style={styles.sectionHeader}>
+            <Settings size={20} color="#007AFF" />
+            <Text style={styles.sectionTitle}>Construction Costs per m²</Text>
+          </View>
           <Text style={styles.sectionDesc}>
-            Configure costs and rents specific to this scenario
+            Base construction costs (inherited from project)
           </Text>
 
-          {mergedParams.length === 0 && (
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyStateText}>
-                No cost parameters found. Pull down to refresh or check your project setup.
-              </Text>
-            </View>
-          )}
+          {CONSTRUCTION_COST_TYPES.map(type => {
+            const param = mergedParams.find(p => p.unit_type === type);
+            if (!param) return null;
 
-          {mergedParams.map(param => {
-            const isEditing = editingParam === param.unit_type;
-            const unitLabel = UNIT_TYPE_LABELS[param.unit_type] || param.unit_type;
-            const isOverridden = scenarioParams.some(sp => sp.unit_type === param.unit_type);
+            const config = CONSTRUCTION_COSTS[type];
 
             return (
-              <View key={param.unit_type} style={styles.paramCard}>
-                <View style={styles.paramHeader}>
-                  <View style={styles.paramIcon}>
-                    <DollarSign size={18} color={isOverridden ? '#34C759' : '#007AFF'} />
-                  </View>
-                  <View style={styles.paramHeaderText}>
-                    <Text style={styles.paramTitle}>{unitLabel}</Text>
-                    {isOverridden && (
-                      <Text style={styles.overrideLabel}>Custom Override</Text>
-                    )}
-                    {!isOverridden && (
-                      <Text style={styles.defaultLabel}>Using Project Default</Text>
-                    )}
-                  </View>
+              <View key={param.unit_type} style={styles.costCard}>
+                <View style={styles.costHeader}>
+                  <Text style={styles.costCode}>{type}</Text>
+                  <Text style={styles.costName}>{config.name}</Text>
                 </View>
 
-                {isEditing ? (
-                  <View style={styles.editForm}>
-                    <View style={styles.inputGroup}>
-                      <Text style={styles.inputLabel}>Build Area (m²)</Text>
-                      <TextInput
-                        style={styles.input}
-                        value={editValues.build_area_m2}
-                        onChangeText={(text) => setEditValues(prev => ({ ...prev, build_area_m2: text }))}
-                        keyboardType="decimal-pad"
-                        placeholder="Build area"
-                      />
-                    </View>
-
-                    <View style={styles.inputGroup}>
-                      <Text style={styles.inputLabel}>Cost per m² ($)</Text>
-                      <TextInput
-                        style={styles.input}
-                        value={editValues.cost_per_m2}
-                        onChangeText={(text) => setEditValues(prev => ({ ...prev, cost_per_m2: text }))}
-                        keyboardType="decimal-pad"
-                        placeholder="Cost per m²"
-                      />
-                    </View>
-
-                    <View style={styles.inputGroup}>
-                      <Text style={styles.inputLabel}>Monthly Rent ($)</Text>
-                      <TextInput
-                        style={styles.input}
-                        value={editValues.rent_monthly}
-                        onChangeText={(text) => setEditValues(prev => ({ ...prev, rent_monthly: text }))}
-                        keyboardType="decimal-pad"
-                        placeholder="Monthly rent"
-                      />
-                    </View>
-
-                    <View style={styles.editButtons}>
-                      <TouchableOpacity
-                        style={[styles.editButton, styles.cancelButton]}
-                        onPress={cancelEditing}
-                      >
-                        <Text style={styles.cancelButtonText}>Cancel</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={[styles.editButton, styles.saveButton]}
-                        onPress={() => saveParam(param.unit_type)}
-                      >
-                        <Text style={styles.saveButtonText}>Save Override</Text>
-                      </TouchableOpacity>
-                    </View>
+                <View style={styles.costDetails}>
+                  <View style={styles.costDetailRow}>
+                    <Text style={styles.costDetailLabel}>Gold Content:</Text>
+                    <Text style={styles.costDetailValue}>{config.goldGramsPerM2.toFixed(2)} g Au/m²</Text>
                   </View>
-                ) : (
-                  <>
-                    <View style={styles.paramGrid}>
-                      <View style={styles.paramItem}>
-                        <Text style={styles.paramItemLabel}>Build Area</Text>
-                        <Text style={styles.paramItemValue}>
-                          {param.build_area_m2.toFixed(0)} m²
-                        </Text>
-                      </View>
-                      <View style={styles.paramItem}>
-                        <Text style={styles.paramItemLabel}>Cost/m²</Text>
-                        <Text style={styles.paramItemValue}>
-                          ${param.cost_per_m2.toLocaleString()}
-                        </Text>
-                      </View>
-                      <View style={styles.paramItem}>
-                        <Text style={styles.paramItemLabel}>Monthly Rent</Text>
-                        <Text style={styles.paramItemValue}>
-                          ${param.rent_monthly.toLocaleString()}
-                        </Text>
-                      </View>
-                    </View>
-
-                    <View style={styles.paramSummary}>
-                      <View style={styles.paramSummaryItem}>
-                        <Text style={styles.paramSummaryLabel}>Total Build Cost</Text>
-                        <Text style={styles.paramSummaryValue}>
-                          ${(param.build_area_m2 * param.cost_per_m2).toLocaleString()}
-                        </Text>
-                      </View>
-                      <View style={styles.paramSummaryItem}>
-                        <Text style={styles.paramSummaryLabel}>Yearly Revenue</Text>
-                        <Text style={styles.paramSummaryValue}>
-                          ${(param.rent_monthly * 12).toLocaleString()}
-                        </Text>
-                      </View>
-                    </View>
-
-                    <View style={styles.actionButtons}>
-                      <TouchableOpacity
-                        style={styles.editTrigger}
-                        onPress={() => startEditing(param.unit_type, {
-                          build_area_m2: param.build_area_m2,
-                          cost_per_m2: param.cost_per_m2,
-                          rent_monthly: param.rent_monthly,
-                        })}
-                      >
-                        <Text style={styles.editTriggerText}>Edit Parameters</Text>
-                      </TouchableOpacity>
-                      
-                      {isOverridden && (
-                        <TouchableOpacity
-                          style={styles.resetButton}
-                          onPress={() => resetToProjectDefaults(param.unit_type)}
-                        >
-                          <Text style={styles.resetButtonText}>Reset to Project Default</Text>
-                        </TouchableOpacity>
-                      )}
-                    </View>
-                  </>
-                )}
+                  <View style={styles.costDetailRow}>
+                    <Text style={styles.costDetailLabel}>Cost per m²:</Text>
+                    <Text style={styles.costDetailValue}>{(param.cost_per_m2 * USD_TO_XOF).toLocaleString(undefined, {maximumFractionDigits: 0})} XOF/m²</Text>
+                  </View>
+                </View>
               </View>
             );
+          })}
+        </View>
+
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Building2 size={20} color="#007AFF" />
+            <Text style={styles.sectionTitle}>Apartment Housing Types</Text>
+          </View>
+          <Text style={styles.sectionDesc}>
+            Configure apartment unit types for this scenario
+          </Text>
+
+          {APARTMENT_TYPES.map(type => {
+            const param = mergedParams.find(p => p.unit_type === type);
+            if (!param) return null;
+            return renderHousingTypeCard(param, type);
+          })}
+        </View>
+
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Home size={20} color="#007AFF" />
+            <Text style={styles.sectionTitle}>Villa Housing Types</Text>
+          </View>
+          <Text style={styles.sectionDesc}>
+            Configure villa unit types for this scenario
+          </Text>
+
+          {VILLA_TYPES.map(type => {
+            const param = mergedParams.find(p => p.unit_type === type);
+            if (!param) return null;
+            return renderHousingTypeCard(param, type);
+          })}
+        </View>
+
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <ShoppingBag size={20} color="#007AFF" />
+            <Text style={styles.sectionTitle}>Commercial Housing Types</Text>
+          </View>
+          <Text style={styles.sectionDesc}>
+            Configure commercial unit types for this scenario
+          </Text>
+
+          {COMMERCIAL_TYPES.map(type => {
+            const param = mergedParams.find(p => p.unit_type === type);
+            if (!param) return null;
+            return renderHousingTypeCard(param, type);
           })}
         </View>
       </ScrollView>
@@ -434,11 +499,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingBottom: 32,
   },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
   sectionTitle: {
     fontSize: 20,
     fontWeight: '700' as const,
     color: '#212529',
-    marginBottom: 8,
   },
   sectionDesc: {
     fontSize: 14,
@@ -480,15 +550,37 @@ const styles = StyleSheet.create({
     color: '#212529',
     marginBottom: 4,
   },
+  paramSubtitle: {
+    fontSize: 13,
+    color: '#6C757D',
+    marginTop: 2,
+    marginBottom: 6,
+  },
+  costTypeBadge: {
+    backgroundColor: '#E3F2FD',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    marginTop: 6,
+    marginBottom: 6,
+    alignSelf: 'flex-start',
+  },
+  costTypeBadgeText: {
+    fontSize: 11,
+    fontWeight: '600' as const,
+    color: '#007AFF',
+  },
   overrideLabel: {
     fontSize: 12,
     color: '#34C759',
     fontWeight: '600' as const,
+    marginTop: 4,
   },
   defaultLabel: {
     fontSize: 12,
     color: '#6C757D',
     fontWeight: '500' as const,
+    marginTop: 4,
   },
   paramGrid: {
     flexDirection: 'row',
@@ -511,6 +603,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700' as const,
     color: '#212529',
+  },
+  paramItemSubtext: {
+    fontSize: 11,
+    color: '#007AFF',
+    marginTop: 2,
   },
   paramSummary: {
     flexDirection: 'row',
@@ -612,18 +709,44 @@ const styles = StyleSheet.create({
     fontWeight: '600' as const,
     color: '#FFFFFF',
   },
-  emptyState: {
+  costCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 16,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#E9ECEF',
   },
-  emptyStateText: {
-    fontSize: 15,
+  costHeader: {
+    marginBottom: 8,
+  },
+  costCode: {
+    fontSize: 16,
+    fontWeight: '700' as const,
+    color: '#212529',
+    marginBottom: 4,
+  },
+  costName: {
+    fontSize: 13,
     color: '#6C757D',
-    textAlign: 'center',
-    lineHeight: 22,
+    lineHeight: 18,
+  },
+  costDetails: {
+    gap: 8,
+  },
+  costDetailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  costDetailLabel: {
+    fontSize: 13,
+    color: '#6C757D',
+    fontWeight: '500' as const,
+  },
+  costDetailValue: {
+    fontSize: 15,
+    fontWeight: '700' as const,
+    color: '#212529',
   },
 });

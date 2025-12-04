@@ -1,9 +1,10 @@
 import { Stack, useLocalSearchParams, router } from 'expo-router';
 import React, { useMemo, useState } from 'react';
-import { Settings2 } from 'lucide-react-native';
-import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity } from 'react-native';
+import { Settings2, Building2 } from 'lucide-react-native';
+import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useZURB } from '@/contexts/ZURBContext';
+import { USD_TO_XOF } from '@/lib/goldPrice';
 import {
   UNIT_BUILD_AREAS,
   UNIT_COSTS_PER_M2,
@@ -148,6 +149,14 @@ export default function ScenarioScreen() {
           <Text style={styles.parametersButtonText}>Configure Scenario Parameters</Text>
         </TouchableOpacity>
 
+        <TouchableOpacity
+          style={styles.buildingTypesButton}
+          onPress={() => Alert.alert('Building Type Selection', 'Building type selection feature coming soon. You will be able to select apartment building types (AB1, AB2, ABH), equipment/utilities, and villa types here.')}
+        >
+          <Building2 size={20} color="#34C759" />
+          <Text style={styles.buildingTypesButtonText}>Select Building Types</Text>
+        </TouchableOpacity>
+
         <View style={styles.summaryCard}>
           <Text style={styles.summaryTitle}>Scenario Summary</Text>
 
@@ -164,14 +173,14 @@ export default function ScenarioScreen() {
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Total Costs</Text>
             <Text style={styles.summaryValue}>
-              ${summary.totalCosts.toLocaleString()}
+              {(summary.totalCosts * USD_TO_XOF).toLocaleString(undefined, {maximumFractionDigits: 0})} XOF
             </Text>
           </View>
 
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Expected Revenue</Text>
             <Text style={styles.summaryValue}>
-              ${summary.totalRevenue.toLocaleString()}
+              {(summary.totalRevenue * USD_TO_XOF).toLocaleString(undefined, {maximumFractionDigits: 0})} XOF
             </Text>
           </View>
 
@@ -237,6 +246,24 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600' as const,
     color: '#007AFF',
+  },
+  buildingTypesButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#E8F5E9',
+    marginHorizontal: 16,
+    marginTop: 12,
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#81C784',
+    gap: 8,
+  },
+  buildingTypesButtonText: {
+    fontSize: 15,
+    fontWeight: '600' as const,
+    color: '#34C759',
   },
   summaryCard: {
     backgroundColor: '#FFFFFF',

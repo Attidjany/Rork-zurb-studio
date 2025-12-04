@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useZURB } from '@/contexts/ZURBContext';
-import { fetchLiveGoldPrice, getCachedGoldPrice, getDefaultGoldPrice, GoldPriceData } from '@/lib/goldPrice';
+import { fetchLiveGoldPrice, getCachedGoldPrice, getDefaultGoldPrice, GoldPriceData, USD_TO_XOF } from '@/lib/goldPrice';
 import { CONSTRUCTION_COSTS, HOUSING_TYPES } from '@/constants/typologies';
 
 const CONSTRUCTION_COST_TYPES = ['ZME', 'ZHE', 'ZOS', 'ZMER', 'ZHER'];
@@ -165,7 +165,7 @@ export default function ProjectParametersScreen() {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Cost per m² ($)</Text>
+              <Text style={styles.inputLabel}>Cost per m² (XOF)</Text>
               <TextInput
                 style={styles.input}
                 value={editValues.cost_per_m2}
@@ -176,7 +176,7 @@ export default function ProjectParametersScreen() {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Monthly Rent ($)</Text>
+              <Text style={styles.inputLabel}>Monthly Rent (XOF)</Text>
               <TextInput
                 style={styles.input}
                 value={editValues.rent_monthly}
@@ -213,7 +213,7 @@ export default function ProjectParametersScreen() {
               <View style={styles.paramItem}>
                 <Text style={styles.paramItemLabel}>Cost/m²</Text>
                 <Text style={styles.paramItemValue}>
-                  ${param.cost_per_m2.toFixed(2)}
+                  {(param.cost_per_m2 * USD_TO_XOF).toLocaleString(undefined, {maximumFractionDigits: 0})} XOF
                 </Text>
                 {costTypeConfig && (
                   <Text style={styles.paramItemSubtext}>
@@ -224,7 +224,7 @@ export default function ProjectParametersScreen() {
               <View style={styles.paramItem}>
                 <Text style={styles.paramItemLabel}>Monthly Rent</Text>
                 <Text style={styles.paramItemValue}>
-                  ${param.rent_monthly.toLocaleString()}
+                  {(param.rent_monthly).toLocaleString(undefined, {maximumFractionDigits: 0})} XOF
                 </Text>
               </View>
             </View>
@@ -233,13 +233,13 @@ export default function ProjectParametersScreen() {
               <View style={styles.paramSummaryItem}>
                 <Text style={styles.paramSummaryLabel}>Total Build Cost</Text>
                 <Text style={styles.paramSummaryValue}>
-                  ${(param.build_area_m2 * param.cost_per_m2).toLocaleString()}
+                  {(param.build_area_m2 * param.cost_per_m2 * USD_TO_XOF).toLocaleString(undefined, {maximumFractionDigits: 0})} XOF
                 </Text>
               </View>
               <View style={styles.paramSummaryItem}>
                 <Text style={styles.paramSummaryLabel}>Yearly Revenue</Text>
                 <Text style={styles.paramSummaryValue}>
-                  ${(param.rent_monthly * 12).toLocaleString()}
+                  {(param.rent_monthly * 12).toLocaleString(undefined, {maximumFractionDigits: 0})} XOF
                 </Text>
               </View>
             </View>
@@ -300,11 +300,11 @@ export default function ProjectParametersScreen() {
               <Text style={styles.goldPriceLabel}>Live Gold Price (updates daily)</Text>
               <View style={styles.goldPriceRow}>
                 <Text style={styles.goldPriceValue}>
-                  ${goldPrice.pricePerGram.toFixed(2)} / g
+                  {(goldPrice.pricePerGram * USD_TO_XOF).toLocaleString(undefined, {maximumFractionDigits: 0})} XOF/g
                 </Text>
                 <Text style={styles.goldPriceSeparator}>•</Text>
                 <Text style={styles.goldPriceValue}>
-                  ${goldPrice.pricePerOz.toFixed(2)} / oz
+                  {(goldPrice.pricePerOz * USD_TO_XOF).toLocaleString(undefined, {maximumFractionDigits: 0})} XOF/oz
                 </Text>
               </View>
               <Text style={styles.goldPriceTimestamp}>
@@ -371,12 +371,12 @@ export default function ProjectParametersScreen() {
                   </View>
                   <View style={styles.costDetailRow}>
                     <Text style={styles.costDetailLabel}>Cost per m²:</Text>
-                    <Text style={styles.costDetailValue}>${param.cost_per_m2.toFixed(2)}/m²</Text>
+                    <Text style={styles.costDetailValue}>{(param.cost_per_m2 * USD_TO_XOF).toLocaleString(undefined, {maximumFractionDigits: 0})} XOF/m²</Text>
                   </View>
                   <View style={styles.costDetailRow}>
                     <Text style={styles.costDetailLabel}>Calculated at:</Text>
                     <Text style={styles.costDetailValueSmall}>
-                      {config.goldGramsPerM2.toFixed(2)} g × ${goldPrice.pricePerGram.toFixed(2)}/g
+                      {config.goldGramsPerM2.toFixed(2)} g × {(goldPrice.pricePerGram * USD_TO_XOF).toLocaleString(undefined, {maximumFractionDigits: 0})} XOF/g
                     </Text>
                   </View>
                 </View>
