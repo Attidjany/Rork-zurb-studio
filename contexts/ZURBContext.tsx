@@ -503,11 +503,13 @@ export const [ZURBContext, useZURB] = createContextHook(() => {
         if (error) throw error;
 
         console.log('[ZURB] Project created:', data);
-        await loadProjects();
-        await loadProjectCostParams();
-        await loadProjectConstructionCosts();
-        await loadProjectHousingTypes();
-        await loadProjectEquipmentUtilityTypes();
+        setProjects(prev => [data, ...prev]);
+        await Promise.all([
+          loadProjectCostParams(),
+          loadProjectConstructionCosts(),
+          loadProjectHousingTypes(),
+          loadProjectEquipmentUtilityTypes(),
+        ]);
         return data;
       } catch (error: any) {
         console.error('[ZURB] Error creating project:', error);
@@ -515,7 +517,7 @@ export const [ZURBContext, useZURB] = createContextHook(() => {
         return null;
       }
     },
-    [user, loadProjects, loadProjectCostParams, loadProjectConstructionCosts, loadProjectHousingTypes, loadProjectEquipmentUtilityTypes]
+    [user, loadProjectCostParams, loadProjectConstructionCosts, loadProjectHousingTypes, loadProjectEquipmentUtilityTypes]
   );
 
   const updateProject = useCallback(
@@ -613,9 +615,11 @@ export const [ZURBContext, useZURB] = createContextHook(() => {
         if (error) throw error;
 
         console.log('[ZURB] Site created:', data);
-        await loadSites();
-        await loadBlocks();
-        await loadHalfBlocks();
+        setSites(prev => [data, ...prev]);
+        await Promise.all([
+          loadBlocks(),
+          loadHalfBlocks(),
+        ]);
         return data;
       } catch (error: any) {
         console.error('[ZURB] Error creating site:', error);
@@ -623,7 +627,7 @@ export const [ZURBContext, useZURB] = createContextHook(() => {
         return null;
       }
     },
-    [user, loadSites, loadBlocks, loadHalfBlocks]
+    [user, loadBlocks, loadHalfBlocks]
   );
 
   const deleteSite = useCallback(
@@ -790,7 +794,7 @@ export const [ZURBContext, useZURB] = createContextHook(() => {
         if (error) throw error;
 
         console.log('[ZURB] Scenario created:', data);
-        await loadScenarios();
+        setScenarios(prev => [data, ...prev]);
         await loadScenarioCostParams();
         return data;
       } catch (error: any) {
@@ -799,7 +803,7 @@ export const [ZURBContext, useZURB] = createContextHook(() => {
         return null;
       }
     },
-    [user, loadScenarios, loadScenarioCostParams]
+    [user, loadScenarioCostParams]
   );
 
   const updateScenario = useCallback(
