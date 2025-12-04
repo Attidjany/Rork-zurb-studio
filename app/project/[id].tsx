@@ -1,5 +1,5 @@
 import { Stack, useRouter, useLocalSearchParams } from 'expo-router';
-import { Plus, MapPin, Copy, Trash2, Settings } from 'lucide-react-native';
+import { Plus, MapPin, Copy, Trash2, Settings, FileText } from 'lucide-react-native';
 import React, { useState } from 'react';
 import {
   View,
@@ -29,16 +29,20 @@ type Site = {
 export default function ProjectScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { projects, getSitesByProjectId, createSite, isLoading, loadSites, loadProjects, deleteSite, duplicateSite } = useZURB();
+  const { projects, getSitesByProjectId, getScenariosBySiteId, createSite, createScenario, deleteScenario, duplicateScenario, isLoading, loadSites, loadProjects, loadScenarios, deleteSite, duplicateSite } = useZURB();
   const [modalVisible, setModalVisible] = useState<boolean>(false);
   const [siteName, setSiteName] = useState<string>('');
   const [siteArea, setSiteArea] = useState<string>('');
   const [isCreating, setIsCreating] = useState<boolean>(false);
   const [refreshing, setRefreshing] = useState<boolean>(false);
+  const [scenarioModalVisible, setScenarioModalVisible] = useState<string | null>(null);
+  const [scenarioName, setScenarioName] = useState<string>('');
+  const [scenarioNotes, setScenarioNotes] = useState<string>('');
+  const [isCreatingScenario, setIsCreatingScenario] = useState<boolean>(false);
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await Promise.all([loadProjects(), loadSites()]);
+    await Promise.all([loadProjects(), loadSites(), loadScenarios()]);
     setRefreshing(false);
   };
 
@@ -61,6 +65,43 @@ export default function ProjectScreen() {
 
   const handleDuplicateSite = async (siteId: string) => {
     await duplicateSite(siteId);
+  };
+
+  const handleCreateScenario = async () => {
+    if (!scenarioName.trim() || !scenarioModalVisible) return;
+
+    setIsCreatingScenario(true);
+    try {
+      const result = await createScenario(scenarioModalVisible, scenarioName.trim(), scenarioNotes.trim() || undefined);
+      if (result) {
+        setScenarioName('');
+        setScenarioNotes('');
+        setScenarioModalVisible(null);
+      }
+    } finally {
+      setIsCreatingScenario(false);
+    }
+  };
+
+  const handleDeleteScenario = async (scenarioId: string) => {
+    Alert.alert(
+      'Delete Scenario',
+      'Are you sure you want to delete this scenario?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            await deleteScenario(scenarioId);
+          },
+        },
+      ]
+    );
+  };
+
+  const handleDuplicateScenario = async (scenarioId: string) => {
+    await duplicateScenario(scenarioId);
   };
 
   const project = projects.find(p => p.id === id);
@@ -89,7 +130,10 @@ export default function ProjectScreen() {
     setModalVisible(false);
   };
 
-  const renderSite = ({ item }: { item: Site }) => (
+  const renderSite = ({ item }: { item: Site }) => {
+    const siteScenarios = getScenariosBySiteId(item.id);
+
+    return (
     <View style={styles.siteCard}>
       <TouchableOpacity
         style={styles.siteCardMain}
@@ -122,8 +166,57 @@ export default function ProjectScreen() {
           <Trash2 size={16} color="#FF3B30" />
         </TouchableOpacity>
       </View>
+      <View style={styles.siteScenariosSection}>
+        <View style={styles.siteScenariosHeader}>
+          <Text style={styles.siteScenariosTitle}>Scenarios ({siteScenarios.length})</Text>
+          <TouchableOpacity
+            style={styles.addScenarioButton}
+            onPress={() => setScenarioModalVisible(item.id)}
+            testID={`add-scenario-${item.id}`}
+          >
+            <Plus size={14} color="#007AFF" />
+            <Text style={styles.addScenarioButtonText}>Add</Text>
+          </TouchableOpacity>
+        </View>
+        {siteScenarios.length > 0 && (
+          <View style={styles.scenariosList}>
+            {siteScenarios.map(scenario => (
+              <TouchableOpacity
+                key={scenario.id}
+                style={styles.scenarioItem}
+                onPress={() => router.push({ pathname: '/scenario/[id]', params: { id: scenario.id } } as any)}
+                testID={`scenario-${scenario.id}`}
+              >
+                <FileText size={14} color="#6C757D" />
+                <Text style={styles.scenarioItemName} numberOfLines={1}>{scenario.name}</Text>
+                <View style={styles.scenarioItemActions}>
+                  <TouchableOpacity
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      handleDuplicateScenario(scenario.id);
+                    }}
+                    style={styles.scenarioItemAction}
+                  >
+                    <Copy size={12} color="#007AFF" />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      handleDeleteScenario(scenario.id);
+                    }}
+                    style={styles.scenarioItemAction}
+                  >
+                    <Trash2 size={12} color="#FF3B30" />
+                  </TouchableOpacity>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+      </View>
     </View>
   );
+  };
 
   if (isLoading) {
     return (
@@ -243,6 +336,65 @@ export default function ProjectScreen() {
                 testID="confirm-create-button"
               >
                 {isCreating ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.createButtonText}>Create</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={scenarioModalVisible !== null}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setScenarioModalVisible(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>New Scenario</Text>
+
+            <TextInput
+              style={styles.input}
+              placeholder="Scenario Name"
+              value={scenarioName}
+              onChangeText={setScenarioName}
+              testID="scenario-name-input"
+            />
+
+            <TextInput
+              style={[styles.input, styles.textArea]}
+              placeholder="Notes (optional)"
+              value={scenarioNotes}
+              onChangeText={setScenarioNotes}
+              multiline
+              numberOfLines={4}
+              textAlignVertical="top"
+              testID="scenario-notes-input"
+            />
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={() => {
+                  setScenarioModalVisible(null);
+                  setScenarioName('');
+                  setScenarioNotes('');
+                }}
+                testID="cancel-scenario-button"
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.modalButton, styles.createButton]}
+                onPress={handleCreateScenario}
+                disabled={!scenarioName.trim() || isCreatingScenario}
+                testID="confirm-create-scenario-button"
+              >
+                {isCreatingScenario ? (
                   <ActivityIndicator size="small" color="#FFFFFF" />
                 ) : (
                   <Text style={styles.createButtonText}>Create</Text>
@@ -424,6 +576,10 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     color: '#000000',
   },
+  textArea: {
+    height: 100,
+    paddingTop: 12,
+  },
   modalButtons: {
     flexDirection: 'row',
     gap: 12,
@@ -450,84 +606,63 @@ const styles = StyleSheet.create({
     fontWeight: '600' as const,
     color: '#FFFFFF',
   },
-  toggleContainer: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 16,
+  siteScenariosSection: {
+    borderTopWidth: 1,
+    borderTopColor: '#F5F5F7',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#FAFAFA',
   },
-  toggleButton: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: 8,
-    backgroundColor: '#F5F5F7',
-    alignItems: 'center',
-  },
-  toggleButtonActive: {
-    backgroundColor: '#007AFF',
-  },
-  toggleButtonText: {
-    fontSize: 14,
-    fontWeight: '600' as const,
-    color: '#666666',
-  },
-  toggleButtonTextActive: {
-    color: '#FFFFFF',
-  },
-  polygonContainer: {
-    maxHeight: 300,
-  },
-  polygonLabel: {
-    fontSize: 14,
-    fontWeight: '600' as const,
-    color: '#666666',
-    marginBottom: 12,
-  },
-  coordRow: {
+  siteScenariosHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    justifyContent: 'space-between',
     marginBottom: 8,
   },
-  coordInput: {
-    flex: 1,
-    marginBottom: 0,
+  siteScenariosTitle: {
+    fontSize: 13,
+    fontWeight: '600' as const,
+    color: '#666666',
   },
-  removeButton: {
-    padding: 8,
-  },
-  addButton: {
+  addScenarioButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#007AFF',
-    borderStyle: 'dashed' as const,
-    marginTop: 8,
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
+    backgroundColor: '#E3F2FD',
   },
-  addButtonText: {
-    fontSize: 14,
-    fontWeight: '600' as const,
-    color: '#007AFF',
-  },
-  areaDisplay: {
-    marginTop: 16,
-    padding: 12,
-    backgroundColor: '#F0F9FF',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#007AFF',
-  },
-  areaDisplayLabel: {
+  addScenarioButtonText: {
     fontSize: 12,
-    color: '#666666',
-    marginBottom: 4,
-  },
-  areaDisplayValue: {
-    fontSize: 18,
     fontWeight: '600' as const,
     color: '#007AFF',
+  },
+  scenariosList: {
+    gap: 6,
+  },
+  scenarioItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E9ECEF',
+  },
+  scenarioItemName: {
+    flex: 1,
+    fontSize: 13,
+    color: '#333333',
+    fontWeight: '500' as const,
+  },
+  scenarioItemActions: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  scenarioItemAction: {
+    padding: 4,
   },
 });

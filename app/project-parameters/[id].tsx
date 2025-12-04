@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useZURB } from '@/contexts/ZURBContext';
-import { fetchLiveGoldPrice, getCachedGoldPrice, DEFAULT_GOLD_PRICE_PER_GRAM } from '@/lib/goldPrice';
+import { fetchLiveGoldPrice, getCachedGoldPrice, getDefaultGoldPrice, GoldPriceData } from '@/lib/goldPrice';
 
 const UNIT_TYPE_LABELS: { [key: string]: string } = {
   XM: 'Extra Small',
@@ -36,7 +36,7 @@ export default function ProjectParametersScreen() {
   } = useZURB();
 
   const [refreshing, setRefreshing] = useState<boolean>(false);
-  const [goldPrice, setGoldPrice] = useState<number>(getCachedGoldPrice() || DEFAULT_GOLD_PRICE_PER_GRAM);
+  const [goldPrice, setGoldPrice] = useState<GoldPriceData>(getCachedGoldPrice() || getDefaultGoldPrice());
   const [loadingGoldPrice, setLoadingGoldPrice] = useState<boolean>(false);
   const [editingParam, setEditingParam] = useState<string | null>(null);
   const [editValues, setEditValues] = useState<{
@@ -151,9 +151,18 @@ export default function ProjectParametersScreen() {
               <TrendingUp size={20} color="#FFB700" />
             </View>
             <View style={styles.goldPriceInfo}>
-              <Text style={styles.goldPriceLabel}>Live Gold Price</Text>
-              <Text style={styles.goldPriceValue}>
-                ${goldPrice.toFixed(2)} / gram
+              <Text style={styles.goldPriceLabel}>Live Gold Price (updates daily)</Text>
+              <View style={styles.goldPriceRow}>
+                <Text style={styles.goldPriceValue}>
+                  ${goldPrice.pricePerGram.toFixed(2)} / g
+                </Text>
+                <Text style={styles.goldPriceSeparator}>•</Text>
+                <Text style={styles.goldPriceValue}>
+                  ${goldPrice.pricePerOz.toFixed(2)} / oz
+                </Text>
+              </View>
+              <Text style={styles.goldPriceTimestamp}>
+                Last updated: {new Date(goldPrice.timestamp).toLocaleDateString()}
               </Text>
             </View>
             <TouchableOpacity
@@ -370,10 +379,25 @@ const styles = StyleSheet.create({
     marginBottom: 4,
     fontWeight: '600' as const,
   },
+  goldPriceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 4,
+  },
   goldPriceValue: {
-    fontSize: 20,
+    fontSize: 16,
     fontWeight: '700' as const,
     color: '#8D6E00',
+  },
+  goldPriceSeparator: {
+    fontSize: 14,
+    color: '#8D6E00',
+  },
+  goldPriceTimestamp: {
+    fontSize: 11,
+    color: '#A67C00',
+    marginTop: 2,
   },
   refreshButton: {
     paddingHorizontal: 16,
