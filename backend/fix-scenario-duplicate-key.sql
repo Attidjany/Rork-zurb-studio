@@ -117,4 +117,8 @@ FROM project_construction_costs
 GROUP BY project_id, code
 HAVING COUNT(*) > 1;
 
-RAISE NOTICE 'Trigger fix applied successfully';
+-- Confirmation message
+DO $
+BEGIN
+  RAISE NOTICE 'Trigger fix applied successfully';
+END $;
