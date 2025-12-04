@@ -1,23 +1,57 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { Plus, FileText, Copy, Trash2 } from 'lucide-react-native';
+import { ChevronRight, FileText, Copy, Trash2 } from 'lucide-react-native';
 import React, { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, TextInput, RefreshControl, Alert } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  Modal,
+  TextInput,
+  RefreshControl,
+  Alert,
+  ActivityIndicator,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useZURB } from '@/contexts/ZURBContext';
-import { DEFAULT_TYPOLOGIES } from '@/constants/typologies';
+import {
+  VILLA_LAYOUTS,
+  APARTMENT_LAYOUT,
+  BUILDING_TYPES,
+  EQUIPMENT_OPTIONS,
+  UTILITY_OPTIONS,
+} from '@/constants/typologies';
+import { DbBlock, DbHalfBlock, VillaLayout, HalfBlockType } from '@/types';
 
 export default function SiteScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { sites, scenarios, createScenario, loadSites, deleteScenario, duplicateScenario } = useZURB();
+  const {
+    sites,
+    getBlocksBySiteId,
+    getHalfBlocksByBlockId,
+    getScenariosBySiteId,
+    createScenario,
+    deleteScenario,
+    duplicateScenario,
+    loadSites,
+    loadBlocks,
+    loadHalfBlocks,
+    updateHalfBlock,
+    createUnit,
+  } = useZURB();
+
   const [modalVisible, setModalVisible] = useState<boolean>(false);
   const [scenarioName, setScenarioName] = useState<string>('');
   const [scenarioNotes, setScenarioNotes] = useState<string>('');
   const [refreshing, setRefreshing] = useState<boolean>(false);
+  const [configModalVisible, setConfigModalVisible] = useState<boolean>(false);
+  const [selectedHalfBlock, setSelectedHalfBlock] = useState<DbHalfBlock | null>(null);
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await loadSites();
+    await Promise.all([loadSites(), loadBlocks(), loadHalfBlocks()]);
     setRefreshing(false);
   };
 
@@ -38,26 +72,53 @@ export default function SiteScreen() {
     );
   };
 
-  const handleDuplicateScenario = (scenarioId: string) => {
-    duplicateScenario(scenarioId);
+  const handleDuplicateScenario = async (scenarioId: string) => {
+    await duplicateScenario(scenarioId);
   };
 
   const site = useMemo(() => {
     return sites.find(s => s.id === id) || null;
   }, [sites, id]);
 
-  const siteScenarios = useMemo(() => {
-    return scenarios[id || ''] || [];
-  }, [scenarios, id]);
+  const siteBlocks = useMemo(() => {
+    return getBlocksBySiteId(id || '');
+  }, [getBlocksBySiteId, id]);
 
-  const handleCreateScenario = () => {
+  const siteScenarios = useMemo(() => {
+    return getScenariosBySiteId(id || '');
+  }, [getScenariosBySiteId, id]);
+
+  const handleCreateScenario = async () => {
     if (scenarioName.trim() && id) {
-      const newScenario = createScenario(id, scenarioName.trim(), scenarioNotes.trim());
-      setScenarioName('');
-      setScenarioNotes('');
-      setModalVisible(false);
-      router.push({ pathname: '/scenario/[id]', params: { id: newScenario.id } } as any);
+      const newScenario = await createScenario(id, scenarioName.trim(), scenarioNotes.trim());
+      if (newScenario) {
+        setScenarioName('');
+        setScenarioNotes('');
+        setModalVisible(false);
+        router.push({ pathname: '/scenario/[id]', params: { id: newScenario.id } } as any);
+      }
     }
+  };
+
+  const openHalfBlockConfig = (halfBlock: DbHalfBlock) => {
+    setSelectedHalfBlock(halfBlock);
+    setConfigModalVisible(true);
+  };
+
+  const handleSelectType = async (type: HalfBlockType) => {
+    if (!selectedHalfBlock) return;
+
+    await updateHalfBlock(selectedHalfBlock.id, type);
+    setConfigModalVisible(false);
+    setSelectedHalfBlock(null);
+  };
+
+  const handleSelectVillaLayout = async (layout: VillaLayout) => {
+    if (!selectedHalfBlock) return;
+
+    await updateHalfBlock(selectedHalfBlock.id, 'villas', layout);
+    setConfigModalVisible(false);
+    setSelectedHalfBlock(null);
   };
 
   if (!site) {
@@ -67,6 +128,8 @@ export default function SiteScreen() {
       </View>
     );
   }
+
+  const numBlocks = Math.floor(site.area_ha / 6);
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
@@ -84,33 +147,75 @@ export default function SiteScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
         }
       >
-
         <View style={styles.infoCard}>
           <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Area</Text>
-            <Text style={styles.infoValue}>{site.area_ha ? site.area_ha.toFixed(2) : '0.00'} ha</Text>
+            <Text style={styles.infoLabel}>Total Area</Text>
+            <Text style={styles.infoValue}>{site.area_ha.toFixed(2)} ha</Text>
+          </View>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>6ha Blocks</Text>
+            <Text style={styles.infoValue}>{numBlocks}</Text>
           </View>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Available Typologies</Text>
-          {DEFAULT_TYPOLOGIES.map(typology => (
-            <View key={typology.code} style={styles.typologyCard}>
-              <View style={styles.typologyHeader}>
-                <Text style={styles.typologyCode}>{typology.code}</Text>
-                <Text style={styles.typologyName}>{typology.name}</Text>
-              </View>
-              <Text style={styles.typologyDesc}>{typology.description}</Text>
-              <View style={styles.typologyStats}>
-                <Text style={styles.typologyStat}>
-                  {typology.defaultGfaM2} m² GFA
-                </Text>
-                <Text style={styles.typologyStat}>
-                  {typology.unitsPerBlock} units/block
-                </Text>
-              </View>
+          <Text style={styles.sectionTitle}>Blocks Configuration</Text>
+          {siteBlocks.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <ActivityIndicator size="small" color="#007AFF" />
+              <Text style={styles.emptyText}>Generating blocks...</Text>
             </View>
-          ))}
+          ) : (
+            siteBlocks.map((block: DbBlock) => {
+              const halfBlocks = getHalfBlocksByBlockId(block.id);
+              const northHB = halfBlocks.find((hb: DbHalfBlock) => hb.position === 'north');
+              const southHB = halfBlocks.find((hb: DbHalfBlock) => hb.position === 'south');
+
+              return (
+                <View key={block.id} style={styles.blockCard}>
+                  <Text style={styles.blockTitle}>Block {block.block_number}</Text>
+
+                  <TouchableOpacity
+                    style={styles.halfBlockRow}
+                    onPress={() => northHB && openHalfBlockConfig(northHB)}
+                    testID={`north-half-block-${block.block_number}`}
+                  >
+                    <View style={styles.halfBlockInfo}>
+                      <Text style={styles.halfBlockLabel}>North Half</Text>
+                      {northHB?.type ? (
+                        <Text style={styles.halfBlockValue}>
+                          {northHB.type === 'villas' ? 'Villas' : 'Apartments'}
+                          {northHB.villa_layout && ` (${northHB.villa_layout.replace('_', ' ')})`}
+                        </Text>
+                      ) : (
+                        <Text style={styles.halfBlockPlaceholder}>Not configured</Text>
+                      )}
+                    </View>
+                    <ChevronRight size={20} color="#999" />
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.halfBlockRow}
+                    onPress={() => southHB && openHalfBlockConfig(southHB)}
+                    testID={`south-half-block-${block.block_number}`}
+                  >
+                    <View style={styles.halfBlockInfo}>
+                      <Text style={styles.halfBlockLabel}>South Half</Text>
+                      {southHB?.type ? (
+                        <Text style={styles.halfBlockValue}>
+                          {southHB.type === 'villas' ? 'Villas' : 'Apartments'}
+                          {southHB.villa_layout && ` (${southHB.villa_layout.replace('_', ' ')})`}
+                        </Text>
+                      ) : (
+                        <Text style={styles.halfBlockPlaceholder}>Not configured</Text>
+                      )}
+                    </View>
+                    <ChevronRight size={20} color="#999" />
+                  </TouchableOpacity>
+                </View>
+              );
+            })
+          )}
         </View>
 
         <View style={styles.section}>
@@ -139,12 +244,9 @@ export default function SiteScreen() {
                         {scenario.notes}
                       </Text>
                     ) : null}
-                    <View style={styles.scenarioFooter}>
-                      <Text style={styles.scenarioItems}>{scenario.items.length} items</Text>
-                      <Text style={styles.scenarioDate}>
-                        {new Date(scenario.createdAt).toLocaleDateString()}
-                      </Text>
-                    </View>
+                    <Text style={styles.scenarioDate}>
+                      {new Date(scenario.created_at).toLocaleDateString()}
+                    </Text>
                   </TouchableOpacity>
                   <View style={styles.scenarioActions}>
                     <TouchableOpacity
@@ -171,8 +273,7 @@ export default function SiteScreen() {
             onPress={() => setModalVisible(true)}
             testID="create-scenario-button"
           >
-            <Plus size={20} color="#007AFF" />
-            <Text style={styles.actionButtonText}>Create Scenario</Text>
+            <Text style={styles.actionButtonText}>+ Create Scenario</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -231,6 +332,84 @@ export default function SiteScreen() {
           </View>
         </View>
       </Modal>
+
+      <Modal
+        visible={configModalVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setConfigModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Configure Half Block</Text>
+
+            {!selectedHalfBlock?.type ? (
+              <View>
+                <Text style={styles.modalSubtitle}>Select Type</Text>
+                <TouchableOpacity
+                  style={styles.optionButton}
+                  onPress={() => handleSelectType('villas')}
+                  testID="select-villas"
+                >
+                  <Text style={styles.optionButtonText}>Villas</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.optionButton}
+                  onPress={() => handleSelectType('apartments')}
+                  testID="select-apartments"
+                >
+                  <Text style={styles.optionButtonText}>Apartment Buildings</Text>
+                </TouchableOpacity>
+              </View>
+            ) : selectedHalfBlock.type === 'villas' ? (
+              <View>
+                <Text style={styles.modalSubtitle}>Select Villa Layout</Text>
+                {VILLA_LAYOUTS.map(layout => (
+                  <TouchableOpacity
+                    key={layout.id}
+                    style={styles.optionButton}
+                    onPress={() => handleSelectVillaLayout(layout.id)}
+                    testID={`villa-layout-${layout.id}`}
+                  >
+                    <Text style={styles.optionButtonText}>{layout.name}</Text>
+                    <Text style={styles.optionButtonDesc}>{layout.description}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            ) : (
+              <View>
+                <Text style={styles.modalSubtitle}>Apartment Layout</Text>
+                <Text style={styles.modalText}>
+                  {APARTMENT_LAYOUT.apartmentBuildings} apartment buildings
+                </Text>
+                <Text style={styles.modalText}>
+                  {APARTMENT_LAYOUT.equipmentSpots} equipment spots
+                </Text>
+                <Text style={styles.modalText}>
+                  {APARTMENT_LAYOUT.utilitySpots} utility spot
+                </Text>
+                <TouchableOpacity
+                  style={styles.actionButton}
+                  onPress={() => setConfigModalVisible(false)}
+                >
+                  <Text style={styles.actionButtonText}>Done</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            <TouchableOpacity
+              style={[styles.modalButton, styles.cancelButton, { marginTop: 16 }]}
+              onPress={() => {
+                setConfigModalVisible(false);
+                setSelectedHalfBlock(null);
+              }}
+              testID="close-config"
+            >
+              <Text style={styles.cancelButtonText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -252,22 +431,6 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-  },
-  mapContainer: {
-    height: 250,
-    backgroundColor: '#E5E5EA',
-  },
-  map: {
-    flex: 1,
-  },
-  mapPlaceholder: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#E5E5EA',
-  },
-  mapPlaceholderText: {
-    fontSize: 14,
-    color: '#666666',
   },
   infoCard: {
     backgroundColor: '#FFFFFF',
@@ -307,7 +470,17 @@ const styles = StyleSheet.create({
     color: '#000000',
     marginBottom: 16,
   },
-  typologyCard: {
+  emptyContainer: {
+    padding: 32,
+    alignItems: 'center',
+  },
+  emptyText: {
+    fontSize: 14,
+    color: '#666666',
+    textAlign: 'center',
+    marginTop: 8,
+  },
+  blockCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
     padding: 16,
@@ -318,67 +491,41 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
-  typologyHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginBottom: 8,
-  },
-  typologyCode: {
-    fontSize: 20,
-    fontWeight: '700' as const,
-    color: '#007AFF',
-    width: 30,
-  },
-  typologyName: {
-    fontSize: 16,
+  blockTitle: {
+    fontSize: 18,
     fontWeight: '600' as const,
     color: '#000000',
-    flex: 1,
+    marginBottom: 12,
   },
-  typologyDesc: {
-    fontSize: 14,
-    color: '#666666',
-    marginBottom: 8,
-    lineHeight: 20,
-  },
-  typologyStats: {
-    flexDirection: 'row',
-    gap: 16,
-  },
-  typologyStat: {
-    fontSize: 12,
-    color: '#999999',
-  },
-  actionButton: {
+  halfBlockRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    paddingVertical: 16,
-    borderWidth: 2,
-    borderColor: '#007AFF',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#F5F5F7',
   },
-  actionButtonText: {
+  halfBlockInfo: {
+    flex: 1,
+  },
+  halfBlockLabel: {
+    fontSize: 14,
+    color: '#666666',
+    marginBottom: 4,
+  },
+  halfBlockValue: {
     fontSize: 16,
-    fontWeight: '600' as const,
-    color: '#007AFF',
+    fontWeight: '500' as const,
+    color: '#000000',
+  },
+  halfBlockPlaceholder: {
+    fontSize: 16,
+    color: '#999999',
+    fontStyle: 'italic' as const,
   },
   emptyScenarios: {
     padding: 32,
     alignItems: 'center',
-  },
-  emptyText: {
-    fontSize: 14,
-    color: '#666666',
-    textAlign: 'center',
   },
   scenariosList: {
     gap: 12,
@@ -432,17 +579,20 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     lineHeight: 20,
   },
-  scenarioFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  scenarioItems: {
-    fontSize: 12,
-    color: '#007AFF',
-  },
   scenarioDate: {
     fontSize: 12,
     color: '#999999',
+  },
+  actionButton: {
+    backgroundColor: '#007AFF',
+    borderRadius: 12,
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  actionButtonText: {
+    fontSize: 16,
+    fontWeight: '600' as const,
+    color: '#FFFFFF',
   },
   modalOverlay: {
     flex: 1,
@@ -452,6 +602,7 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     width: '85%',
+    maxHeight: '80%',
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
     padding: 24,
@@ -461,6 +612,17 @@ const styles = StyleSheet.create({
     fontWeight: '600' as const,
     color: '#000000',
     marginBottom: 20,
+  },
+  modalSubtitle: {
+    fontSize: 16,
+    fontWeight: '600' as const,
+    color: '#000000',
+    marginBottom: 12,
+  },
+  modalText: {
+    fontSize: 14,
+    color: '#666666',
+    marginBottom: 8,
   },
   input: {
     backgroundColor: '#F5F5F7',
@@ -499,5 +661,21 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600' as const,
     color: '#FFFFFF',
+  },
+  optionButton: {
+    backgroundColor: '#F5F5F7',
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 12,
+  },
+  optionButtonText: {
+    fontSize: 16,
+    fontWeight: '600' as const,
+    color: '#000000',
+    marginBottom: 4,
+  },
+  optionButtonDesc: {
+    fontSize: 14,
+    color: '#666666',
   },
 });

@@ -1,49 +1,115 @@
-import { Typology } from '@/types';
+import { 
+  VillaLayoutConfig, 
+  ApartmentLayoutConfig, 
+  BuildingTypeConfig, 
+  EquipmentOption, 
+  UtilityOption 
+} from '@/types';
 
-export const DEFAULT_TYPOLOGIES: Typology[] = [
+export const VILLA_LAYOUTS: VillaLayoutConfig[] = [
   {
-    code: 'A',
-    name: 'Multifamily (5 storeys)',
-    category: 'residential',
-    defaultGfaM2: 3000,
-    floors: 5,
-    unitsPerBlock: 20,
-    description: 'Multifamily buildings, ~3,000 m² per building, 20 buildings per 6 ha block',
+    id: '200_300_mix',
+    name: '200/300 sqm Mix',
+    description: '26 plots of 200sqm + 24 plots of 300sqm',
+    plots: [
+      { size: 200, count: 26 },
+      { size: 300, count: 24 },
+    ],
+    totalUnits: 50,
   },
   {
-    code: 'B',
-    name: 'Small Villas',
-    category: 'residential',
-    defaultGfaM2: 300,
-    floors: 2,
-    unitsPerBlock: 80,
-    description: 'Small villa plots ≥300 m², 50% footprint, up to 300 m² on 2 floors',
+    id: '500',
+    name: '500 sqm Layout',
+    description: '30 plots of 500sqm each',
+    plots: [
+      { size: 500, count: 30 },
+    ],
+    totalUnits: 30,
   },
   {
-    code: 'C',
-    name: 'High-End Villas',
-    category: 'residential',
-    defaultGfaM2: 450,
-    floors: 2,
-    unitsPerBlock: 24,
-    description: 'High-end villa plots ≥1,000 m², ~450 m² total built area',
-  },
-  {
-    code: 'XM',
-    name: 'Commercial Mid-End',
-    category: 'commercial',
-    defaultGfaM2: 100,
-    floors: 1,
-    unitsPerBlock: 40,
-    description: 'Commercial units, ground floor, MidEnd finish',
-  },
-  {
-    code: 'XH',
-    name: 'Commercial High-End',
-    category: 'commercial',
-    defaultGfaM2: 120,
-    floors: 1,
-    unitsPerBlock: 40,
-    description: 'Commercial units, ground floor, HighEnd finish',
+    id: '1000',
+    name: '1000 sqm Layout',
+    description: '20 plots of 1000sqm each',
+    plots: [
+      { size: 1000, count: 20 },
+    ],
+    totalUnits: 20,
   },
 ];
+
+export const APARTMENT_LAYOUT: ApartmentLayoutConfig = {
+  totalBuildings: 13,
+  apartmentBuildings: 10,
+  equipmentSpots: 2,
+  utilitySpots: 1,
+};
+
+export const BUILDING_TYPES: BuildingTypeConfig[] = [
+  {
+    id: 'AM1',
+    name: 'Apartment Type AM1',
+    category: 'apartment',
+    units: {
+      XM: 10,
+      AMS: 15,
+      AML: 5,
+    },
+  },
+  {
+    id: 'AM2',
+    name: 'Apartment Type AM2',
+    category: 'apartment',
+    units: {
+      XM: 8,
+      AMS: 20,
+      AML: 2,
+    },
+  },
+  {
+    id: 'AH',
+    name: 'Apartment Type AH',
+    category: 'apartment',
+    units: {
+      AH: 25,
+    },
+  },
+];
+
+export const EQUIPMENT_OPTIONS: EquipmentOption[] = [
+  { id: 'school', name: 'School' },
+  { id: 'clinic', name: 'Health Clinic' },
+  { id: 'community_center', name: 'Community Center' },
+  { id: 'sports_complex', name: 'Sports Complex' },
+  { id: 'market', name: 'Market' },
+];
+
+export const UTILITY_OPTIONS: UtilityOption[] = [
+  { id: 'water_treatment', name: 'Water Treatment Plant' },
+  { id: 'power_station', name: 'Power Station' },
+  { id: 'waste_management', name: 'Waste Management Facility' },
+  { id: 'maintenance', name: 'Maintenance Depot' },
+];
+
+export const UNIT_COSTS_PER_M2: { [key: string]: number } = {
+  XM: 800,
+  AMS: 900,
+  AML: 1000,
+  AH: 1200,
+  villa_200: 1100,
+  villa_300: 1200,
+  villa_500: 1300,
+  villa_1000: 1500,
+};
+
+export const UNIT_RENTS_MONTHLY: { [key: string]: number } = {
+  XM: 300,
+  AMS: 500,
+  AML: 600,
+  AH: 850,
+  villa_200: 800,
+  villa_300: 1000,
+  villa_500: 1200,
+  villa_1000: 2000,
+};
+
+export const DEFAULT_LEASE_YEARS = 20;

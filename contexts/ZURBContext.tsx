@@ -4,47 +4,25 @@ import { Alert } from 'react-native';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from './AuthContext';
 import {
-  CostParams,
-  MixRule,
-  RentConfig,
-  OverheadConfig,
-  Scenario,
-  ScenarioItem,
+  DbProject,
+  DbSite,
+  DbBlock,
+  DbHalfBlock,
+  DbUnit,
+  DbScenario,
+  VillaLayout,
+  HalfBlockType,
+  BuildingType,
 } from '@/types';
-import {
-  DEFAULT_COST_PARAMS,
-  DEFAULT_MIX_RULES,
-  DEFAULT_RENTS,
-  DEFAULT_OVERHEADS,
-} from '@/constants/costs';
-
-type DbProject = {
-  id: string;
-  name: string;
-  description: string | null;
-  created_at: string;
-  updated_at: string;
-  owner_id: string;
-};
-
-type DbSite = {
-  id: string;
-  project_id: string;
-  name: string;
-  area_ha: number | null;
-  created_at: string;
-  updated_at: string;
-};
 
 export const [ZURBContext, useZURB] = createContextHook(() => {
   const { user } = useAuth();
   const [projects, setProjects] = useState<DbProject[]>([]);
   const [sites, setSites] = useState<DbSite[]>([]);
-  const [costParams, setCostParams] = useState<CostParams>(DEFAULT_COST_PARAMS);
-  const [mixRules, setMixRules] = useState<MixRule[]>(DEFAULT_MIX_RULES);
-  const [rents, setRents] = useState<RentConfig[]>(DEFAULT_RENTS);
-  const [overheads, setOverheads] = useState<OverheadConfig>(DEFAULT_OVERHEADS);
-  const [scenarios, setScenarios] = useState<{ [siteId: string]: Scenario[] }>({});
+  const [blocks, setBlocks] = useState<DbBlock[]>([]);
+  const [halfBlocks, setHalfBlocks] = useState<DbHalfBlock[]>([]);
+  const [units, setUnits] = useState<DbUnit[]>([]);
+  const [scenarios, setScenarios] = useState<DbScenario[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   const loadProjects = useCallback(async () => {
@@ -89,11 +67,101 @@ export const [ZURBContext, useZURB] = createContextHook(() => {
     }
   }, [user]);
 
+  const loadBlocks = useCallback(async () => {
+    if (!user) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('blocks')
+        .select('*')
+        .order('block_number', { ascending: true });
+
+      if (error) {
+        console.error('[ZURB] Error loading blocks:', error);
+        return;
+      }
+
+      console.log('[ZURB] Loaded blocks:', data?.length);
+      setBlocks(data || []);
+    } catch (error) {
+      console.error('[ZURB] Exception loading blocks:', error);
+    }
+  }, [user]);
+
+  const loadHalfBlocks = useCallback(async () => {
+    if (!user) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('half_blocks')
+        .select('*');
+
+      if (error) {
+        console.error('[ZURB] Error loading half blocks:', error);
+        return;
+      }
+
+      console.log('[ZURB] Loaded half blocks:', data?.length);
+      setHalfBlocks(data || []);
+    } catch (error) {
+      console.error('[ZURB] Exception loading half blocks:', error);
+    }
+  }, [user]);
+
+  const loadUnits = useCallback(async () => {
+    if (!user) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('units')
+        .select('*')
+        .order('unit_number', { ascending: true });
+
+      if (error) {
+        console.error('[ZURB] Error loading units:', error);
+        return;
+      }
+
+      console.log('[ZURB] Loaded units:', data?.length);
+      setUnits(data || []);
+    } catch (error) {
+      console.error('[ZURB] Exception loading units:', error);
+    }
+  }, [user]);
+
+  const loadScenarios = useCallback(async () => {
+    if (!user) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('scenarios')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('[ZURB] Error loading scenarios:', error);
+        return;
+      }
+
+      console.log('[ZURB] Loaded scenarios:', data?.length);
+      setScenarios(data || []);
+    } catch (error) {
+      console.error('[ZURB] Exception loading scenarios:', error);
+    }
+  }, [user]);
+
   const loadData = useCallback(async () => {
     setIsLoading(true);
-    await Promise.all([loadProjects(), loadSites()]);
+    await Promise.all([
+      loadProjects(),
+      loadSites(),
+      loadBlocks(),
+      loadHalfBlocks(),
+      loadUnits(),
+      loadScenarios(),
+    ]);
     setIsLoading(false);
-  }, [loadProjects, loadSites]);
+  }, [loadProjects, loadSites, loadBlocks, loadHalfBlocks, loadUnits, loadScenarios]);
 
   useEffect(() => {
     if (!user) {
@@ -136,13 +204,79 @@ export const [ZURBContext, useZURB] = createContextHook(() => {
       )
       .subscribe();
 
+    const blocksChannel = supabase
+      .channel('blocks-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'blocks',
+        },
+        () => {
+          console.log('[ZURB] Blocks changed, reloading');
+          loadBlocks();
+        }
+      )
+      .subscribe();
+
+    const halfBlocksChannel = supabase
+      .channel('half_blocks-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'half_blocks',
+        },
+        () => {
+          console.log('[ZURB] Half blocks changed, reloading');
+          loadHalfBlocks();
+        }
+      )
+      .subscribe();
+
+    const unitsChannel = supabase
+      .channel('units-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'units',
+        },
+        () => {
+          console.log('[ZURB] Units changed, reloading');
+          loadUnits();
+        }
+      )
+      .subscribe();
+
+    const scenariosChannel = supabase
+      .channel('scenarios-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'scenarios',
+        },
+        () => {
+          console.log('[ZURB] Scenarios changed, reloading');
+          loadScenarios();
+        }
+      )
+      .subscribe();
+
     return () => {
       supabase.removeChannel(projectsChannel);
       supabase.removeChannel(sitesChannel);
+      supabase.removeChannel(blocksChannel);
+      supabase.removeChannel(halfBlocksChannel);
+      supabase.removeChannel(unitsChannel);
+      supabase.removeChannel(scenariosChannel);
     };
-  }, [user, loadData, loadProjects, loadSites]);
-
-
+  }, [user, loadData, loadProjects, loadSites, loadBlocks, loadHalfBlocks, loadUnits, loadScenarios]);
 
   const createProject = useCallback(
     async (name: string, description?: string) => {
@@ -244,6 +378,37 @@ export const [ZURBContext, useZURB] = createContextHook(() => {
     [projects, user]
   );
 
+  const createSite = useCallback(
+    async (projectId: string, name: string, areaHa: number) => {
+      if (!user) {
+        Alert.alert('Error', 'You must be logged in');
+        return null;
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from('sites')
+          .insert({
+            project_id: projectId,
+            name,
+            area_ha: areaHa,
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        console.log('[ZURB] Site created:', data);
+        return data;
+      } catch (error: any) {
+        console.error('[ZURB] Error creating site:', error);
+        Alert.alert('Error', error.message || 'Failed to create site');
+        return null;
+      }
+    },
+    [user]
+  );
+
   const deleteSite = useCallback(
     async (siteId: string) => {
       try {
@@ -294,8 +459,98 @@ export const [ZURBContext, useZURB] = createContextHook(() => {
     [sites]
   );
 
-  const createSite = useCallback(
-    async (projectId: string, name: string, areaHa: number) => {
+  const updateHalfBlock = useCallback(
+    async (
+      halfBlockId: string,
+      type: HalfBlockType,
+      villaLayout?: VillaLayout
+    ) => {
+      try {
+        const { error } = await supabase
+          .from('half_blocks')
+          .update({
+            type,
+            villa_layout: villaLayout || null,
+          })
+          .eq('id', halfBlockId);
+
+        if (error) throw error;
+
+        console.log('[ZURB] Half block updated');
+      } catch (error: any) {
+        console.error('[ZURB] Error updating half block:', error);
+        Alert.alert('Error', error.message || 'Failed to update half block');
+      }
+    },
+    []
+  );
+
+  const createUnit = useCallback(
+    async (
+      halfBlockId: string,
+      unitNumber: number,
+      unitType: string,
+      sizeM2?: number,
+      buildingType?: BuildingType,
+      equipmentName?: string,
+      utilityName?: string
+    ) => {
+      try {
+        const { data, error } = await supabase
+          .from('units')
+          .insert({
+            half_block_id: halfBlockId,
+            unit_number: unitNumber,
+            unit_type: unitType,
+            size_m2: sizeM2 || null,
+            building_type: buildingType || null,
+            equipment_name: equipmentName || null,
+            utility_name: utilityName || null,
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        console.log('[ZURB] Unit created:', data);
+        return data;
+      } catch (error: any) {
+        console.error('[ZURB] Error creating unit:', error);
+        Alert.alert('Error', error.message || 'Failed to create unit');
+        return null;
+      }
+    },
+    []
+  );
+
+  const updateUnit = useCallback(
+    async (
+      unitId: string,
+      updates: {
+        building_type?: BuildingType;
+        equipment_name?: string;
+        utility_name?: string;
+      }
+    ) => {
+      try {
+        const { error } = await supabase
+          .from('units')
+          .update(updates)
+          .eq('id', unitId);
+
+        if (error) throw error;
+
+        console.log('[ZURB] Unit updated');
+      } catch (error: any) {
+        console.error('[ZURB] Error updating unit:', error);
+        Alert.alert('Error', error.message || 'Failed to update unit');
+      }
+    },
+    []
+  );
+
+  const createScenario = useCallback(
+    async (siteId: string, name: string, notes?: string) => {
       if (!user) {
         Alert.alert('Error', 'You must be logged in');
         return null;
@@ -303,112 +558,97 @@ export const [ZURBContext, useZURB] = createContextHook(() => {
 
       try {
         const { data, error } = await supabase
-          .from('sites')
+          .from('scenarios')
           .insert({
-            project_id: projectId,
+            site_id: siteId,
             name,
-            area_ha: areaHa,
+            notes: notes || null,
+            created_by: user.id,
           })
           .select()
           .single();
 
         if (error) throw error;
 
-        console.log('[ZURB] Site created:', data);
+        console.log('[ZURB] Scenario created:', data);
         return data;
       } catch (error: any) {
-        console.error('[ZURB] Error creating site:', error);
-        Alert.alert('Error', error.message || 'Failed to create site');
+        console.error('[ZURB] Error creating scenario:', error);
+        Alert.alert('Error', error.message || 'Failed to create scenario');
         return null;
       }
     },
     [user]
   );
 
-  const updateCostParams = useCallback(async (newParams: CostParams) => {
-    setCostParams(newParams);
-  }, []);
-
-  const updateMixRules = useCallback(async (newRules: MixRule[]) => {
-    setMixRules(newRules);
-  }, []);
-
-  const updateRents = useCallback(async (newRents: RentConfig[]) => {
-    setRents(newRents);
-  }, []);
-
-  const updateOverheads = useCallback(async (newOverheads: OverheadConfig) => {
-    setOverheads(newOverheads);
-  }, []);
-
-  const createScenario = useCallback((siteId: string, name: string, notes: string) => {
-    const newScenario: Scenario = {
-      id: Date.now().toString(),
-      siteId,
-      name,
-      notes,
-      createdAt: new Date(),
-      items: [],
-    };
-    setScenarios(prev => ({
-      ...prev,
-      [siteId]: [...(prev[siteId] || []), newScenario],
-    }));
-    return newScenario;
-  }, []);
-
   const updateScenario = useCallback(
-    (scenarioId: string, updates: { name?: string; notes?: string; items?: ScenarioItem[] }) => {
-      setScenarios(prev => {
-        const newScenarios = { ...prev };
-        for (const siteId in newScenarios) {
-          newScenarios[siteId] = newScenarios[siteId].map(scenario =>
-            scenario.id === scenarioId ? { ...scenario, ...updates } : scenario
-          );
-        }
-        return newScenarios;
-      });
+    async (scenarioId: string, updates: { name?: string; notes?: string }) => {
+      try {
+        const { error } = await supabase
+          .from('scenarios')
+          .update(updates)
+          .eq('id', scenarioId);
+
+        if (error) throw error;
+
+        console.log('[ZURB] Scenario updated');
+      } catch (error: any) {
+        console.error('[ZURB] Error updating scenario:', error);
+        Alert.alert('Error', error.message || 'Failed to update scenario');
+      }
     },
     []
   );
 
   const deleteScenario = useCallback(
-    (scenarioId: string) => {
-      setScenarios(prev => {
-        const newScenarios = { ...prev };
-        for (const siteId in newScenarios) {
-          newScenarios[siteId] = newScenarios[siteId].filter(scenario => scenario.id !== scenarioId);
-        }
-        return newScenarios;
-      });
-      return true;
+    async (scenarioId: string) => {
+      try {
+        const { error } = await supabase
+          .from('scenarios')
+          .delete()
+          .eq('id', scenarioId);
+
+        if (error) throw error;
+
+        console.log('[ZURB] Scenario deleted');
+        return true;
+      } catch (error: any) {
+        console.error('[ZURB] Error deleting scenario:', error);
+        Alert.alert('Error', error.message || 'Failed to delete scenario');
+        return false;
+      }
     },
     []
   );
 
   const duplicateScenario = useCallback(
-    (scenarioId: string) => {
-      let duplicated: Scenario | null = null;
-      setScenarios(prev => {
-        const newScenarios = { ...prev };
-        for (const siteId in newScenarios) {
-          const original = newScenarios[siteId].find(s => s.id === scenarioId);
-          if (original) {
-            duplicated = {
-              ...original,
-              id: Date.now().toString(),
-              name: `${original.name} (Copy)`,
-              createdAt: new Date(),
-            };
-            newScenarios[siteId] = [...newScenarios[siteId], duplicated];
-            break;
-          }
-        }
-        return newScenarios;
-      });
-      return duplicated;
+    async (scenarioId: string) => {
+      try {
+        const original = scenarios.find(s => s.id === scenarioId);
+        if (!original || !user) throw new Error('Scenario not found');
+
+        const { data, error } = await supabase
+          .from('scenarios')
+          .insert({
+            site_id: original.site_id,
+            name: `${original.name} (Copy)`,
+            notes: original.notes,
+            created_by: user.id,
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        console.log('[ZURB] Scenario duplicated:', data);
+        return data;
+      } catch (error: any) {
+        console.error('[ZURB] Error duplicating scenario:', error);
+        Alert.alert('Error', error.message || 'Failed to duplicate scenario');
+        return null;
+      }
     },
-    []
+    [scenarios, user]
   );
 
   const getSitesByProjectId = useCallback(
@@ -418,20 +658,40 @@ export const [ZURBContext, useZURB] = createContextHook(() => {
     [sites]
   );
 
-  const getRentsMap = useCallback((): { [code: string]: number } => {
-    return rents.reduce((acc, rent) => {
-      acc[rent.code] = rent.monthlyUsd;
-      return acc;
-    }, {} as { [code: string]: number });
-  }, [rents]);
+  const getBlocksBySiteId = useCallback(
+    (siteId: string) => {
+      return blocks.filter(b => b.site_id === siteId);
+    },
+    [blocks]
+  );
+
+  const getHalfBlocksByBlockId = useCallback(
+    (blockId: string) => {
+      return halfBlocks.filter(hb => hb.block_id === blockId);
+    },
+    [halfBlocks]
+  );
+
+  const getUnitsByHalfBlockId = useCallback(
+    (halfBlockId: string) => {
+      return units.filter(u => u.half_block_id === halfBlockId);
+    },
+    [units]
+  );
+
+  const getScenariosBySiteId = useCallback(
+    (siteId: string) => {
+      return scenarios.filter(s => s.site_id === siteId);
+    },
+    [scenarios]
+  );
 
   return {
     projects,
     sites,
-    costParams,
-    mixRules,
-    rents,
-    overheads,
+    blocks,
+    halfBlocks,
+    units,
     scenarios,
     isLoading,
     createProject,
@@ -441,17 +701,23 @@ export const [ZURBContext, useZURB] = createContextHook(() => {
     createSite,
     deleteSite,
     duplicateSite,
-    getSitesByProjectId,
-    updateCostParams,
-    updateMixRules,
-    updateRents,
-    updateOverheads,
-    getRentsMap,
+    updateHalfBlock,
+    createUnit,
+    updateUnit,
     createScenario,
     updateScenario,
     deleteScenario,
     duplicateScenario,
+    getSitesByProjectId,
+    getBlocksBySiteId,
+    getHalfBlocksByBlockId,
+    getUnitsByHalfBlockId,
+    getScenariosBySiteId,
     loadProjects,
     loadSites,
+    loadBlocks,
+    loadHalfBlocks,
+    loadUnits,
+    loadScenarios,
   };
 });

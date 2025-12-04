@@ -1,5 +1,5 @@
 import { Stack, useRouter } from 'expo-router';
-import { Settings, Plus, Copy, Trash2 } from 'lucide-react-native';
+import { Plus, Copy, Trash2 } from 'lucide-react-native';
 import React, { useState } from 'react';
 import {
   View,
@@ -129,15 +129,6 @@ export default function ProjectsScreen() {
         options={{
           headerShown: true,
           title: 'ZURB Studio',
-          headerRight: () => (
-            <TouchableOpacity
-              onPress={() => router.push('/settings' as any)}
-              style={styles.headerButton}
-              testID="settings-button"
-            >
-              <Settings size={24} color="#007AFF" />
-            </TouchableOpacity>
-          ),
         }}
       />
 

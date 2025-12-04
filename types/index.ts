@@ -1,98 +1,111 @@
-export interface Project {
+export interface DbProject {
   id: string;
+  owner_id: string;
+  name: string;
+  description: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DbSite {
+  id: string;
+  project_id: string;
+  name: string;
+  area_ha: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DbBlock {
+  id: string;
+  site_id: string;
+  block_number: number;
+  created_at: string;
+}
+
+export type HalfBlockPosition = 'north' | 'south';
+export type HalfBlockType = 'villas' | 'apartments';
+export type VillaLayout = '200_300_mix' | '500' | '1000';
+export type BuildingType = 'AM1' | 'AM2' | 'AH' | 'equipment' | 'utility';
+
+export interface DbHalfBlock {
+  id: string;
+  block_id: string;
+  position: HalfBlockPosition;
+  type: HalfBlockType | null;
+  villa_layout: VillaLayout | null;
+  created_at: string;
+}
+
+export interface DbUnit {
+  id: string;
+  half_block_id: string;
+  unit_number: number;
+  unit_type: string;
+  size_m2: number | null;
+  building_type: BuildingType | null;
+  equipment_name: string | null;
+  utility_name: string | null;
+  created_at: string;
+}
+
+export interface DbScenario {
+  id: string;
+  site_id: string;
+  name: string;
+  notes: string | null;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface VillaLayoutConfig {
+  id: VillaLayout;
   name: string;
   description: string;
-  createdAt: Date;
-  sites: Site[];
-}
-
-export interface Site {
-  id: string;
-  projectId: string;
-  name: string;
-  areaHa: number;
-  location: {
-    latitude: number;
-    longitude: number;
-  };
-  polygon?: { latitude: number; longitude: number }[];
-  blocks: Block[];
-}
-
-export interface Block {
-  id: string;
-  siteId: string;
-  name: string;
-  areaM2: number;
-  typologyCode: string | null;
-  unitCount: number;
-}
-
-export interface Typology {
-  code: string;
-  name: string;
-  category: 'residential' | 'commercial';
-  defaultGfaM2: number;
-  floors: number;
-  unitsPerBlock: number;
-  description: string;
-}
-
-export interface CostParams {
-  goldUsdPerOz: number;
-  gramsMidEnd: number;
-  gramsHighEnd: number;
-  gramsOutstanding: number;
-}
-
-export interface MixRule {
-  category: string;
-  midEndPct: number;
-  highEndPct: number;
-  outstandingPct: number;
-}
-
-export interface RentConfig {
-  code: string;
-  monthlyUsd: number;
-}
-
-export interface OverheadConfig {
-  devMonthlyUsd: number;
-  maintMonthlyUsd: number;
-  leaseYears: number;
-  infraSubsidyPct: number;
-}
-
-export interface Scenario {
-  id: string;
-  siteId: string;
-  name: string;
-  notes: string;
-  createdAt: Date;
-  items: ScenarioItem[];
-}
-
-export interface ScenarioItem {
-  id: string;
-  blockId: string;
-  typologyCode: string;
-  units: number;
-  gfaM2: number;
-}
-
-export interface CalculationResult {
-  totalGfa: number;
+  plots: {
+    size: number;
+    count: number;
+  }[];
   totalUnits: number;
-  constructionCost: number;
-  expectedRevenue: number;
-  margin: number;
-  breakdownByCategory: {
-    [category: string]: {
-      units: number;
-      gfa: number;
-      cost: number;
-      revenue: number;
-    };
+}
+
+export interface ApartmentLayoutConfig {
+  totalBuildings: number;
+  apartmentBuildings: number;
+  equipmentSpots: number;
+  utilitySpots: number;
+}
+
+export interface BuildingTypeConfig {
+  id: BuildingType;
+  name: string;
+  category: 'apartment' | 'equipment' | 'utility';
+  units?: {
+    XM?: number;
+    AMS?: number;
+    AML?: number;
+    AH?: number;
   };
+}
+
+export interface EquipmentOption {
+  id: string;
+  name: string;
+}
+
+export interface UtilityOption {
+  id: string;
+  name: string;
+}
+
+export interface ScenarioSummary {
+  totalResidentialUnits: number;
+  unitsByType: {
+    [key: string]: number;
+  };
+  totalBuildArea: number;
+  totalCosts: number;
+  expectedRevenue: number;
+  rentalPeriod: number;
 }
