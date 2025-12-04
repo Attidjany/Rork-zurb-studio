@@ -24,14 +24,12 @@ BEGIN
     scenario_id,
     code,
     name,
-    description,
     gold_grams_per_m2
   )
   SELECT 
     NEW.id,
     code,
     name,
-    description,
     gold_grams_per_m2
   FROM project_construction_costs
   WHERE project_id = v_project_id
