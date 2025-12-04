@@ -1,5 +1,5 @@
 import { Stack, useRouter, useLocalSearchParams } from 'expo-router';
-import { Plus, MapPin, Copy, Trash2 } from 'lucide-react-native';
+import { Plus, MapPin, Copy, Trash2, Settings } from 'lucide-react-native';
 import React, { useState } from 'react';
 import {
   View,
@@ -147,6 +147,15 @@ export default function ProjectScreen() {
         options={{
           title: project.name,
           headerShown: true,
+          headerRight: () => (
+            <TouchableOpacity
+              style={styles.headerButton}
+              onPress={() => router.push({ pathname: '/project-parameters/[id]', params: { id } } as any)}
+              testID="project-parameters-button"
+            >
+              <Settings size={22} color="#000" />
+            </TouchableOpacity>
+          ),
         }}
       />
 
@@ -251,6 +260,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F5F5F7',
+  },
+  headerButton: {
+    padding: 8,
+    marginRight: 8,
   },
   centerContainer: {
     flex: 1,

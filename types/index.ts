@@ -59,6 +59,28 @@ export interface DbScenario {
   updated_at: string;
 }
 
+export interface DbProjectCostParam {
+  id: string;
+  project_id: string;
+  unit_type: string;
+  build_area_m2: number;
+  cost_per_m2: number;
+  rent_monthly: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DbScenarioCostParam {
+  id: string;
+  scenario_id: string;
+  unit_type: string;
+  build_area_m2: number;
+  cost_per_m2: number;
+  rent_monthly: number;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface VillaLayoutConfig {
   id: VillaLayout;
   name: string;

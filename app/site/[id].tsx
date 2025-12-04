@@ -1,6 +1,6 @@
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { ChevronRight, FileText, Copy, Trash2 } from 'lucide-react-native';
-import React, { useMemo, useState } from 'react';
+import { Stack, useLocalSearchParams } from 'expo-router';
+import { Settings } from 'lucide-react-native';
+import React, { useMemo, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,9 +8,7 @@ import {
   ScrollView,
   TouchableOpacity,
   Modal,
-  TextInput,
   RefreshControl,
-  Alert,
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -22,60 +20,37 @@ import {
   EQUIPMENT_OPTIONS,
   UTILITY_OPTIONS,
 } from '@/constants/typologies';
-import { DbBlock, DbHalfBlock, VillaLayout, HalfBlockType } from '@/types';
+import { DbBlock, DbHalfBlock, VillaLayout, HalfBlockType, BuildingType } from '@/types';
 
 export default function SiteScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const router = useRouter();
   const {
     sites,
     getBlocksBySiteId,
     getHalfBlocksByBlockId,
-    getScenariosBySiteId,
-    createScenario,
-    deleteScenario,
-    duplicateScenario,
+    getUnitsByHalfBlockId,
     loadSites,
     loadBlocks,
     loadHalfBlocks,
-    loadScenarios,
+    loadUnits,
     updateHalfBlock,
     createUnit,
+    updateUnit,
   } = useZURB();
 
-  const [modalVisible, setModalVisible] = useState<boolean>(false);
-  const [scenarioName, setScenarioName] = useState<string>('');
-  const [scenarioNotes, setScenarioNotes] = useState<string>('');
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [configModalVisible, setConfigModalVisible] = useState<boolean>(false);
   const [selectedHalfBlock, setSelectedHalfBlock] = useState<DbHalfBlock | null>(null);
+  const [selectedBlock, setSelectedBlock] = useState<DbBlock | null>(null);
+  const [bulkEditMode, setBulkEditMode] = useState<boolean>(false);
+  const [selectedHalfBlocks, setSelectedHalfBlocks] = useState<Set<string>>(new Set());
+  const [buildingAssignModalVisible, setBuildingAssignModalVisible] = useState<boolean>(false);
 
-  const handleRefresh = async () => {
+  const handleRefresh = useCallback(async () => {
     setRefreshing(true);
-    await Promise.all([loadSites(), loadBlocks(), loadHalfBlocks(), loadScenarios()]);
+    await Promise.all([loadSites(), loadBlocks(), loadHalfBlocks(), loadUnits()]);
     setRefreshing(false);
-  };
-
-  const handleDeleteScenario = (scenarioId: string) => {
-    Alert.alert(
-      'Delete Scenario',
-      'Are you sure you want to delete this scenario?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => {
-            deleteScenario(scenarioId);
-          },
-        },
-      ]
-    );
-  };
-
-  const handleDuplicateScenario = async (scenarioId: string) => {
-    await duplicateScenario(scenarioId);
-  };
+  }, [loadSites, loadBlocks, loadHalfBlocks, loadUnits]);
 
   const site = useMemo(() => {
     return sites.find(s => s.id === id) || null;
@@ -85,42 +60,97 @@ export default function SiteScreen() {
     return getBlocksBySiteId(id || '');
   }, [getBlocksBySiteId, id]);
 
-  const siteScenarios = useMemo(() => {
-    return getScenariosBySiteId(id || '');
-  }, [getScenariosBySiteId, id]);
-
-  const handleCreateScenario = async () => {
-    if (scenarioName.trim() && id) {
-      const newScenario = await createScenario(id, scenarioName.trim(), scenarioNotes.trim());
-      if (newScenario) {
-        setScenarioName('');
-        setScenarioNotes('');
-        setModalVisible(false);
-        router.push({ pathname: '/scenario/[id]', params: { id: newScenario.id } } as any);
-      }
-    }
-  };
-
-  const openHalfBlockConfig = (halfBlock: DbHalfBlock) => {
+  const openHalfBlockConfig = useCallback((halfBlock: DbHalfBlock, block: DbBlock) => {
     setSelectedHalfBlock(halfBlock);
-    setConfigModalVisible(true);
-  };
+    setSelectedBlock(block);
+    
+    if (halfBlock.type === 'apartments') {
+      setBuildingAssignModalVisible(true);
+    } else {
+      setConfigModalVisible(true);
+    }
+  }, []);
 
-  const handleSelectType = async (type: HalfBlockType) => {
+  const handleSelectType = useCallback(async (type: HalfBlockType) => {
     if (!selectedHalfBlock) return;
 
     await updateHalfBlock(selectedHalfBlock.id, type);
+    
+    if (type === 'apartments') {
+      const units = getUnitsByHalfBlockId(selectedHalfBlock.id);
+      if (units.length === 0) {
+        for (let i = 0; i < APARTMENT_LAYOUT.totalBuildings; i++) {
+          let unitType = 'apartment';
+          let buildingType: BuildingType | undefined = undefined;
+          
+          if (i < APARTMENT_LAYOUT.apartmentBuildings) {
+            unitType = 'apartment';
+          } else if (i < APARTMENT_LAYOUT.apartmentBuildings + APARTMENT_LAYOUT.equipmentSpots) {
+            unitType = 'equipment';
+            buildingType = 'equipment';
+          } else {
+            unitType = 'utility';
+            buildingType = 'utility';
+          }
+          
+          await createUnit(
+            selectedHalfBlock.id,
+            i + 1,
+            unitType,
+            undefined,
+            buildingType,
+            undefined,
+            undefined
+          );
+        }
+      }
+    }
+    
     setConfigModalVisible(false);
     setSelectedHalfBlock(null);
-  };
+    setSelectedBlock(null);
+  }, [selectedHalfBlock, updateHalfBlock, getUnitsByHalfBlockId, createUnit]);
 
-  const handleSelectVillaLayout = async (layout: VillaLayout) => {
+  const handleSelectVillaLayout = useCallback(async (layout: VillaLayout) => {
     if (!selectedHalfBlock) return;
-
     await updateHalfBlock(selectedHalfBlock.id, 'villas', layout);
     setConfigModalVisible(false);
     setSelectedHalfBlock(null);
-  };
+    setSelectedBlock(null);
+  }, [selectedHalfBlock, updateHalfBlock]);
+
+  const toggleBulkSelect = useCallback((halfBlockId: string) => {
+    setSelectedHalfBlocks(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(halfBlockId)) {
+        newSet.delete(halfBlockId);
+      } else {
+        newSet.add(halfBlockId);
+      }
+      return newSet;
+    });
+  }, []);
+
+  const applyBulkType = useCallback(async (type: HalfBlockType, villaLayout?: VillaLayout) => {
+    const promises = Array.from(selectedHalfBlocks).map(hbId =>
+      updateHalfBlock(hbId, type, villaLayout)
+    );
+    await Promise.all(promises);
+    setSelectedHalfBlocks(new Set());
+    setBulkEditMode(false);
+  }, [selectedHalfBlocks, updateHalfBlock]);
+
+  const handleUpdateBuildingType = useCallback(async (unitId: string, buildingType: BuildingType) => {
+    await updateUnit(unitId, { building_type: buildingType });
+  }, [updateUnit]);
+
+  const handleUpdateEquipmentName = useCallback(async (unitId: string, equipmentName: string) => {
+    await updateUnit(unitId, { equipment_name: equipmentName });
+  }, [updateUnit]);
+
+  const handleUpdateUtilityName = useCallback(async (unitId: string, utilityName: string) => {
+    await updateUnit(unitId, { utility_name: utilityName });
+  }, [updateUnit]);
 
   if (!site) {
     return (
@@ -138,6 +168,15 @@ export default function SiteScreen() {
         options={{
           title: site.name,
           headerShown: true,
+          headerRight: () => (
+            <TouchableOpacity
+              style={styles.headerButton}
+              onPress={() => setBulkEditMode(!bulkEditMode)}
+              testID="bulk-edit-toggle"
+            >
+              <Settings size={22} color={bulkEditMode ? '#007AFF' : '#000'} />
+            </TouchableOpacity>
+          ),
         }}
       />
 
@@ -148,19 +187,42 @@ export default function SiteScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
         }
       >
-        <View style={styles.infoCard}>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Total Area</Text>
-            <Text style={styles.infoValue}>{site.area_ha.toFixed(2)} ha</Text>
+        <View style={styles.statsCard}>
+          <View style={styles.statItem}>
+            <Text style={styles.statLabel}>Total Area</Text>
+            <Text style={styles.statValue}>{site.area_ha.toFixed(2)} ha</Text>
           </View>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>6ha Blocks</Text>
-            <Text style={styles.infoValue}>{numBlocks}</Text>
+          <View style={styles.statDivider} />
+          <View style={styles.statItem}>
+            <Text style={styles.statLabel}>6ha Blocks</Text>
+            <Text style={styles.statValue}>{numBlocks}</Text>
           </View>
         </View>
 
+        {bulkEditMode && selectedHalfBlocks.size > 0 && (
+          <View style={styles.bulkActionBar}>
+            <Text style={styles.bulkActionText}>
+              {selectedHalfBlocks.size} selected
+            </Text>
+            <View style={styles.bulkActionButtons}>
+              <TouchableOpacity
+                style={styles.bulkActionButton}
+                onPress={() => applyBulkType('villas', '200_300_mix')}
+              >
+                <Text style={styles.bulkActionButtonText}>Villas</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.bulkActionButton}
+                onPress={() => applyBulkType('apartments')}
+              >
+                <Text style={styles.bulkActionButtonText}>Apartments</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Blocks Configuration</Text>
+          <Text style={styles.sectionTitle}>Block Configuration</Text>
           {siteBlocks.length === 0 ? (
             <View style={styles.emptyContainer}>
               <ActivityIndicator size="small" color="#007AFF" />
@@ -174,165 +236,121 @@ export default function SiteScreen() {
 
               return (
                 <View key={block.id} style={styles.blockCard}>
-                  <Text style={styles.blockTitle}>Block {block.block_number}</Text>
+                  <View style={styles.blockHeader}>
+                    <Text style={styles.blockTitle}>Block {block.block_number}</Text>
+                  </View>
 
-                  <TouchableOpacity
-                    style={styles.halfBlockRow}
-                    onPress={() => northHB && openHalfBlockConfig(northHB)}
-                    testID={`north-half-block-${block.block_number}`}
-                  >
-                    <View style={styles.halfBlockInfo}>
-                      <Text style={styles.halfBlockLabel}>North Half</Text>
-                      {northHB?.type ? (
-                        <Text style={styles.halfBlockValue}>
-                          {northHB.type === 'villas' ? 'Villas' : 'Apartments'}
-                          {northHB.villa_layout && ` (${northHB.villa_layout.replace('_', ' ')})`}
-                        </Text>
-                      ) : (
-                        <Text style={styles.halfBlockPlaceholder}>Not configured</Text>
-                      )}
-                    </View>
-                    <ChevronRight size={20} color="#999" />
-                  </TouchableOpacity>
+                  {northHB && (
+                    <TouchableOpacity
+                      style={[
+                        styles.halfBlockRow,
+                        bulkEditMode && selectedHalfBlocks.has(northHB.id) && styles.halfBlockRowSelected,
+                      ]}
+                      onPress={() => {
+                        if (bulkEditMode) {
+                          toggleBulkSelect(northHB.id);
+                        } else {
+                          openHalfBlockConfig(northHB, block);
+                        }
+                      }}
+                      onLongPress={() => {
+                        setBulkEditMode(true);
+                        toggleBulkSelect(northHB.id);
+                      }}
+                      testID={`north-half-block-${block.block_number}`}
+                    >
+                      <View style={styles.halfBlockContent}>
+                        <View style={styles.halfBlockHeader}>
+                          <View style={[styles.positionBadge, styles.northBadge]}>
+                            <Text style={styles.positionBadgeText}>N</Text>
+                          </View>
+                          <View style={styles.halfBlockInfo}>
+                            {northHB.type ? (
+                              <>
+                                <Text style={styles.halfBlockType}>
+                                  {northHB.type === 'villas' ? 'Villas' : 'Apartments'}
+                                </Text>
+                                {northHB.villa_layout && (
+                                  <Text style={styles.halfBlockSubtype}>
+                                    {VILLA_LAYOUTS.find(l => l.id === northHB.villa_layout)?.name}
+                                  </Text>
+                                )}
+                              </>
+                            ) : (
+                              <Text style={styles.halfBlockPlaceholder}>Tap to configure</Text>
+                            )}
+                          </View>
+                        </View>
+                        {bulkEditMode && (
+                          <View
+                            style={[
+                              styles.checkbox,
+                              selectedHalfBlocks.has(northHB.id) && styles.checkboxSelected,
+                            ]}
+                          />
+                        )}
+                      </View>
+                    </TouchableOpacity>
+                  )}
 
-                  <TouchableOpacity
-                    style={styles.halfBlockRow}
-                    onPress={() => southHB && openHalfBlockConfig(southHB)}
-                    testID={`south-half-block-${block.block_number}`}
-                  >
-                    <View style={styles.halfBlockInfo}>
-                      <Text style={styles.halfBlockLabel}>South Half</Text>
-                      {southHB?.type ? (
-                        <Text style={styles.halfBlockValue}>
-                          {southHB.type === 'villas' ? 'Villas' : 'Apartments'}
-                          {southHB.villa_layout && ` (${southHB.villa_layout.replace('_', ' ')})`}
-                        </Text>
-                      ) : (
-                        <Text style={styles.halfBlockPlaceholder}>Not configured</Text>
-                      )}
-                    </View>
-                    <ChevronRight size={20} color="#999" />
-                  </TouchableOpacity>
+                  {southHB && (
+                    <TouchableOpacity
+                      style={[
+                        styles.halfBlockRow,
+                        bulkEditMode && selectedHalfBlocks.has(southHB.id) && styles.halfBlockRowSelected,
+                      ]}
+                      onPress={() => {
+                        if (bulkEditMode) {
+                          toggleBulkSelect(southHB.id);
+                        } else {
+                          openHalfBlockConfig(southHB, block);
+                        }
+                      }}
+                      onLongPress={() => {
+                        setBulkEditMode(true);
+                        toggleBulkSelect(southHB.id);
+                      }}
+                      testID={`south-half-block-${block.block_number}`}
+                    >
+                      <View style={styles.halfBlockContent}>
+                        <View style={styles.halfBlockHeader}>
+                          <View style={[styles.positionBadge, styles.southBadge]}>
+                            <Text style={styles.positionBadgeText}>S</Text>
+                          </View>
+                          <View style={styles.halfBlockInfo}>
+                            {southHB.type ? (
+                              <>
+                                <Text style={styles.halfBlockType}>
+                                  {southHB.type === 'villas' ? 'Villas' : 'Apartments'}
+                                </Text>
+                                {southHB.villa_layout && (
+                                  <Text style={styles.halfBlockSubtype}>
+                                    {VILLA_LAYOUTS.find(l => l.id === southHB.villa_layout)?.name}
+                                  </Text>
+                                )}
+                              </>
+                            ) : (
+                              <Text style={styles.halfBlockPlaceholder}>Tap to configure</Text>
+                            )}
+                          </View>
+                        </View>
+                        {bulkEditMode && (
+                          <View
+                            style={[
+                              styles.checkbox,
+                              selectedHalfBlocks.has(southHB.id) && styles.checkboxSelected,
+                            ]}
+                          />
+                        )}
+                      </View>
+                    </TouchableOpacity>
+                  )}
                 </View>
               );
             })
           )}
         </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Scenarios</Text>
-          {siteScenarios.length === 0 ? (
-            <View style={styles.emptyScenarios}>
-              <Text style={styles.emptyText}>No scenarios yet. Create one to get started.</Text>
-            </View>
-          ) : (
-            <View style={styles.scenariosList}>
-              {siteScenarios.map(scenario => (
-                <View key={scenario.id} style={styles.scenarioCard}>
-                  <TouchableOpacity
-                    style={styles.scenarioCardMain}
-                    onPress={() => {
-                      router.push({ pathname: '/scenario/[id]', params: { id: scenario.id } } as any);
-                    }}
-                    testID={`scenario-${scenario.id}`}
-                  >
-                    <View style={styles.scenarioHeader}>
-                      <FileText size={18} color="#007AFF" />
-                      <Text style={styles.scenarioName}>{scenario.name}</Text>
-                    </View>
-                    {scenario.notes ? (
-                      <Text style={styles.scenarioNotes} numberOfLines={2}>
-                        {scenario.notes}
-                      </Text>
-                    ) : null}
-                    <Text style={styles.scenarioDate}>
-                      {new Date(scenario.created_at).toLocaleDateString()}
-                    </Text>
-                  </TouchableOpacity>
-                  <View style={styles.scenarioActions}>
-                    <TouchableOpacity
-                      style={styles.actionBtn}
-                      onPress={() => handleDuplicateScenario(scenario.id)}
-                      testID={`duplicate-scenario-${scenario.id}`}
-                    >
-                      <Copy size={16} color="#007AFF" />
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.actionBtn}
-                      onPress={() => handleDeleteScenario(scenario.id)}
-                      testID={`delete-scenario-${scenario.id}`}
-                    >
-                      <Trash2 size={16} color="#FF3B30" />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              ))}
-            </View>
-          )}
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={() => setModalVisible(true)}
-            testID="create-scenario-button"
-          >
-            <Text style={styles.actionButtonText}>+ Create Scenario</Text>
-          </TouchableOpacity>
-        </View>
       </ScrollView>
-
-      <Modal
-        visible={modalVisible}
-        animationType="slide"
-        transparent
-        onRequestClose={() => setModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>New Scenario</Text>
-
-            <TextInput
-              style={styles.input}
-              placeholder="Scenario Name"
-              value={scenarioName}
-              onChangeText={setScenarioName}
-              testID="scenario-name-input"
-            />
-
-            <TextInput
-              style={[styles.input, styles.textArea]}
-              placeholder="Notes (optional)"
-              value={scenarioNotes}
-              onChangeText={setScenarioNotes}
-              multiline
-              numberOfLines={4}
-              textAlignVertical="top"
-              testID="scenario-notes-input"
-            />
-
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.cancelButton]}
-                onPress={() => {
-                  setModalVisible(false);
-                  setScenarioName('');
-                  setScenarioNotes('');
-                }}
-                testID="cancel-button"
-              >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.modalButton, styles.createButton]}
-                onPress={handleCreateScenario}
-                disabled={!scenarioName.trim()}
-                testID="confirm-create-button"
-              >
-                <Text style={styles.createButtonText}>Create</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
 
       <Modal
         visible={configModalVisible}
@@ -342,71 +360,175 @@ export default function SiteScreen() {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Configure Half Block</Text>
+            <Text style={styles.modalTitle}>
+              Configure {selectedBlock && `Block ${selectedBlock.block_number}`}
+            </Text>
+            <Text style={styles.modalSubtitle}>
+              {selectedHalfBlock?.position === 'north' ? 'North' : 'South'} Half
+            </Text>
 
             {!selectedHalfBlock?.type ? (
-              <View>
-                <Text style={styles.modalSubtitle}>Select Type</Text>
+              <View style={styles.optionsContainer}>
                 <TouchableOpacity
-                  style={styles.optionButton}
+                  style={styles.typeOption}
                   onPress={() => handleSelectType('villas')}
                   testID="select-villas"
                 >
-                  <Text style={styles.optionButtonText}>Villas</Text>
+                  <Text style={styles.typeOptionTitle}>Villas</Text>
+                  <Text style={styles.typeOptionDesc}>Residential villas with plot layouts</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={styles.optionButton}
+                  style={styles.typeOption}
                   onPress={() => handleSelectType('apartments')}
                   testID="select-apartments"
                 >
-                  <Text style={styles.optionButtonText}>Apartment Buildings</Text>
+                  <Text style={styles.typeOptionTitle}>Apartment Buildings</Text>
+                  <Text style={styles.typeOptionDesc}>Multi-unit apartment complexes</Text>
                 </TouchableOpacity>
               </View>
             ) : selectedHalfBlock.type === 'villas' ? (
-              <View>
-                <Text style={styles.modalSubtitle}>Select Villa Layout</Text>
+              <View style={styles.optionsContainer}>
                 {VILLA_LAYOUTS.map(layout => (
                   <TouchableOpacity
                     key={layout.id}
-                    style={styles.optionButton}
+                    style={[
+                      styles.layoutOption,
+                      selectedHalfBlock.villa_layout === layout.id && styles.layoutOptionSelected,
+                    ]}
                     onPress={() => handleSelectVillaLayout(layout.id)}
                     testID={`villa-layout-${layout.id}`}
                   >
-                    <Text style={styles.optionButtonText}>{layout.name}</Text>
-                    <Text style={styles.optionButtonDesc}>{layout.description}</Text>
+                    <Text style={styles.layoutOptionTitle}>{layout.name}</Text>
+                    <Text style={styles.layoutOptionDesc}>{layout.description}</Text>
+                    <Text style={styles.layoutOptionUnits}>{layout.totalUnits} units</Text>
                   </TouchableOpacity>
                 ))}
               </View>
-            ) : (
-              <View>
-                <Text style={styles.modalSubtitle}>Apartment Layout</Text>
-                <Text style={styles.modalText}>
-                  {APARTMENT_LAYOUT.apartmentBuildings} apartment buildings
-                </Text>
-                <Text style={styles.modalText}>
-                  {APARTMENT_LAYOUT.equipmentSpots} equipment spots
-                </Text>
-                <Text style={styles.modalText}>
-                  {APARTMENT_LAYOUT.utilitySpots} utility spot
-                </Text>
-                <TouchableOpacity
-                  style={styles.actionButton}
-                  onPress={() => setConfigModalVisible(false)}
-                >
-                  <Text style={styles.actionButtonText}>Done</Text>
-                </TouchableOpacity>
-              </View>
-            )}
+            ) : null}
 
             <TouchableOpacity
-              style={[styles.modalButton, styles.cancelButton, { marginTop: 16 }]}
+              style={styles.closeButton}
               onPress={() => {
                 setConfigModalVisible(false);
                 setSelectedHalfBlock(null);
+                setSelectedBlock(null);
               }}
               testID="close-config"
             >
-              <Text style={styles.cancelButtonText}>Close</Text>
+              <Text style={styles.closeButtonText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={buildingAssignModalVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setBuildingAssignModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, styles.buildingModalContent]}>
+            <Text style={styles.modalTitle}>
+              Assign Building Types
+            </Text>
+            <Text style={styles.modalSubtitle}>
+              Block {selectedBlock?.block_number} - {selectedHalfBlock?.position === 'north' ? 'North' : 'South'}
+            </Text>
+
+            <ScrollView style={styles.buildingList} showsVerticalScrollIndicator={false}>
+              {selectedHalfBlock && getUnitsByHalfBlockId(selectedHalfBlock.id).map((unit, index) => {
+                const isApartment = unit.unit_type === 'apartment';
+                const isEquipment = unit.unit_type === 'equipment';
+                const isUtility = unit.unit_type === 'utility';
+
+                return (
+                  <View key={unit.id} style={styles.buildingItem}>
+                    <Text style={styles.buildingNumber}>Building {index + 1}</Text>
+                    {isApartment && (
+                      <View style={styles.buildingTypeSelector}>
+                        {BUILDING_TYPES.filter(bt => bt.category === 'apartment').map(bt => (
+                          <TouchableOpacity
+                            key={bt.id}
+                            style={[
+                              styles.buildingTypeButton,
+                              unit.building_type === bt.id && styles.buildingTypeButtonSelected,
+                            ]}
+                            onPress={() => handleUpdateBuildingType(unit.id, bt.id)}
+                            testID={`building-type-${bt.id}-unit-${index}`}
+                          >
+                            <Text
+                              style={[
+                                styles.buildingTypeButtonText,
+                                unit.building_type === bt.id && styles.buildingTypeButtonTextSelected,
+                              ]}
+                            >
+                              {bt.id}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    )}
+                    {isEquipment && (
+                      <View style={styles.equipmentSelector}>
+                        {EQUIPMENT_OPTIONS.map(eq => (
+                          <TouchableOpacity
+                            key={eq.id}
+                            style={[
+                              styles.equipmentButton,
+                              unit.equipment_name === eq.id && styles.equipmentButtonSelected,
+                            ]}
+                            onPress={() => handleUpdateEquipmentName(unit.id, eq.id)}
+                          >
+                            <Text
+                              style={[
+                                styles.equipmentButtonText,
+                                unit.equipment_name === eq.id && styles.equipmentButtonTextSelected,
+                              ]}
+                            >
+                              {eq.name}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    )}
+                    {isUtility && (
+                      <View style={styles.equipmentSelector}>
+                        {UTILITY_OPTIONS.map(util => (
+                          <TouchableOpacity
+                            key={util.id}
+                            style={[
+                              styles.equipmentButton,
+                              unit.utility_name === util.id && styles.equipmentButtonSelected,
+                            ]}
+                            onPress={() => handleUpdateUtilityName(unit.id, util.id)}
+                          >
+                            <Text
+                              style={[
+                                styles.equipmentButtonText,
+                                unit.utility_name === util.id && styles.equipmentButtonTextSelected,
+                              ]}
+                            >
+                              {util.name}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    )}
+                  </View>
+                );
+              })}
+            </ScrollView>
+
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={() => {
+                setBuildingAssignModalVisible(false);
+                setSelectedHalfBlock(null);
+                setSelectedBlock(null);
+              }}
+            >
+              <Text style={styles.closeButtonText}>Done</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -418,47 +540,87 @@ export default function SiteScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F7',
+    backgroundColor: '#F8F9FA',
   },
   centerContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#F5F5F7',
+    backgroundColor: '#F8F9FA',
   },
   errorText: {
     fontSize: 16,
-    color: '#666666',
+    color: '#6C757D',
   },
   content: {
     flex: 1,
   },
-  infoCard: {
+  headerButton: {
+    padding: 8,
+    marginRight: 8,
+  },
+  statsCard: {
+    flexDirection: 'row',
     backgroundColor: '#FFFFFF',
+    marginHorizontal: 16,
+    marginTop: 16,
+    borderRadius: 16,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  statItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  statDivider: {
+    width: 1,
+    backgroundColor: '#E9ECEF',
+    marginHorizontal: 16,
+  },
+  statLabel: {
+    fontSize: 13,
+    color: '#6C757D',
+    marginBottom: 8,
+    fontWeight: '500' as const,
+  },
+  statValue: {
+    fontSize: 24,
+    fontWeight: '700' as const,
+    color: '#212529',
+  },
+  bulkActionBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#007AFF',
     marginHorizontal: 16,
     marginTop: 16,
     borderRadius: 12,
     padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
-  infoRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 8,
-  },
-  infoLabel: {
-    fontSize: 14,
-    color: '#666666',
-  },
-  infoValue: {
+  bulkActionText: {
     fontSize: 16,
     fontWeight: '600' as const,
-    color: '#000000',
+    color: '#FFFFFF',
+  },
+  bulkActionButtons: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  bulkActionButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+  },
+  bulkActionButtonText: {
+    fontSize: 14,
+    fontWeight: '600' as const,
+    color: '#FFFFFF',
   },
   section: {
     marginTop: 24,
@@ -467,216 +629,258 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 20,
-    fontWeight: '600' as const,
-    color: '#000000',
+    fontWeight: '700' as const,
+    color: '#212529',
     marginBottom: 16,
   },
   emptyContainer: {
-    padding: 32,
+    padding: 40,
     alignItems: 'center',
   },
   emptyText: {
     fontSize: 14,
-    color: '#666666',
+    color: '#6C757D',
     textAlign: 'center',
-    marginTop: 8,
+    marginTop: 12,
   },
   blockCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
+    borderRadius: 16,
+    marginBottom: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
+    overflow: 'hidden',
+  },
+  blockHeader: {
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F8F9FA',
   },
   blockTitle: {
     fontSize: 18,
-    fontWeight: '600' as const,
-    color: '#000000',
-    marginBottom: 12,
+    fontWeight: '700' as const,
+    color: '#212529',
   },
   halfBlockRow: {
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F8F9FA',
+  },
+  halfBlockRowSelected: {
+    backgroundColor: '#E3F2FD',
+  },
+  halfBlockContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#F5F5F7',
+  },
+  halfBlockHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  positionBadge: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  northBadge: {
+    backgroundColor: '#E3F2FD',
+  },
+  southBadge: {
+    backgroundColor: '#FFF3E0',
+  },
+  positionBadgeText: {
+    fontSize: 14,
+    fontWeight: '700' as const,
+    color: '#007AFF',
   },
   halfBlockInfo: {
     flex: 1,
   },
-  halfBlockLabel: {
-    fontSize: 14,
-    color: '#666666',
-    marginBottom: 4,
-  },
-  halfBlockValue: {
-    fontSize: 16,
-    fontWeight: '500' as const,
-    color: '#000000',
-  },
-  halfBlockPlaceholder: {
-    fontSize: 16,
-    color: '#999999',
-    fontStyle: 'italic' as const,
-  },
-  emptyScenarios: {
-    padding: 32,
-    alignItems: 'center',
-  },
-  scenariosList: {
-    gap: 12,
-    marginBottom: 16,
-  },
-  scenarioCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-    overflow: 'hidden',
-  },
-  scenarioCardMain: {
-    padding: 16,
-  },
-  scenarioActions: {
-    flexDirection: 'row',
-    borderTopWidth: 1,
-    borderTopColor: '#F5F5F7',
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    gap: 8,
-  },
-  actionBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 6,
-    borderRadius: 6,
-    backgroundColor: '#F5F5F7',
-  },
-  scenarioHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 8,
-  },
-  scenarioName: {
+  halfBlockType: {
     fontSize: 16,
     fontWeight: '600' as const,
-    color: '#000000',
-    flex: 1,
+    color: '#212529',
+    marginBottom: 2,
   },
-  scenarioNotes: {
+  halfBlockSubtype: {
+    fontSize: 13,
+    color: '#6C757D',
+  },
+  halfBlockPlaceholder: {
+    fontSize: 15,
+    color: '#ADB5BD',
+    fontStyle: 'italic' as const,
+  },
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#ADB5BD',
+    backgroundColor: '#FFFFFF',
+  },
+  checkboxSelected: {
+    backgroundColor: '#007AFF',
+    borderColor: '#007AFF',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
+    maxHeight: '85%',
+  },
+  buildingModalContent: {
+    maxHeight: '90%',
+  },
+  modalTitle: {
+    fontSize: 24,
+    fontWeight: '700' as const,
+    color: '#212529',
+    marginBottom: 4,
+  },
+  modalSubtitle: {
+    fontSize: 16,
+    color: '#6C757D',
+    marginBottom: 24,
+  },
+  optionsContainer: {
+    gap: 12,
+    marginBottom: 24,
+  },
+  typeOption: {
+    padding: 20,
+    borderRadius: 16,
+    backgroundColor: '#F8F9FA',
+    borderWidth: 2,
+    borderColor: '#F8F9FA',
+  },
+  typeOptionTitle: {
+    fontSize: 18,
+    fontWeight: '700' as const,
+    color: '#212529',
+    marginBottom: 6,
+  },
+  typeOptionDesc: {
     fontSize: 14,
-    color: '#666666',
-    marginBottom: 8,
+    color: '#6C757D',
     lineHeight: 20,
   },
-  scenarioDate: {
-    fontSize: 12,
-    color: '#999999',
+  layoutOption: {
+    padding: 16,
+    borderRadius: 12,
+    backgroundColor: '#F8F9FA',
+    borderWidth: 2,
+    borderColor: '#F8F9FA',
   },
-  actionButton: {
+  layoutOptionSelected: {
+    backgroundColor: '#E3F2FD',
+    borderColor: '#007AFF',
+  },
+  layoutOptionTitle: {
+    fontSize: 16,
+    fontWeight: '600' as const,
+    color: '#212529',
+    marginBottom: 4,
+  },
+  layoutOptionDesc: {
+    fontSize: 13,
+    color: '#6C757D',
+    marginBottom: 6,
+  },
+  layoutOptionUnits: {
+    fontSize: 13,
+    fontWeight: '600' as const,
+    color: '#007AFF',
+  },
+  closeButton: {
     backgroundColor: '#007AFF',
     borderRadius: 12,
     paddingVertical: 16,
     alignItems: 'center',
   },
-  actionButtonText: {
+  closeButtonText: {
     fontSize: 16,
     fontWeight: '600' as const,
     color: '#FFFFFF',
   },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
+  buildingList: {
+    maxHeight: 400,
   },
-  modalContent: {
-    width: '85%',
-    maxHeight: '80%',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 24,
-  },
-  modalTitle: {
-    fontSize: 22,
-    fontWeight: '600' as const,
-    color: '#000000',
+  buildingItem: {
     marginBottom: 20,
+    paddingBottom: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F8F9FA',
   },
-  modalSubtitle: {
+  buildingNumber: {
     fontSize: 16,
     fontWeight: '600' as const,
-    color: '#000000',
+    color: '#212529',
     marginBottom: 12,
   },
-  modalText: {
-    fontSize: 14,
-    color: '#666666',
-    marginBottom: 8,
-  },
-  input: {
-    backgroundColor: '#F5F5F7',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    marginBottom: 16,
-    color: '#000000',
-  },
-  textArea: {
-    height: 100,
-    paddingTop: 12,
-  },
-  modalButtons: {
+  buildingTypeSelector: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 8,
   },
-  modalButton: {
+  buildingTypeButton: {
     flex: 1,
-    paddingVertical: 14,
-    borderRadius: 8,
+    paddingVertical: 12,
+    borderRadius: 10,
+    backgroundColor: '#F8F9FA',
     alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#F8F9FA',
   },
-  cancelButton: {
-    backgroundColor: '#F5F5F7',
-  },
-  cancelButtonText: {
-    fontSize: 16,
-    fontWeight: '600' as const,
-    color: '#666666',
-  },
-  createButton: {
+  buildingTypeButtonSelected: {
     backgroundColor: '#007AFF',
+    borderColor: '#007AFF',
   },
-  createButtonText: {
-    fontSize: 16,
+  buildingTypeButtonText: {
+    fontSize: 15,
     fontWeight: '600' as const,
+    color: '#6C757D',
+  },
+  buildingTypeButtonTextSelected: {
     color: '#FFFFFF',
   },
-  optionButton: {
-    backgroundColor: '#F5F5F7',
-    borderRadius: 8,
-    padding: 16,
-    marginBottom: 12,
+  equipmentSelector: {
+    gap: 8,
   },
-  optionButtonText: {
-    fontSize: 16,
-    fontWeight: '600' as const,
-    color: '#000000',
-    marginBottom: 4,
+  equipmentButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    backgroundColor: '#F8F9FA',
+    borderWidth: 2,
+    borderColor: '#F8F9FA',
   },
-  optionButtonDesc: {
+  equipmentButtonSelected: {
+    backgroundColor: '#007AFF',
+    borderColor: '#007AFF',
+  },
+  equipmentButtonText: {
     fontSize: 14,
-    color: '#666666',
+    fontWeight: '600' as const,
+    color: '#6C757D',
+    textAlign: 'center',
+  },
+  equipmentButtonTextSelected: {
+    color: '#FFFFFF',
   },
 });
