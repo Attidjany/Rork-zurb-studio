@@ -1,5 +1,5 @@
 import { Stack, useLocalSearchParams, router } from 'expo-router';
-import { Settings, DollarSign, Building2, Home, ShoppingBag, Edit2, Trash2 } from 'lucide-react-native';
+import { Settings, DollarSign, Building2, Home, ShoppingBag, Edit2, Trash2, RotateCcw } from 'lucide-react-native';
 import React, { useMemo, useState, useCallback, useEffect } from 'react';
 import {
   View,
@@ -102,6 +102,31 @@ export default function ScenarioParametersScreen() {
     return scenarioEquipmentUtilityTypes.length > 0 ? scenarioEquipmentUtilityTypes : projectEquipmentUtilityTypes;
   }, [scenarioEquipmentUtilityTypes, projectEquipmentUtilityTypes]);
 
+  const hasScenarioOverrides = scenarioConstructionCosts.length > 0 || scenarioHousingTypes.length > 0 || scenarioEquipmentUtilityTypes.length > 0;
+
+  const handleResetToProjectSettings = useCallback(async () => {
+    Alert.alert(
+      'Reset to Project Settings',
+      'This will delete all scenario-specific parameters and use the project defaults. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reset',
+          style: 'destructive',
+          onPress: async () => {
+            const deletePromises = [
+              ...scenarioConstructionCosts.map(c => deleteScenarioConstructionCost(c.id)),
+              ...scenarioHousingTypes.map(h => deleteScenarioHousingType(h.id)),
+              ...scenarioEquipmentUtilityTypes.map(e => deleteScenarioEquipmentUtilityType(e.id)),
+            ];
+            await Promise.all(deletePromises);
+            Alert.alert('Success', 'Scenario parameters have been reset to project defaults');
+          },
+        },
+      ]
+    );
+  }, [scenarioConstructionCosts, scenarioHousingTypes, scenarioEquipmentUtilityTypes, deleteScenarioConstructionCost, deleteScenarioHousingType, deleteScenarioEquipmentUtilityType]);
+
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     await Promise.all([
@@ -155,6 +180,349 @@ export default function ScenarioParametersScreen() {
   const equipmentTypes = mergedEquipmentUtilityTypes.filter(e => e.category === 'equipment');
   const utilityTypes = mergedEquipmentUtilityTypes.filter(e => e.category === 'utility');
 
+  const renderHousingType = (type: any) => {
+    const costConfig = mergedConstructionCosts.find(c => c.code === type.default_cost_type);
+    const costPerM2XOF = costConfig
+      ? costConfig.gold_grams_per_m2 * goldPrice.pricePerGram * USD_TO_XOF
+      : 0;
+    const totalCost = type.default_area_m2 * costPerM2XOF;
+    const yearlyRevenue = type.default_rent_monthly * 12;
+    const isEditing = editingId === type.id;
+    const isScenarioType = scenarioHousingTypes.some(h => h.id === type.id);
+
+    return (
+      <View key={type.id} style={styles.paramCard}>
+        <View style={[styles.paramHeader, isScenarioType && styles.paramHeaderWithActions]}>
+          <View style={styles.paramIcon}>
+            <DollarSign size={18} color="#007AFF" />
+          </View>
+          <View style={styles.paramHeaderText}>
+            {isEditing ? (
+              <View style={styles.editForm}>
+                <TextInput
+                  style={styles.input}
+                  value={editValues.code !== undefined ? editValues.code : type.code}
+                  onChangeText={(text) => setEditValues({...editValues, code: text})}
+                  placeholder="Code"
+                />
+                <TextInput
+                  style={styles.input}
+                  value={editValues.name !== undefined ? editValues.name : type.name}
+                  onChangeText={(text) => setEditValues({...editValues, name: text})}
+                  placeholder="Name"
+                />
+                <TextInput
+                  style={styles.input}
+                  value={String(editValues.default_area_m2 !== undefined ? editValues.default_area_m2 : type.default_area_m2)}
+                  onChangeText={(text) => setEditValues({...editValues, default_area_m2: parseFloat(text) || 0})}
+                  placeholder="Area (m²)"
+                  keyboardType="numeric"
+                />
+                <TextInput
+                  style={styles.input}
+                  value={editValues.default_cost_type !== undefined ? editValues.default_cost_type : type.default_cost_type}
+                  onChangeText={(text) => setEditValues({...editValues, default_cost_type: text})}
+                  placeholder="Cost Type"
+                />
+                <TextInput
+                  style={styles.input}
+                  value={String(editValues.default_rent_monthly !== undefined ? editValues.default_rent_monthly : type.default_rent_monthly)}
+                  onChangeText={(text) => setEditValues({...editValues, default_rent_monthly: parseFloat(text) || 0})}
+                  placeholder="Monthly Rent (XOF)"
+                  keyboardType="numeric"
+                />
+              </View>
+            ) : (
+              <>
+                <Text style={styles.paramTitle}>{type.code}</Text>
+                <Text style={styles.paramSubtitle}>{type.name}</Text>
+                <View style={styles.costTypeBadge}>
+                  <Text style={styles.costTypeBadgeText}>Cost Type: {type.default_cost_type}</Text>
+                </View>
+              </>
+            )}
+          </View>
+          {isScenarioType && (
+            <View style={styles.actionButtons}>
+              {isEditing ? (
+                <>
+                  <TouchableOpacity
+                    style={styles.saveButton}
+                    onPress={async () => {
+                      await updateScenarioHousingType(type.id, editValues);
+                      setEditingId(null);
+                      setEditValues({});
+                    }}
+                  >
+                    <Text style={styles.saveButtonText}>Save</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.cancelButton}
+                    onPress={() => {
+                      setEditingId(null);
+                      setEditValues({});
+                    }}
+                  >
+                    <Text style={styles.cancelButtonText}>Cancel</Text>
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <>
+                  <TouchableOpacity
+                    style={styles.iconButton}
+                    onPress={() => {
+                      setEditingId(type.id);
+                      setEditValues({
+                        code: type.code,
+                        name: type.name,
+                        default_area_m2: type.default_area_m2,
+                        default_cost_type: type.default_cost_type,
+                        default_rent_monthly: type.default_rent_monthly,
+                      });
+                    }}
+                  >
+                    <Edit2 size={18} color="#007AFF" />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.iconButton}
+                    onPress={() => {
+                      Alert.alert(
+                        'Delete Housing Type',
+                        `Are you sure you want to delete ${type.code}?`,
+                        [
+                          { text: 'Cancel', style: 'cancel' },
+                          {
+                            text: 'Delete',
+                            style: 'destructive',
+                            onPress: () => deleteScenarioHousingType(type.id),
+                          },
+                        ]
+                      );
+                    }}
+                  >
+                    <Trash2 size={18} color="#FF3B30" />
+                  </TouchableOpacity>
+                </>
+              )}
+            </View>
+          )}
+        </View>
+
+        {!isEditing && (
+          <>
+            <View style={styles.paramGrid}>
+              <View style={styles.paramItem}>
+                <Text style={styles.paramItemLabel}>Build Area</Text>
+                <Text style={styles.paramItemValue}>
+                  {type.default_area_m2.toFixed(0)} m²
+                </Text>
+              </View>
+              <View style={styles.paramItem}>
+                <Text style={styles.paramItemLabel}>Cost/m²</Text>
+                <Text style={styles.paramItemValue}>
+                  {costPerM2XOF.toLocaleString(undefined, {maximumFractionDigits: 0})} XOF
+                </Text>
+                {costConfig && (
+                  <Text style={styles.paramItemSubtext}>
+                    {costConfig.gold_grams_per_m2.toFixed(2)} g Au/m²
+                  </Text>
+                )}
+              </View>
+              <View style={styles.paramItem}>
+                <Text style={styles.paramItemLabel}>Monthly Rent</Text>
+                <Text style={styles.paramItemValue}>
+                  {type.default_rent_monthly.toLocaleString(undefined, {maximumFractionDigits: 0})} XOF
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.paramSummary}>
+              <View style={styles.paramSummaryItem}>
+                <Text style={styles.paramSummaryLabel}>Total Build Cost</Text>
+                <Text style={styles.paramSummaryValue}>
+                  {totalCost.toLocaleString(undefined, {maximumFractionDigits: 0})} XOF
+                </Text>
+              </View>
+              <View style={styles.paramSummaryItem}>
+                <Text style={styles.paramSummaryLabel}>Yearly Revenue</Text>
+                <Text style={styles.paramSummaryValue}>
+                  {yearlyRevenue.toLocaleString(undefined, {maximumFractionDigits: 0})} XOF
+                </Text>
+              </View>
+            </View>
+          </>
+        )}
+      </View>
+    );
+  };
+
+  const renderEquipmentUtilityType = (type: any, category: 'equipment' | 'utility') => {
+    const costConfig = mergedConstructionCosts.find(c => c.code === type.cost_type);
+    const buildAreaM2 = type.land_area_m2 * (type.building_occupation_pct / 100);
+    const costPerM2XOF = costConfig
+      ? costConfig.gold_grams_per_m2 * goldPrice.pricePerGram * USD_TO_XOF
+      : 0;
+    const totalCost = buildAreaM2 * costPerM2XOF;
+    const isEditing = editingId === type.id;
+    const isScenarioType = scenarioEquipmentUtilityTypes.some(e => e.id === type.id);
+    const iconColor = category === 'equipment' ? '#FF9500' : '#34C759';
+    const iconBgStyle = category === 'equipment' ? styles.equipmentIcon : styles.utilityIcon;
+
+    return (
+      <View key={type.id} style={styles.paramCard}>
+        <View style={[styles.paramHeader, isScenarioType && styles.paramHeaderWithActions]}>
+          <View style={[styles.paramIcon, iconBgStyle]}>
+            <Settings size={18} color={iconColor} />
+          </View>
+          <View style={styles.paramHeaderText}>
+            {isEditing ? (
+              <View style={styles.editForm}>
+                <TextInput
+                  style={styles.input}
+                  value={editValues.code !== undefined ? editValues.code : type.code}
+                  onChangeText={(text) => setEditValues({...editValues, code: text})}
+                  placeholder="Code"
+                />
+                <TextInput
+                  style={styles.input}
+                  value={editValues.name !== undefined ? editValues.name : type.name}
+                  onChangeText={(text) => setEditValues({...editValues, name: text})}
+                  placeholder="Name"
+                />
+                <TextInput
+                  style={styles.input}
+                  value={String(editValues.land_area_m2 !== undefined ? editValues.land_area_m2 : type.land_area_m2)}
+                  onChangeText={(text) => setEditValues({...editValues, land_area_m2: parseFloat(text) || 0})}
+                  placeholder="Land Area (m²)"
+                  keyboardType="numeric"
+                />
+                <TextInput
+                  style={styles.input}
+                  value={String(editValues.building_occupation_pct !== undefined ? editValues.building_occupation_pct : type.building_occupation_pct)}
+                  onChangeText={(text) => setEditValues({...editValues, building_occupation_pct: parseFloat(text) || 0})}
+                  placeholder="Building Occupation (%)"
+                  keyboardType="numeric"
+                />
+                <TextInput
+                  style={styles.input}
+                  value={editValues.cost_type !== undefined ? editValues.cost_type : type.cost_type}
+                  onChangeText={(text) => setEditValues({...editValues, cost_type: text})}
+                  placeholder="Cost Type"
+                />
+              </View>
+            ) : (
+              <>
+                <Text style={styles.paramTitle}>{type.code}</Text>
+                <Text style={styles.paramSubtitle}>{type.name} ({category === 'equipment' ? 'Equipment' : 'Utility'})</Text>
+                <View style={styles.costTypeBadge}>
+                  <Text style={styles.costTypeBadgeText}>Cost Type: {type.cost_type}</Text>
+                </View>
+              </>
+            )}
+          </View>
+          {isScenarioType && (
+            <View style={styles.actionButtons}>
+              {isEditing ? (
+                <>
+                  <TouchableOpacity
+                    style={styles.saveButton}
+                    onPress={async () => {
+                      await updateScenarioEquipmentUtilityType(type.id, editValues);
+                      setEditingId(null);
+                      setEditValues({});
+                    }}
+                  >
+                    <Text style={styles.saveButtonText}>Save</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.cancelButton}
+                    onPress={() => {
+                      setEditingId(null);
+                      setEditValues({});
+                    }}
+                  >
+                    <Text style={styles.cancelButtonText}>Cancel</Text>
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <>
+                  <TouchableOpacity
+                    style={styles.iconButton}
+                    onPress={() => {
+                      setEditingId(type.id);
+                      setEditValues({
+                        code: type.code,
+                        name: type.name,
+                        land_area_m2: type.land_area_m2,
+                        building_occupation_pct: type.building_occupation_pct,
+                        cost_type: type.cost_type,
+                      });
+                    }}
+                  >
+                    <Edit2 size={18} color="#007AFF" />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.iconButton}
+                    onPress={() => {
+                      Alert.alert(
+                        `Delete ${category === 'equipment' ? 'Equipment' : 'Utility'} Type`,
+                        `Are you sure you want to delete ${type.code}?`,
+                        [
+                          { text: 'Cancel', style: 'cancel' },
+                          {
+                            text: 'Delete',
+                            style: 'destructive',
+                            onPress: () => deleteScenarioEquipmentUtilityType(type.id),
+                          },
+                        ]
+                      );
+                    }}
+                  >
+                    <Trash2 size={18} color="#FF3B30" />
+                  </TouchableOpacity>
+                </>
+              )}
+            </View>
+          )}
+        </View>
+
+        {!isEditing && (
+          <>
+            <View style={styles.paramGrid}>
+              <View style={styles.paramItem}>
+                <Text style={styles.paramItemLabel}>Land Area</Text>
+                <Text style={styles.paramItemValue}>
+                  {type.land_area_m2.toFixed(0)} m²
+                </Text>
+              </View>
+              <View style={styles.paramItem}>
+                <Text style={styles.paramItemLabel}>Occupation</Text>
+                <Text style={styles.paramItemValue}>
+                  {type.building_occupation_pct.toFixed(0)}%
+                </Text>
+              </View>
+              <View style={styles.paramItem}>
+                <Text style={styles.paramItemLabel}>Build Area</Text>
+                <Text style={styles.paramItemValue}>
+                  {buildAreaM2.toFixed(0)} m²
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.paramSummary}>
+              <View style={styles.paramSummaryItem}>
+                <Text style={styles.paramSummaryLabel}>Total Build Cost</Text>
+                <Text style={styles.paramSummaryValue}>
+                  {totalCost.toLocaleString(undefined, {maximumFractionDigits: 0})} XOF
+                </Text>
+              </View>
+            </View>
+          </>
+        )}
+      </View>
+    );
+  };
+
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
       <Stack.Screen
@@ -192,6 +560,16 @@ export default function ScenarioParametersScreen() {
             These parameters override project defaults for this scenario only. They were copied from the project when you created this scenario and can be edited below.
           </Text>
         </View>
+
+        {hasScenarioOverrides && (
+          <TouchableOpacity
+            style={styles.resetButton}
+            onPress={handleResetToProjectSettings}
+          >
+            <RotateCcw size={18} color="#FF3B30" />
+            <Text style={styles.resetButtonText}>Reset to Project Settings</Text>
+          </TouchableOpacity>
+        )}
 
         {mergedConstructionCosts.length === 0 && mergedHousingTypes.length === 0 && mergedEquipmentUtilityTypes.length === 0 ? (
           <View style={styles.emptyState}>
@@ -355,73 +733,7 @@ export default function ScenarioParametersScreen() {
                 ? 'Scenario-specific apartment configurations'
                 : 'Inherited from project'}
             </Text>
-
-            {apartmentTypes.map(type => {
-              const costConfig = mergedConstructionCosts.find(c => c.code === type.default_cost_type);
-              const costPerM2XOF = costConfig
-                ? costConfig.gold_grams_per_m2 * goldPrice.pricePerGram * USD_TO_XOF
-                : 0;
-              const totalCost = type.default_area_m2 * costPerM2XOF;
-              const yearlyRevenue = type.default_rent_monthly * 12;
-
-              return (
-                <View key={type.id} style={styles.paramCard}>
-                  <View style={styles.paramHeader}>
-                    <View style={styles.paramIcon}>
-                      <DollarSign size={18} color="#007AFF" />
-                    </View>
-                    <View style={styles.paramHeaderText}>
-                      <Text style={styles.paramTitle}>{type.code}</Text>
-                      <Text style={styles.paramSubtitle}>{type.name}</Text>
-                      <View style={styles.costTypeBadge}>
-                        <Text style={styles.costTypeBadgeText}>Cost Type: {type.default_cost_type}</Text>
-                      </View>
-                    </View>
-                  </View>
-
-                  <View style={styles.paramGrid}>
-                    <View style={styles.paramItem}>
-                      <Text style={styles.paramItemLabel}>Build Area</Text>
-                      <Text style={styles.paramItemValue}>
-                        {type.default_area_m2.toFixed(0)} m²
-                      </Text>
-                    </View>
-                    <View style={styles.paramItem}>
-                      <Text style={styles.paramItemLabel}>Cost/m²</Text>
-                      <Text style={styles.paramItemValue}>
-                        {costPerM2XOF.toLocaleString(undefined, {maximumFractionDigits: 0})} XOF
-                      </Text>
-                      {costConfig && (
-                        <Text style={styles.paramItemSubtext}>
-                          {costConfig.gold_grams_per_m2.toFixed(2)} g Au/m²
-                        </Text>
-                      )}
-                    </View>
-                    <View style={styles.paramItem}>
-                      <Text style={styles.paramItemLabel}>Monthly Rent</Text>
-                      <Text style={styles.paramItemValue}>
-                        {type.default_rent_monthly.toLocaleString(undefined, {maximumFractionDigits: 0})} XOF
-                      </Text>
-                    </View>
-                  </View>
-
-                  <View style={styles.paramSummary}>
-                    <View style={styles.paramSummaryItem}>
-                      <Text style={styles.paramSummaryLabel}>Total Build Cost</Text>
-                      <Text style={styles.paramSummaryValue}>
-                        {totalCost.toLocaleString(undefined, {maximumFractionDigits: 0})} XOF
-                      </Text>
-                    </View>
-                    <View style={styles.paramSummaryItem}>
-                      <Text style={styles.paramSummaryLabel}>Yearly Revenue</Text>
-                      <Text style={styles.paramSummaryValue}>
-                        {yearlyRevenue.toLocaleString(undefined, {maximumFractionDigits: 0})} XOF
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-              );
-            })}
+            {apartmentTypes.map(type => renderHousingType(type))}
           </View>
         ) : null}
 
@@ -436,73 +748,7 @@ export default function ScenarioParametersScreen() {
                 ? 'Scenario-specific villa configurations'
                 : 'Inherited from project'}
             </Text>
-
-            {villaTypes.map(type => {
-              const costConfig = mergedConstructionCosts.find(c => c.code === type.default_cost_type);
-              const costPerM2XOF = costConfig
-                ? costConfig.gold_grams_per_m2 * goldPrice.pricePerGram * USD_TO_XOF
-                : 0;
-              const totalCost = type.default_area_m2 * costPerM2XOF;
-              const yearlyRevenue = type.default_rent_monthly * 12;
-
-              return (
-                <View key={type.id} style={styles.paramCard}>
-                  <View style={styles.paramHeader}>
-                    <View style={styles.paramIcon}>
-                      <DollarSign size={18} color="#007AFF" />
-                    </View>
-                    <View style={styles.paramHeaderText}>
-                      <Text style={styles.paramTitle}>{type.code}</Text>
-                      <Text style={styles.paramSubtitle}>{type.name}</Text>
-                      <View style={styles.costTypeBadge}>
-                        <Text style={styles.costTypeBadgeText}>Cost Type: {type.default_cost_type}</Text>
-                      </View>
-                    </View>
-                  </View>
-
-                  <View style={styles.paramGrid}>
-                    <View style={styles.paramItem}>
-                      <Text style={styles.paramItemLabel}>Build Area</Text>
-                      <Text style={styles.paramItemValue}>
-                        {type.default_area_m2.toFixed(0)} m²
-                      </Text>
-                    </View>
-                    <View style={styles.paramItem}>
-                      <Text style={styles.paramItemLabel}>Cost/m²</Text>
-                      <Text style={styles.paramItemValue}>
-                        {costPerM2XOF.toLocaleString(undefined, {maximumFractionDigits: 0})} XOF
-                      </Text>
-                      {costConfig && (
-                        <Text style={styles.paramItemSubtext}>
-                          {costConfig.gold_grams_per_m2.toFixed(2)} g Au/m²
-                        </Text>
-                      )}
-                    </View>
-                    <View style={styles.paramItem}>
-                      <Text style={styles.paramItemLabel}>Monthly Rent</Text>
-                      <Text style={styles.paramItemValue}>
-                        {type.default_rent_monthly.toLocaleString(undefined, {maximumFractionDigits: 0})} XOF
-                      </Text>
-                    </View>
-                  </View>
-
-                  <View style={styles.paramSummary}>
-                    <View style={styles.paramSummaryItem}>
-                      <Text style={styles.paramSummaryLabel}>Total Build Cost</Text>
-                      <Text style={styles.paramSummaryValue}>
-                        {totalCost.toLocaleString(undefined, {maximumFractionDigits: 0})} XOF
-                      </Text>
-                    </View>
-                    <View style={styles.paramSummaryItem}>
-                      <Text style={styles.paramSummaryLabel}>Yearly Revenue</Text>
-                      <Text style={styles.paramSummaryValue}>
-                        {yearlyRevenue.toLocaleString(undefined, {maximumFractionDigits: 0})} XOF
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-              );
-            })}
+            {villaTypes.map(type => renderHousingType(type))}
           </View>
         ) : null}
 
@@ -517,73 +763,7 @@ export default function ScenarioParametersScreen() {
                 ? 'Scenario-specific commercial configurations'
                 : 'Inherited from project'}
             </Text>
-
-            {commercialTypes.map(type => {
-              const costConfig = mergedConstructionCosts.find(c => c.code === type.default_cost_type);
-              const costPerM2XOF = costConfig
-                ? costConfig.gold_grams_per_m2 * goldPrice.pricePerGram * USD_TO_XOF
-                : 0;
-              const totalCost = type.default_area_m2 * costPerM2XOF;
-              const yearlyRevenue = type.default_rent_monthly * 12;
-
-              return (
-                <View key={type.id} style={styles.paramCard}>
-                  <View style={styles.paramHeader}>
-                    <View style={styles.paramIcon}>
-                      <DollarSign size={18} color="#007AFF" />
-                    </View>
-                    <View style={styles.paramHeaderText}>
-                      <Text style={styles.paramTitle}>{type.code}</Text>
-                      <Text style={styles.paramSubtitle}>{type.name}</Text>
-                      <View style={styles.costTypeBadge}>
-                        <Text style={styles.costTypeBadgeText}>Cost Type: {type.default_cost_type}</Text>
-                      </View>
-                    </View>
-                  </View>
-
-                  <View style={styles.paramGrid}>
-                    <View style={styles.paramItem}>
-                      <Text style={styles.paramItemLabel}>Build Area</Text>
-                      <Text style={styles.paramItemValue}>
-                        {type.default_area_m2.toFixed(0)} m²
-                      </Text>
-                    </View>
-                    <View style={styles.paramItem}>
-                      <Text style={styles.paramItemLabel}>Cost/m²</Text>
-                      <Text style={styles.paramItemValue}>
-                        {costPerM2XOF.toLocaleString(undefined, {maximumFractionDigits: 0})} XOF
-                      </Text>
-                      {costConfig && (
-                        <Text style={styles.paramItemSubtext}>
-                          {costConfig.gold_grams_per_m2.toFixed(2)} g Au/m²
-                        </Text>
-                      )}
-                    </View>
-                    <View style={styles.paramItem}>
-                      <Text style={styles.paramItemLabel}>Monthly Rent</Text>
-                      <Text style={styles.paramItemValue}>
-                        {type.default_rent_monthly.toLocaleString(undefined, {maximumFractionDigits: 0})} XOF
-                      </Text>
-                    </View>
-                  </View>
-
-                  <View style={styles.paramSummary}>
-                    <View style={styles.paramSummaryItem}>
-                      <Text style={styles.paramSummaryLabel}>Total Build Cost</Text>
-                      <Text style={styles.paramSummaryValue}>
-                        {totalCost.toLocaleString(undefined, {maximumFractionDigits: 0})} XOF
-                      </Text>
-                    </View>
-                    <View style={styles.paramSummaryItem}>
-                      <Text style={styles.paramSummaryLabel}>Yearly Revenue</Text>
-                      <Text style={styles.paramSummaryValue}>
-                        {yearlyRevenue.toLocaleString(undefined, {maximumFractionDigits: 0})} XOF
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-              );
-            })}
+            {commercialTypes.map(type => renderHousingType(type))}
           </View>
         ) : null}
 
@@ -598,118 +778,8 @@ export default function ScenarioParametersScreen() {
                 ? 'Scenario-specific equipment and utility configurations'
                 : 'Inherited from project'}
             </Text>
-
-            {equipmentTypes.map(type => {
-              const costConfig = mergedConstructionCosts.find(c => c.code === type.cost_type);
-              const buildAreaM2 = type.land_area_m2 * (type.building_occupation_pct / 100);
-              const costPerM2XOF = costConfig
-                ? costConfig.gold_grams_per_m2 * goldPrice.pricePerGram * USD_TO_XOF
-                : 0;
-              const totalCost = buildAreaM2 * costPerM2XOF;
-
-              return (
-                <View key={type.id} style={styles.paramCard}>
-                  <View style={styles.paramHeader}>
-                    <View style={[styles.paramIcon, styles.equipmentIcon]}>
-                      <Settings size={18} color="#FF9500" />
-                    </View>
-                    <View style={styles.paramHeaderText}>
-                      <Text style={styles.paramTitle}>{type.code}</Text>
-                      <Text style={styles.paramSubtitle}>{type.name} (Equipment)</Text>
-                      <View style={styles.costTypeBadge}>
-                        <Text style={styles.costTypeBadgeText}>Cost Type: {type.cost_type}</Text>
-                      </View>
-                    </View>
-                  </View>
-
-                  <View style={styles.paramGrid}>
-                    <View style={styles.paramItem}>
-                      <Text style={styles.paramItemLabel}>Land Area</Text>
-                      <Text style={styles.paramItemValue}>
-                        {type.land_area_m2.toFixed(0)} m²
-                      </Text>
-                    </View>
-                    <View style={styles.paramItem}>
-                      <Text style={styles.paramItemLabel}>Occupation</Text>
-                      <Text style={styles.paramItemValue}>
-                        {type.building_occupation_pct.toFixed(0)}%
-                      </Text>
-                    </View>
-                    <View style={styles.paramItem}>
-                      <Text style={styles.paramItemLabel}>Build Area</Text>
-                      <Text style={styles.paramItemValue}>
-                        {buildAreaM2.toFixed(0)} m²
-                      </Text>
-                    </View>
-                  </View>
-
-                  <View style={styles.paramSummary}>
-                    <View style={styles.paramSummaryItem}>
-                      <Text style={styles.paramSummaryLabel}>Total Build Cost</Text>
-                      <Text style={styles.paramSummaryValue}>
-                        {totalCost.toLocaleString(undefined, {maximumFractionDigits: 0})} XOF
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-              );
-            })}
-
-            {utilityTypes.map(type => {
-              const costConfig = mergedConstructionCosts.find(c => c.code === type.cost_type);
-              const buildAreaM2 = type.land_area_m2 * (type.building_occupation_pct / 100);
-              const costPerM2XOF = costConfig
-                ? costConfig.gold_grams_per_m2 * goldPrice.pricePerGram * USD_TO_XOF
-                : 0;
-              const totalCost = buildAreaM2 * costPerM2XOF;
-
-              return (
-                <View key={type.id} style={styles.paramCard}>
-                  <View style={styles.paramHeader}>
-                    <View style={[styles.paramIcon, styles.utilityIcon]}>
-                      <Settings size={18} color="#34C759" />
-                    </View>
-                    <View style={styles.paramHeaderText}>
-                      <Text style={styles.paramTitle}>{type.code}</Text>
-                      <Text style={styles.paramSubtitle}>{type.name} (Utility)</Text>
-                      <View style={styles.costTypeBadge}>
-                        <Text style={styles.costTypeBadgeText}>Cost Type: {type.cost_type}</Text>
-                      </View>
-                    </View>
-                  </View>
-
-                  <View style={styles.paramGrid}>
-                    <View style={styles.paramItem}>
-                      <Text style={styles.paramItemLabel}>Land Area</Text>
-                      <Text style={styles.paramItemValue}>
-                        {type.land_area_m2.toFixed(0)} m²
-                      </Text>
-                    </View>
-                    <View style={styles.paramItem}>
-                      <Text style={styles.paramItemLabel}>Occupation</Text>
-                      <Text style={styles.paramItemValue}>
-                        {type.building_occupation_pct.toFixed(0)}%
-                      </Text>
-                    </View>
-                    <View style={styles.paramItem}>
-                      <Text style={styles.paramItemLabel}>Build Area</Text>
-                      <Text style={styles.paramItemValue}>
-                        {buildAreaM2.toFixed(0)} m²
-                      </Text>
-                    </View>
-                  </View>
-
-                  <View style={styles.paramSummary}>
-                    <View style={styles.paramSummaryItem}>
-                      <Text style={styles.paramSummaryLabel}>Total Build Cost</Text>
-                      <Text style={styles.paramSummaryValue}>
-                        {totalCost.toLocaleString(undefined, {maximumFractionDigits: 0})} XOF
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-              );
-            })}
+            {equipmentTypes.map(type => renderEquipmentUtilityType(type, 'equipment'))}
+            {utilityTypes.map(type => renderEquipmentUtilityType(type, 'utility'))}
           </View>
         ) : null}
       </ScrollView>
@@ -792,6 +862,24 @@ const styles = StyleSheet.create({
     color: '#0D47A1',
     lineHeight: 18,
   },
+  resetButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 16,
+    marginTop: 12,
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#FF3B30',
+    gap: 8,
+  },
+  resetButtonText: {
+    fontSize: 15,
+    fontWeight: '600' as const,
+    color: '#FF3B30',
+  },
   emptyState: {
     alignItems: 'center',
     paddingVertical: 64,
@@ -859,6 +947,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 16,
+  },
+  paramHeaderWithActions: {
+    alignItems: 'flex-start',
   },
   paramIcon: {
     width: 36,
