@@ -37,11 +37,11 @@ export default function ProjectParametersScreen() {
   const [isLoadingParams, setIsLoadingParams] = useState<boolean>(false);
   const [editValues, setEditValues] = useState<{
     build_area_m2: string;
-    cost_per_m2: string;
+    cost_type: string;
     rent_monthly: string;
   }>({
     build_area_m2: '',
-    cost_per_m2: '',
+    cost_type: '',
     rent_monthly: '',
   });
 
@@ -86,15 +86,15 @@ export default function ProjectParametersScreen() {
     }
   }, [id, costParams.length, loadProjectCostParams]);
 
-  const startEditing = useCallback((paramId: string, currentValues: {
+  const startEditing = useCallback((paramId: string, unitType: string, currentValues: {
     build_area_m2: number;
-    cost_per_m2: number;
     rent_monthly: number;
   }) => {
+    const config = HOUSING_TYPES[unitType];
     setEditingParam(paramId);
     setEditValues({
       build_area_m2: currentValues.build_area_m2.toString(),
-      cost_per_m2: currentValues.cost_per_m2.toString(),
+      cost_type: config.defaultCostType,
       rent_monthly: currentValues.rent_monthly.toString(),
     });
   }, []);
@@ -103,7 +103,7 @@ export default function ProjectParametersScreen() {
     setEditingParam(null);
     setEditValues({
       build_area_m2: '',
-      cost_per_m2: '',
+      cost_type: '',
       rent_monthly: '',
     });
   }, []);
@@ -112,15 +112,15 @@ export default function ProjectParametersScreen() {
     const param = costParams.find(p => p.id === paramId);
     if (!param) return;
 
-    const isConstructionCost = CONSTRUCTION_COST_TYPES.includes(param.unit_type);
+    const buildArea = parseFloat(editValues.build_area_m2);
+    const rentMonthly = parseFloat(editValues.rent_monthly);
 
-    const buildArea = isConstructionCost ? 0 : parseFloat(editValues.build_area_m2);
-    const costPerM2 = parseFloat(editValues.cost_per_m2);
-    const rentMonthly = isConstructionCost ? 0 : parseFloat(editValues.rent_monthly);
-
-    if (isNaN(costPerM2) || (!isConstructionCost && (isNaN(buildArea) || isNaN(rentMonthly)))) {
+    if (isNaN(buildArea) || isNaN(rentMonthly) || !editValues.cost_type) {
       return;
     }
+
+    const costTypeConfig = CONSTRUCTION_COSTS[editValues.cost_type];
+    const costPerM2 = costTypeConfig.goldGramsPerM2 * goldPrice.pricePerGram;
 
     await updateProjectCostParam(paramId, {
       build_area_m2: buildArea,
@@ -129,12 +129,13 @@ export default function ProjectParametersScreen() {
     });
 
     cancelEditing();
-  }, [editValues, updateProjectCostParam, cancelEditing, costParams]);
+  }, [editValues, updateProjectCostParam, cancelEditing, costParams, goldPrice]);
 
   const renderHousingTypeCard = useCallback((param: any, type: string) => {
     const isEditing = editingParam === param.id;
     const config = HOUSING_TYPES[type];
     const costTypeConfig = CONSTRUCTION_COSTS[config.defaultCostType];
+    const calculatedCostPerM2XOF = costTypeConfig.goldGramsPerM2 * goldPrice.pricePerGram * USD_TO_XOF;
 
     return (
       <View key={param.id} style={styles.paramCard}>
@@ -165,14 +166,32 @@ export default function ProjectParametersScreen() {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Cost per m² (XOF)</Text>
-              <TextInput
-                style={styles.input}
-                value={editValues.cost_per_m2}
-                onChangeText={(text) => setEditValues(prev => ({ ...prev, cost_per_m2: text }))}
-                keyboardType="decimal-pad"
-                placeholder="Cost per m²"
-              />
+              <Text style={styles.inputLabel}>Cost Type</Text>
+              <View style={styles.costTypeOptions}>
+                {CONSTRUCTION_COST_TYPES.map(costType => {
+                  const costConfig = CONSTRUCTION_COSTS[costType];
+                  const costXOF = (costConfig.goldGramsPerM2 * goldPrice.pricePerGram * USD_TO_XOF).toLocaleString(undefined, {maximumFractionDigits: 0});
+                  return (
+                    <TouchableOpacity
+                      key={costType}
+                      style={[
+                        styles.costTypeOption,
+                        editValues.cost_type === costType && styles.costTypeOptionSelected,
+                      ]}
+                      onPress={() => setEditValues(prev => ({ ...prev, cost_type: costType }))}
+                    >
+                      <Text style={[
+                        styles.costTypeOptionCode,
+                        editValues.cost_type === costType && styles.costTypeOptionTextSelected,
+                      ]}>{costType}</Text>
+                      <Text style={[
+                        styles.costTypeOptionValue,
+                        editValues.cost_type === costType && styles.costTypeOptionTextSelected,
+                      ]}>{costXOF} XOF/m²</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
             </View>
 
             <View style={styles.inputGroup}>
@@ -213,7 +232,7 @@ export default function ProjectParametersScreen() {
               <View style={styles.paramItem}>
                 <Text style={styles.paramItemLabel}>Cost/m²</Text>
                 <Text style={styles.paramItemValue}>
-                  {(param.cost_per_m2 * USD_TO_XOF).toLocaleString(undefined, {maximumFractionDigits: 0})} XOF
+                  {calculatedCostPerM2XOF.toLocaleString(undefined, {maximumFractionDigits: 0})} XOF
                 </Text>
                 {costTypeConfig && (
                   <Text style={styles.paramItemSubtext}>
@@ -233,7 +252,7 @@ export default function ProjectParametersScreen() {
               <View style={styles.paramSummaryItem}>
                 <Text style={styles.paramSummaryLabel}>Total Build Cost</Text>
                 <Text style={styles.paramSummaryValue}>
-                  {(param.build_area_m2 * param.cost_per_m2 * USD_TO_XOF).toLocaleString(undefined, {maximumFractionDigits: 0})} XOF
+                  {(param.build_area_m2 * calculatedCostPerM2XOF).toLocaleString(undefined, {maximumFractionDigits: 0})} XOF
                 </Text>
               </View>
               <View style={styles.paramSummaryItem}>
@@ -246,9 +265,8 @@ export default function ProjectParametersScreen() {
 
             <TouchableOpacity
               style={styles.editTrigger}
-              onPress={() => startEditing(param.id, {
+              onPress={() => startEditing(param.id, type, {
                 build_area_m2: param.build_area_m2,
-                cost_per_m2: param.cost_per_m2,
                 rent_monthly: param.rent_monthly,
               })}
             >
@@ -258,7 +276,7 @@ export default function ProjectParametersScreen() {
         )}
       </View>
     );
-  }, [editingParam, editValues, cancelEditing, saveParam, startEditing]);
+  }, [editingParam, editValues, cancelEditing, saveParam, startEditing, goldPrice]);
 
   if (!project) {
     return (
@@ -371,7 +389,7 @@ export default function ProjectParametersScreen() {
                   </View>
                   <View style={styles.costDetailRow}>
                     <Text style={styles.costDetailLabel}>Cost per m²:</Text>
-                    <Text style={styles.costDetailValue}>{(param.cost_per_m2 * USD_TO_XOF).toLocaleString(undefined, {maximumFractionDigits: 0})} XOF/m²</Text>
+                    <Text style={styles.costDetailValue}>{(config.goldGramsPerM2 * goldPrice.pricePerGram * USD_TO_XOF).toLocaleString(undefined, {maximumFractionDigits: 0})} XOF/m²</Text>
                   </View>
                   <View style={styles.costDetailRow}>
                     <Text style={styles.costDetailLabel}>Calculated at:</Text>
@@ -804,5 +822,35 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#007AFF',
     marginTop: 2,
+  },
+  costTypeOptions: {
+    gap: 8,
+  },
+  costTypeOption: {
+    backgroundColor: '#F8F9FA',
+    borderRadius: 10,
+    padding: 12,
+    borderWidth: 2,
+    borderColor: '#E9ECEF',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  costTypeOptionSelected: {
+    backgroundColor: '#E3F2FD',
+    borderColor: '#007AFF',
+  },
+  costTypeOptionCode: {
+    fontSize: 15,
+    fontWeight: '700' as const,
+    color: '#212529',
+  },
+  costTypeOptionValue: {
+    fontSize: 13,
+    fontWeight: '600' as const,
+    color: '#6C757D',
+  },
+  costTypeOptionTextSelected: {
+    color: '#007AFF',
   },
 });
