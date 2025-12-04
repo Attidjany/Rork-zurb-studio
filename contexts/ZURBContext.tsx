@@ -1269,6 +1269,90 @@ export const [ZURBContext, useZURB] = createContextHook(() => {
     [loadProjectEquipmentUtilityTypes]
   );
 
+  const updateScenarioConstructionCost = useCallback(
+    async (costId: string, updates: { code?: string; name?: string; gold_grams_per_m2?: number }) => {
+      setScenarioConstructionCosts(prev => 
+        prev.map(cost => cost.id === costId ? { ...cost, ...updates } : cost)
+      );
+      
+      try {
+        const { error } = await supabase
+          .from('scenario_construction_costs')
+          .update(updates)
+          .eq('id', costId);
+
+        if (error) throw error;
+
+        console.log('[ZURB] Scenario construction cost updated');
+      } catch (error: any) {
+        console.error('[ZURB] Error updating scenario construction cost:', error);
+        Alert.alert('Error', error.message || 'Failed to update construction cost');
+        await loadScenarioConstructionCosts();
+      }
+    },
+    [loadScenarioConstructionCosts]
+  );
+
+  const updateScenarioHousingType = useCallback(
+    async (typeId: string, updates: {
+      code?: string;
+      name?: string;
+      default_area_m2?: number;
+      default_cost_type?: string;
+      default_rent_monthly?: number;
+    }) => {
+      setScenarioHousingTypes(prev => 
+        prev.map(type => type.id === typeId ? { ...type, ...updates } : type)
+      );
+      
+      try {
+        const { error } = await supabase
+          .from('scenario_housing_types')
+          .update(updates)
+          .eq('id', typeId);
+
+        if (error) throw error;
+
+        console.log('[ZURB] Scenario housing type updated');
+      } catch (error: any) {
+        console.error('[ZURB] Error updating scenario housing type:', error);
+        Alert.alert('Error', error.message || 'Failed to update housing type');
+        await loadScenarioHousingTypes();
+      }
+    },
+    [loadScenarioHousingTypes]
+  );
+
+  const updateScenarioEquipmentUtilityType = useCallback(
+    async (typeId: string, updates: {
+      code?: string;
+      name?: string;
+      land_area_m2?: number;
+      building_occupation_pct?: number;
+      cost_type?: string;
+    }) => {
+      setScenarioEquipmentUtilityTypes(prev => 
+        prev.map(type => type.id === typeId ? { ...type, ...updates } : type)
+      );
+      
+      try {
+        const { error } = await supabase
+          .from('scenario_equipment_utility_types')
+          .update(updates)
+          .eq('id', typeId);
+
+        if (error) throw error;
+
+        console.log('[ZURB] Scenario equipment utility type updated');
+      } catch (error: any) {
+        console.error('[ZURB] Error updating scenario equipment utility type:', error);
+        Alert.alert('Error', error.message || 'Failed to update equipment/utility type');
+        await loadScenarioEquipmentUtilityTypes();
+      }
+    },
+    [loadScenarioEquipmentUtilityTypes]
+  );
+
   return {
     projects,
     sites,
@@ -1317,6 +1401,9 @@ export const [ZURBContext, useZURB] = createContextHook(() => {
     createProjectEquipmentUtilityType,
     updateProjectEquipmentUtilityType,
     deleteProjectEquipmentUtilityType,
+    updateScenarioConstructionCost,
+    updateScenarioHousingType,
+    updateScenarioEquipmentUtilityType,
     loadProjects,
     loadSites,
     loadBlocks,

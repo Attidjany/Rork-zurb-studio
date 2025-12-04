@@ -121,6 +121,16 @@ export default function ScenarioParametersScreen() {
     fetchGoldPrice();
   }, [fetchGoldPrice]);
 
+  useEffect(() => {
+    console.log('[ScenarioParameters] Scenario:', scenario?.name);
+    console.log('[ScenarioParameters] Project Construction Costs:', projectConstructionCosts.length);
+    console.log('[ScenarioParameters] Scenario Construction Costs:', scenarioConstructionCosts.length);
+    console.log('[ScenarioParameters] Project Housing Types:', projectHousingTypes.length);
+    console.log('[ScenarioParameters] Scenario Housing Types:', scenarioHousingTypes.length);
+    console.log('[ScenarioParameters] Project Equipment/Utility:', projectEquipmentUtilityTypes.length);
+    console.log('[ScenarioParameters] Scenario Equipment/Utility:', scenarioEquipmentUtilityTypes.length);
+  }, [scenario, projectConstructionCosts, scenarioConstructionCosts, projectHousingTypes, scenarioHousingTypes, projectEquipmentUtilityTypes, scenarioEquipmentUtilityTypes]);
+
   if (!scenario || !site || !project) {
     return (
       <View style={styles.centerContainer}>
@@ -169,7 +179,7 @@ export default function ScenarioParametersScreen() {
             <Settings size={18} color="#007AFF" />
           </View>
           <Text style={styles.infoText}>
-            These parameters are inherited from the project. Scenario-specific overrides can be configured via project settings.
+            These parameters override project defaults for this scenario only. They were copied from the project when you created this scenario and can be edited below.
           </Text>
         </View>
 
@@ -199,8 +209,8 @@ export default function ScenarioParametersScreen() {
             </View>
             <Text style={styles.sectionDesc}>
               {scenarioConstructionCosts.length > 0
-                ? 'Scenario-specific construction costs'
-                : 'Inherited from project'}
+                ? `Scenario-specific construction costs (${scenarioConstructionCosts.length} items)`
+                : `Inherited from project (${projectConstructionCosts.length} items) - Scenario has no custom costs yet`}
             </Text>
 
             {mergedConstructionCosts.map(cost => (
