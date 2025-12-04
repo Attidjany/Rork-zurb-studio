@@ -25,17 +25,23 @@ export default function ScenarioScreen() {
     getUnitsByHalfBlockId,
     getScenarioCostParamsByScenarioId,
     getProjectCostParamsByProjectId,
+    getProjectConstructionCostsByProjectId,
+    getProjectHousingTypesByProjectId,
+    getProjectEquipmentUtilityTypesByProjectId,
     loadScenarios,
     loadBlocks,
     loadHalfBlocks,
     loadUnits,
+    loadProjectConstructionCosts,
+    loadProjectHousingTypes,
+    loadProjectEquipmentUtilityTypes,
   } = useZURB();
 
   const [refreshing, setRefreshing] = useState<boolean>(false);
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await Promise.all([loadScenarios(), loadBlocks(), loadHalfBlocks(), loadUnits()]);
+    await Promise.all([loadScenarios(), loadBlocks(), loadHalfBlocks(), loadUnits(), loadProjectConstructionCosts(), loadProjectHousingTypes(), loadProjectEquipmentUtilityTypes()]);
     setRefreshing(false);
   };
 
@@ -70,6 +76,21 @@ export default function ScenarioScreen() {
     });
   }, [projectCostParams, scenarioCostParams]);
 
+  const projectConstructionCosts = useMemo(() => {
+    if (!project) return [];
+    return getProjectConstructionCostsByProjectId(project.id);
+  }, [getProjectConstructionCostsByProjectId, project]);
+
+  const projectHousingTypes = useMemo(() => {
+    if (!project) return [];
+    return getProjectHousingTypesByProjectId(project.id);
+  }, [getProjectHousingTypesByProjectId, project]);
+
+  const projectEquipmentUtilityTypes = useMemo(() => {
+    if (!project) return [];
+    return getProjectEquipmentUtilityTypesByProjectId(project.id);
+  }, [getProjectEquipmentUtilityTypesByProjectId, project]);
+
   const siteBlocks = useMemo(() => {
     if (!scenario) return [];
     return getBlocksBySiteId(scenario.site_id);
@@ -83,6 +104,8 @@ export default function ScenarioScreen() {
     let equipmentCount = 0;
     let utilityCount = 0;
     const unitsByType: { [key: string]: number } = {};
+    const equipmentByType: { [key: string]: number } = {};
+    const utilityByType: { [key: string]: number } = {};
 
     siteBlocks.forEach((block: DbBlock) => {
       const halfBlocks = getHalfBlocksByBlockId(block.id);
@@ -98,10 +121,12 @@ export default function ScenarioScreen() {
               totalResidentialUnits += plot.count;
               unitsByType[plotSizeKey] = (unitsByType[plotSizeKey] || 0) + plot.count;
 
-              const buildArea = UNIT_BUILD_AREAS[plotSizeKey] || plot.size * 0.3;
+              const projectHousing = projectHousingTypes.find(h => h.code === plotSizeKey);
+              const buildArea = projectHousing ? projectHousing.default_area_m2 : (UNIT_BUILD_AREAS[plotSizeKey] || plot.size * 0.3);
+              
               const costParam = costParams.find(cp => cp.unit_type === plotSizeKey);
               const costPerM2 = costParam ? costParam.cost_per_m2 : 1000;
-              const rentMonthly = costParam ? costParam.rent_monthly : 500;
+              const rentMonthly = costParam ? costParam.rent_monthly : (projectHousing?.default_rent_monthly || 500);
 
               totalBuildArea += buildArea * plot.count;
               totalCosts += buildArea * costPerM2 * plot.count;
@@ -118,11 +143,12 @@ export default function ScenarioScreen() {
               totalResidentialUnits += totalCount;
               unitsByType[unitType] = (unitsByType[unitType] || 0) + totalCount;
 
+              const projectHousing = projectHousingTypes.find(h => h.code === unitType);
               const costParam = costParams.find(cp => cp.unit_type === unitType);
               const housingConfig = HOUSING_TYPES[unitType];
-              const buildArea = costParam ? costParam.build_area_m2 : (housingConfig?.defaultArea || 80);
+              const buildArea = projectHousing ? projectHousing.default_area_m2 : (costParam ? costParam.build_area_m2 : (housingConfig?.defaultArea || 80));
               const costPerM2 = costParam ? costParam.cost_per_m2 : 900;
-              const rentMonthly = costParam ? costParam.rent_monthly : (housingConfig?.defaultRent || 400);
+              const rentMonthly = projectHousing ? projectHousing.default_rent_monthly : (costParam ? costParam.rent_monthly : (housingConfig?.defaultRent || 400));
 
               totalBuildArea += buildArea * totalCount;
               totalCosts += buildArea * costPerM2 * totalCount;
@@ -133,30 +159,42 @@ export default function ScenarioScreen() {
           units.forEach(unit => {
             if (unit.unit_type === 'equipment') {
               equipmentCount++;
-              const buildingTypeConfig = BUILDING_TYPES.find(bt => bt.id === unit.building_type);
-              if (buildingTypeConfig) {
-                const landArea = buildingTypeConfig.landArea || 1800;
-                const occupation = buildingTypeConfig.buildingOccupation || 0.3;
-                const buildArea = landArea * occupation;
-                const costParam = costParams.find(cp => cp.unit_type === 'ZMER');
-                const costPerM2 = costParam ? costParam.cost_per_m2 : 0;
+              const buildingType = unit.building_type || 'EQS';
+              equipmentByType[buildingType] = (equipmentByType[buildingType] || 0) + 1;
+              
+              const projectEquipment = projectEquipmentUtilityTypes.find(e => e.code === buildingType && e.category === 'equipment');
+              const buildingTypeConfig = BUILDING_TYPES.find(bt => bt.id === buildingType);
+              
+              const landArea = projectEquipment ? projectEquipment.land_area_m2 : (buildingTypeConfig?.landArea || 1800);
+              const occupation = projectEquipment ? projectEquipment.building_occupation_pct : (buildingTypeConfig?.buildingOccupation || 0.3);
+              const buildArea = landArea * occupation;
+              
+              const costTypeCode = projectEquipment ? projectEquipment.cost_type : 'ZMER';
+              const projectCost = projectConstructionCosts.find(c => c.code === costTypeCode);
+              const costParam = costParams.find(cp => cp.unit_type === costTypeCode);
+              const costPerM2 = costParam ? costParam.cost_per_m2 : (projectCost ? projectCost.gold_grams_per_m2 * 85 * 656 : 0);
 
-                totalBuildArea += buildArea;
-                totalCosts += buildArea * costPerM2;
-              }
+              totalBuildArea += buildArea;
+              totalCosts += buildArea * costPerM2;
             } else if (unit.unit_type === 'utility') {
               utilityCount++;
-              const buildingTypeConfig = BUILDING_TYPES.find(bt => bt.id === unit.building_type);
-              if (buildingTypeConfig) {
-                const landArea = buildingTypeConfig.landArea || 1800;
-                const occupation = buildingTypeConfig.buildingOccupation || 0.3;
-                const buildArea = landArea * occupation;
-                const costParam = costParams.find(cp => cp.unit_type === 'ZMER');
-                const costPerM2 = costParam ? costParam.cost_per_m2 : 0;
+              const buildingType = unit.building_type || 'UTL';
+              utilityByType[buildingType] = (utilityByType[buildingType] || 0) + 1;
+              
+              const projectUtility = projectEquipmentUtilityTypes.find(e => e.code === buildingType && e.category === 'utility');
+              const buildingTypeConfig = BUILDING_TYPES.find(bt => bt.id === buildingType);
+              
+              const landArea = projectUtility ? projectUtility.land_area_m2 : (buildingTypeConfig?.landArea || 1800);
+              const occupation = projectUtility ? projectUtility.building_occupation_pct : (buildingTypeConfig?.buildingOccupation || 0.3);
+              const buildArea = landArea * occupation;
+              
+              const costTypeCode = projectUtility ? projectUtility.cost_type : 'ZMER';
+              const projectCost = projectConstructionCosts.find(c => c.code === costTypeCode);
+              const costParam = costParams.find(cp => cp.unit_type === costTypeCode);
+              const costPerM2 = costParam ? costParam.cost_per_m2 : (projectCost ? projectCost.gold_grams_per_m2 * 85 * 656 : 0);
 
-                totalBuildArea += buildArea;
-                totalCosts += buildArea * costPerM2;
-              }
+              totalBuildArea += buildArea;
+              totalCosts += buildArea * costPerM2;
             }
           });
         }
@@ -171,11 +209,13 @@ export default function ScenarioScreen() {
       totalCosts,
       totalRevenue,
       unitsByType,
+      equipmentByType,
+      utilityByType,
       equipmentCount,
       utilityCount,
       rentalPeriodYears,
     };
-  }, [siteBlocks, getHalfBlocksByBlockId, getUnitsByHalfBlockId, costParams]);
+  }, [siteBlocks, getHalfBlocksByBlockId, getUnitsByHalfBlockId, costParams, projectConstructionCosts, projectHousingTypes, projectEquipmentUtilityTypes]);
 
   if (!scenario || !site) {
     return (
@@ -255,26 +295,27 @@ export default function ScenarioScreen() {
         </View>
 
         <View style={styles.breakdownCard}>
-          <Text style={styles.breakdownTitle}>Units Breakdown</Text>
+          <Text style={styles.breakdownTitle}>Residential Units</Text>
           {Object.entries(summary.unitsByType).length === 0 ? (
             <Text style={styles.emptyText}>No units configured yet</Text>
           ) : (
             Object.entries(summary.unitsByType).map(([type, count]) => {
+              const projectHousing = projectHousingTypes.find(h => h.code === type);
               const housingConfig = HOUSING_TYPES[type];
               const costParam = costParams.find(cp => cp.unit_type === type);
+              const name = projectHousing ? projectHousing.name : (housingConfig?.name || type);
+              const area = projectHousing ? projectHousing.default_area_m2 : (costParam ? costParam.build_area_m2 : 0);
               return (
                 <View key={type} style={styles.breakdownRow}>
                   <View style={styles.breakdownLabelContainer}>
                     <Text style={styles.breakdownLabel}>{type}</Text>
-                    {housingConfig && (
-                      <Text style={styles.breakdownSubLabel}>{housingConfig.name}</Text>
-                    )}
+                    <Text style={styles.breakdownSubLabel}>{name}</Text>
                   </View>
                   <View style={styles.breakdownValueContainer}>
                     <Text style={styles.breakdownValue}>{count} units</Text>
-                    {costParam && (
+                    {area > 0 && (
                       <Text style={styles.breakdownSubValue}>
-                        {costParam.build_area_m2.toFixed(0)} m² each
+                        {area.toFixed(0)} m² each
                       </Text>
                     )}
                   </View>
@@ -283,6 +324,56 @@ export default function ScenarioScreen() {
             })
           )}
         </View>
+
+        {(Object.keys(summary.equipmentByType).length > 0 || Object.keys(summary.utilityByType).length > 0) && (
+          <View style={styles.breakdownCard}>
+            <Text style={styles.breakdownTitle}>Equipment & Utility Buildings</Text>
+            
+            {Object.entries(summary.equipmentByType).map(([type, count]) => {
+              const projectEquipment = projectEquipmentUtilityTypes.find(e => e.code === type && e.category === 'equipment');
+              const name = projectEquipment ? projectEquipment.name : type;
+              const area = projectEquipment ? projectEquipment.land_area_m2 : 0;
+              return (
+                <View key={`equipment-${type}`} style={styles.breakdownRow}>
+                  <View style={styles.breakdownLabelContainer}>
+                    <Text style={styles.breakdownLabel}>{type}</Text>
+                    <Text style={styles.breakdownSubLabel}>{name} (Equipment)</Text>
+                  </View>
+                  <View style={styles.breakdownValueContainer}>
+                    <Text style={styles.breakdownValue}>{count} building{count > 1 ? 's' : ''}</Text>
+                    {area > 0 && (
+                      <Text style={styles.breakdownSubValue}>
+                        {area.toFixed(0)} m² land
+                      </Text>
+                    )}
+                  </View>
+                </View>
+              );
+            })}
+            
+            {Object.entries(summary.utilityByType).map(([type, count]) => {
+              const projectUtility = projectEquipmentUtilityTypes.find(e => e.code === type && e.category === 'utility');
+              const name = projectUtility ? projectUtility.name : type;
+              const area = projectUtility ? projectUtility.land_area_m2 : 0;
+              return (
+                <View key={`utility-${type}`} style={styles.breakdownRow}>
+                  <View style={styles.breakdownLabelContainer}>
+                    <Text style={styles.breakdownLabel}>{type}</Text>
+                    <Text style={styles.breakdownSubLabel}>{name} (Utility)</Text>
+                  </View>
+                  <View style={styles.breakdownValueContainer}>
+                    <Text style={styles.breakdownValue}>{count} building{count > 1 ? 's' : ''}</Text>
+                    {area > 0 && (
+                      <Text style={styles.breakdownSubValue}>
+                        {area.toFixed(0)} m² land
+                      </Text>
+                    )}
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        )}
 
         {scenario.notes ? (
           <View style={styles.notesCard}>

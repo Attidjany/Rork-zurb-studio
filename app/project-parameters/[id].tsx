@@ -33,6 +33,7 @@ export default function ProjectParametersScreen() {
     createProjectEquipmentUtilityType,
     updateProjectEquipmentUtilityType,
     deleteProjectEquipmentUtilityType,
+    updateProject,
   } = useZURB();
 
   const [refreshing, setRefreshing] = useState<boolean>(false);
@@ -68,6 +69,10 @@ export default function ProjectParametersScreen() {
   const [newEquipmentLandArea, setNewEquipmentLandArea] = useState<string>('1800');
   const [newEquipmentOccupation, setNewEquipmentOccupation] = useState<string>('0.3');
   const [newEquipmentCostType, setNewEquipmentCostType] = useState<string>('ZMER');
+  
+  const [projectEditModalVisible, setProjectEditModalVisible] = useState<boolean>(false);
+  const [newProjectName, setNewProjectName] = useState<string>('');
+  const [newProjectDesc, setNewProjectDesc] = useState<string>('');
 
   const project = useMemo(() => {
     return projects.find(p => p.id === id) || null;
@@ -301,6 +306,19 @@ export default function ProjectParametersScreen() {
     setEditEquipmentModalVisible(true);
   }, []);
 
+  const handleSaveProjectName = useCallback(async () => {
+    if (!id || !newProjectName.trim()) {
+      Alert.alert('Error', 'Please enter a valid project name');
+      return;
+    }
+
+    await updateProject(id, {
+      name: newProjectName.trim(),
+      description: newProjectDesc.trim() || undefined,
+    });
+    setProjectEditModalVisible(false);
+  }, [id, newProjectName, newProjectDesc, updateProject]);
+
   const handleSaveEditEquipment = useCallback(async () => {
     if (!editingEquipment || !newEquipmentCode || !newEquipmentName || !newEquipmentLandArea || !newEquipmentOccupation) {
       Alert.alert('Error', 'Please fill in all fields');
@@ -354,10 +372,24 @@ export default function ProjectParametersScreen() {
         }
       >
         <View style={styles.projectCard}>
-          <Text style={styles.projectName}>{project.name}</Text>
-          {project.description && (
-            <Text style={styles.projectDesc}>{project.description}</Text>
-          )}
+          <View style={styles.projectHeader}>
+            <View style={styles.projectTitleSection}>
+              <Text style={styles.projectName}>{project.name}</Text>
+              {project.description && (
+                <Text style={styles.projectDesc}>{project.description}</Text>
+              )}
+            </View>
+            <TouchableOpacity
+              style={styles.projectEditButton}
+              onPress={() => {
+                setNewProjectName(project.name);
+                setNewProjectDesc(project.description || '');
+                setProjectEditModalVisible(true);
+              }}
+            >
+              <Edit2 size={20} color="#007AFF" />
+            </TouchableOpacity>
+          </View>
         </View>
 
         <View style={styles.goldPriceCard}>
@@ -757,6 +789,55 @@ export default function ProjectParametersScreen() {
           })}
         </View>
       </ScrollView>
+
+      <Modal
+        visible={projectEditModalVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => {
+          setProjectEditModalVisible(false);
+          setNewProjectName('');
+          setNewProjectDesc('');
+        }}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Edit Project Details</Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Project Name"
+              value={newProjectName}
+              onChangeText={setNewProjectName}
+            />
+            <TextInput
+              style={[styles.modalInput, styles.modalTextArea]}
+              placeholder="Description (optional)"
+              value={newProjectDesc}
+              onChangeText={setNewProjectDesc}
+              multiline
+              numberOfLines={3}
+            />
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalCancelButton]}
+                onPress={() => {
+                  setProjectEditModalVisible(false);
+                  setNewProjectName('');
+                  setNewProjectDesc('');
+                }}
+              >
+                <Text style={styles.modalCancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalSaveButton]}
+                onPress={handleSaveProjectName}
+              >
+                <Text style={styles.modalSaveButtonText}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       <Modal
         visible={editCostModalVisible}
@@ -1271,6 +1352,14 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 2,
   },
+  projectHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+  },
+  projectTitleSection: {
+    flex: 1,
+  },
   projectName: {
     fontSize: 24,
     fontWeight: '700' as const,
@@ -1281,6 +1370,10 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: '#6C757D',
     lineHeight: 22,
+  },
+  projectEditButton: {
+    padding: 8,
+    marginLeft: 12,
   },
   goldPriceCard: {
     backgroundColor: '#FFF8E1',
@@ -1602,6 +1695,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E9ECEF',
     marginBottom: 12,
+  },
+  modalTextArea: {
+    height: 80,
+    textAlignVertical: 'top',
   },
   pickerContainer: {
     marginBottom: 12,

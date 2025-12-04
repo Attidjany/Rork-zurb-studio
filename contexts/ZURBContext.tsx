@@ -515,6 +515,10 @@ export const [ZURBContext, useZURB] = createContextHook(() => {
 
   const updateProject = useCallback(
     async (projectId: string, updates: { name?: string; description?: string }) => {
+      setProjects(prev => 
+        prev.map(project => project.id === projectId ? { ...project, ...updates } : project)
+      );
+      
       try {
         const { error } = await supabase
           .from('projects')
@@ -527,9 +531,10 @@ export const [ZURBContext, useZURB] = createContextHook(() => {
       } catch (error: any) {
         console.error('[ZURB] Error updating project:', error);
         Alert.alert('Error', error.message || 'Failed to update project');
+        await loadProjects();
       }
     },
-    []
+    [loadProjects]
   );
 
   const deleteProject = useCallback(
