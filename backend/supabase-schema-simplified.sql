@@ -79,6 +79,7 @@ CREATE TABLE IF NOT EXISTS half_blocks (
   position TEXT NOT NULL CHECK (position IN ('north', 'south')),
   type TEXT CHECK (type IN ('villas', 'apartments')),
   villa_layout TEXT CHECK (villa_layout IN ('200_300_mix', '500', '1000')),
+  apartment_layout TEXT CHECK (apartment_layout IN ('AB1', 'AB2', 'ABH')),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE(block_id, position)
 );

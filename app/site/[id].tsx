@@ -273,9 +273,22 @@ export default function SiteScreen() {
                                   </Text>
                                 )}
                                 {northHB.apartment_layout && (
-                                  <Text style={styles.halfBlockSubtype}>
-                                    {APARTMENT_LAYOUTS.find(l => l.id === northHB.apartment_layout)?.name}
-                                  </Text>
+                                  <>
+                                    <Text style={styles.halfBlockSubtype}>
+                                      {APARTMENT_LAYOUTS.find(l => l.id === northHB.apartment_layout)?.name}
+                                    </Text>
+                                    <TouchableOpacity
+                                      style={styles.editBuildingsButton}
+                                      onPress={(e) => {
+                                        e.stopPropagation();
+                                        setSelectedHalfBlock(northHB);
+                                        setSelectedBlock(block);
+                                        setBuildingAssignModalVisible(true);
+                                      }}
+                                    >
+                                      <Text style={styles.editBuildingsButtonText}>Edit Buildings</Text>
+                                    </TouchableOpacity>
+                                  </>
                                 )}
                               </>
                             ) : (
@@ -331,9 +344,22 @@ export default function SiteScreen() {
                                   </Text>
                                 )}
                                 {southHB.apartment_layout && (
-                                  <Text style={styles.halfBlockSubtype}>
-                                    {APARTMENT_LAYOUTS.find(l => l.id === southHB.apartment_layout)?.name}
-                                  </Text>
+                                  <>
+                                    <Text style={styles.halfBlockSubtype}>
+                                      {APARTMENT_LAYOUTS.find(l => l.id === southHB.apartment_layout)?.name}
+                                    </Text>
+                                    <TouchableOpacity
+                                      style={styles.editBuildingsButton}
+                                      onPress={(e) => {
+                                        e.stopPropagation();
+                                        setSelectedHalfBlock(southHB);
+                                        setSelectedBlock(block);
+                                        setBuildingAssignModalVisible(true);
+                                      }}
+                                    >
+                                      <Text style={styles.editBuildingsButtonText}>Edit Buildings</Text>
+                                    </TouchableOpacity>
+                                  </>
                                 )}
                               </>
                             ) : (
@@ -906,6 +932,19 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   equipmentButtonTextSelected: {
+    color: '#FFFFFF',
+  },
+  editBuildingsButton: {
+    marginTop: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    backgroundColor: '#007AFF',
+    borderRadius: 8,
+    alignSelf: 'flex-start',
+  },
+  editBuildingsButtonText: {
+    fontSize: 12,
+    fontWeight: '600' as const,
     color: '#FFFFFF',
   },
 });

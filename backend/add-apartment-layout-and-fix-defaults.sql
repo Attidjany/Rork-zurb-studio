@@ -3,7 +3,8 @@ ALTER TABLE half_blocks
 ADD COLUMN IF NOT EXISTS apartment_layout TEXT CHECK (apartment_layout IN ('AB1', 'AB2', 'ABH'));
 
 -- Drop and recreate the project cost params function with corrected default values
-DROP FUNCTION IF EXISTS auto_generate_project_cost_params();
+-- Use CASCADE to drop the trigger that depends on this function
+DROP FUNCTION IF EXISTS auto_generate_project_cost_params() CASCADE;
 
 CREATE OR REPLACE FUNCTION auto_generate_project_cost_params()
 RETURNS TRIGGER AS $$
@@ -52,3 +53,9 @@ UPDATE project_cost_params SET build_area_m2 = 75, rent_monthly = 300000 WHERE u
 
 -- Set cost_per_m2 to 0 for all units (will be calculated dynamically from gold prices)
 UPDATE project_cost_params SET cost_per_m2 = 0;
+
+-- Recreate the trigger
+DROP TRIGGER IF EXISTS trigger_auto_generate_project_cost_params ON projects;
+CREATE TRIGGER trigger_auto_generate_project_cost_params
+  AFTER INSERT ON projects
+  FOR EACH ROW EXECUTE FUNCTION auto_generate_project_cost_params();
