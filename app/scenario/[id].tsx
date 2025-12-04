@@ -4,7 +4,7 @@ import { Settings2 } from 'lucide-react-native';
 import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useZURB } from '@/contexts/ZURBContext';
-import { USD_TO_XOF } from '@/lib/goldPrice';
+
 import {
   UNIT_BUILD_AREAS,
   DEFAULT_LEASE_YEARS,
@@ -80,6 +80,8 @@ export default function ScenarioScreen() {
     let totalBuildArea = 0;
     let totalCosts = 0;
     let totalRevenue = 0;
+    let equipmentCount = 0;
+    let utilityCount = 0;
     const unitsByType: { [key: string]: number } = {};
 
     siteBlocks.forEach((block: DbBlock) => {
@@ -129,7 +131,21 @@ export default function ScenarioScreen() {
           }
 
           units.forEach(unit => {
-            if (unit.unit_type === 'equipment' || unit.unit_type === 'utility') {
+            if (unit.unit_type === 'equipment') {
+              equipmentCount++;
+              const buildingTypeConfig = BUILDING_TYPES.find(bt => bt.id === unit.building_type);
+              if (buildingTypeConfig) {
+                const landArea = buildingTypeConfig.landArea || 1800;
+                const occupation = buildingTypeConfig.buildingOccupation || 0.3;
+                const buildArea = landArea * occupation;
+                const costParam = costParams.find(cp => cp.unit_type === 'ZMER');
+                const costPerM2 = costParam ? costParam.cost_per_m2 : 0;
+
+                totalBuildArea += buildArea;
+                totalCosts += buildArea * costPerM2;
+              }
+            } else if (unit.unit_type === 'utility') {
+              utilityCount++;
               const buildingTypeConfig = BUILDING_TYPES.find(bt => bt.id === unit.building_type);
               if (buildingTypeConfig) {
                 const landArea = buildingTypeConfig.landArea || 1800;
@@ -155,6 +171,8 @@ export default function ScenarioScreen() {
       totalCosts,
       totalRevenue,
       unitsByType,
+      equipmentCount,
+      utilityCount,
       rentalPeriodYears,
     };
   }, [siteBlocks, getHalfBlocksByBlockId, getUnitsByHalfBlockId, costParams]);
@@ -202,6 +220,16 @@ export default function ScenarioScreen() {
           </View>
 
           <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Equipment Buildings</Text>
+            <Text style={styles.summaryValue}>{summary.equipmentCount}</Text>
+          </View>
+
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Utility Buildings</Text>
+            <Text style={styles.summaryValue}>{summary.utilityCount}</Text>
+          </View>
+
+          <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Total Build Area</Text>
             <Text style={styles.summaryValue}>{summary.totalBuildArea.toFixed(0)} m²</Text>
           </View>
@@ -209,14 +237,14 @@ export default function ScenarioScreen() {
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Total Costs</Text>
             <Text style={styles.summaryValue}>
-              {(summary.totalCosts * USD_TO_XOF).toLocaleString(undefined, {maximumFractionDigits: 0})} XOF
+              {summary.totalCosts.toLocaleString(undefined, {maximumFractionDigits: 0})} XOF
             </Text>
           </View>
 
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Expected Revenue</Text>
             <Text style={styles.summaryValue}>
-              {(summary.totalRevenue * USD_TO_XOF).toLocaleString(undefined, {maximumFractionDigits: 0})} XOF
+              {summary.totalRevenue.toLocaleString(undefined, {maximumFractionDigits: 0})} XOF
             </Text>
           </View>
 

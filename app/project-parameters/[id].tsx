@@ -1,5 +1,5 @@
 import { Stack, useLocalSearchParams } from 'expo-router';
-import { TrendingUp, Building2, Home, ShoppingBag, Factory, Plus, Trash2, Settings } from 'lucide-react-native';
+import { TrendingUp, Building2, Home, ShoppingBag, Factory, Plus, Trash2, Settings, Edit2 } from 'lucide-react-native';
 import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import {
   View,
@@ -25,10 +25,13 @@ export default function ProjectParametersScreen() {
     getProjectHousingTypesByProjectId,
     getProjectEquipmentUtilityTypesByProjectId,
     createProjectConstructionCost,
+    updateProjectConstructionCost,
     deleteProjectConstructionCost,
     createProjectHousingType,
+    updateProjectHousingType,
     deleteProjectHousingType,
     createProjectEquipmentUtilityType,
+    updateProjectEquipmentUtilityType,
     deleteProjectEquipmentUtilityType,
   } = useZURB();
 
@@ -39,6 +42,14 @@ export default function ProjectParametersScreen() {
   const [addCostModalVisible, setAddCostModalVisible] = useState<boolean>(false);
   const [addHousingModalVisible, setAddHousingModalVisible] = useState<boolean>(false);
   const [addEquipmentModalVisible, setAddEquipmentModalVisible] = useState<boolean>(false);
+  
+  const [editCostModalVisible, setEditCostModalVisible] = useState<boolean>(false);
+  const [editHousingModalVisible, setEditHousingModalVisible] = useState<boolean>(false);
+  const [editEquipmentModalVisible, setEditEquipmentModalVisible] = useState<boolean>(false);
+  
+  const [editingCost, setEditingCost] = useState<any>(null);
+  const [editingHousing, setEditingHousing] = useState<any>(null);
+  const [editingEquipment, setEditingEquipment] = useState<any>(null);
   
   const [newCostCode, setNewCostCode] = useState<string>('');
   const [newCostName, setNewCostName] = useState<string>('');
@@ -207,6 +218,116 @@ export default function ProjectParametersScreen() {
     setNewEquipmentLandArea('1800');
     setNewEquipmentOccupation('0.3');
   }, [id, newEquipmentCode, newEquipmentName, newEquipmentCategory, newEquipmentLandArea, newEquipmentOccupation, newEquipmentCostType, createProjectEquipmentUtilityType]);
+
+  const handleEditCost = useCallback((cost: any) => {
+    setEditingCost(cost);
+    setNewCostCode(cost.code);
+    setNewCostName(cost.name);
+    setNewCostGoldGrams(cost.gold_grams_per_m2.toString());
+    setEditCostModalVisible(true);
+  }, []);
+
+  const handleSaveEditCost = useCallback(async () => {
+    if (!editingCost || !newCostCode || !newCostName || !newCostGoldGrams) {
+      Alert.alert('Error', 'Please fill in all fields');
+      return;
+    }
+
+    const goldGrams = parseFloat(newCostGoldGrams);
+    if (isNaN(goldGrams) || goldGrams <= 0) {
+      Alert.alert('Error', 'Please enter a valid gold content value');
+      return;
+    }
+
+    await updateProjectConstructionCost(editingCost.id, {
+      code: newCostCode.toUpperCase(),
+      name: newCostName,
+      gold_grams_per_m2: goldGrams,
+    });
+    setEditCostModalVisible(false);
+    setEditingCost(null);
+    setNewCostCode('');
+    setNewCostName('');
+    setNewCostGoldGrams('');
+  }, [editingCost, newCostCode, newCostName, newCostGoldGrams, updateProjectConstructionCost]);
+
+  const handleEditHousing = useCallback((housing: any) => {
+    setEditingHousing(housing);
+    setNewHousingCode(housing.code);
+    setNewHousingName(housing.name);
+    setNewHousingCategory(housing.category);
+    setNewHousingArea(housing.default_area_m2.toString());
+    setNewHousingCostType(housing.default_cost_type);
+    setNewHousingRent(housing.default_rent_monthly.toString());
+    setEditHousingModalVisible(true);
+  }, []);
+
+  const handleSaveEditHousing = useCallback(async () => {
+    if (!editingHousing || !newHousingCode || !newHousingName || !newHousingArea || !newHousingCostType || !newHousingRent) {
+      Alert.alert('Error', 'Please fill in all fields');
+      return;
+    }
+
+    const area = parseFloat(newHousingArea);
+    const rent = parseFloat(newHousingRent);
+    if (isNaN(area) || area <= 0 || isNaN(rent) || rent <= 0) {
+      Alert.alert('Error', 'Please enter valid numeric values');
+      return;
+    }
+
+    await updateProjectHousingType(editingHousing.id, {
+      code: newHousingCode.toUpperCase(),
+      name: newHousingName,
+      default_area_m2: area,
+      default_cost_type: newHousingCostType,
+      default_rent_monthly: rent,
+    });
+    setEditHousingModalVisible(false);
+    setEditingHousing(null);
+    setNewHousingCode('');
+    setNewHousingName('');
+    setNewHousingArea('');
+    setNewHousingRent('');
+  }, [editingHousing, newHousingCode, newHousingName, newHousingArea, newHousingCostType, newHousingRent, updateProjectHousingType]);
+
+  const handleEditEquipment = useCallback((equipment: any) => {
+    setEditingEquipment(equipment);
+    setNewEquipmentCode(equipment.code);
+    setNewEquipmentName(equipment.name);
+    setNewEquipmentCategory(equipment.category);
+    setNewEquipmentLandArea(equipment.land_area_m2.toString());
+    setNewEquipmentOccupation(equipment.building_occupation_pct.toString());
+    setNewEquipmentCostType(equipment.cost_type);
+    setEditEquipmentModalVisible(true);
+  }, []);
+
+  const handleSaveEditEquipment = useCallback(async () => {
+    if (!editingEquipment || !newEquipmentCode || !newEquipmentName || !newEquipmentLandArea || !newEquipmentOccupation) {
+      Alert.alert('Error', 'Please fill in all fields');
+      return;
+    }
+
+    const landArea = parseFloat(newEquipmentLandArea);
+    const occupation = parseFloat(newEquipmentOccupation);
+    if (isNaN(landArea) || landArea <= 0 || isNaN(occupation) || occupation <= 0 || occupation > 1) {
+      Alert.alert('Error', 'Please enter valid values (occupation must be between 0 and 1)');
+      return;
+    }
+
+    await updateProjectEquipmentUtilityType(editingEquipment.id, {
+      code: newEquipmentCode.toUpperCase(),
+      name: newEquipmentName,
+      land_area_m2: landArea,
+      building_occupation_pct: occupation,
+      cost_type: newEquipmentCostType,
+    });
+    setEditEquipmentModalVisible(false);
+    setEditingEquipment(null);
+    setNewEquipmentCode('');
+    setNewEquipmentName('');
+    setNewEquipmentLandArea('1800');
+    setNewEquipmentOccupation('0.3');
+  }, [editingEquipment, newEquipmentCode, newEquipmentName, newEquipmentLandArea, newEquipmentOccupation, newEquipmentCostType, updateProjectEquipmentUtilityType]);
 
   if (!project) {
     return (
