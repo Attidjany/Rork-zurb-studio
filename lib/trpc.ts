@@ -3,6 +3,7 @@ import { httpLink } from "@trpc/client";
 import type { AppRouter } from "@/backend/trpc/app-router";
 import superjson from "superjson";
 import { supabase } from "@/lib/supabase";
+import { Alert } from "react-native";
 
 export const trpc = createTRPCReact<AppRouter>();
 
@@ -21,6 +22,8 @@ const getBaseUrl = () => {
     "Backend URL not available. Make sure the app is started with 'bun start' or 'bunx rork start'. The EXPO_PUBLIC_RORK_API_BASE_URL environment variable is required."
   );
 };
+
+let rateLimitWarningShown = false;
 
 export const trpcClient = trpc.createClient({
   links: [
@@ -41,9 +44,28 @@ export const trpcClient = trpc.createClient({
           const contentType = res.headers.get('content-type');
           console.log('[tRPC Client] Content-Type:', contentType);
           
+          if (res.status === 429) {
+            if (!rateLimitWarningShown) {
+              rateLimitWarningShown = true;
+              setTimeout(() => {
+                Alert.alert(
+                  'Service Temporarily Unavailable',
+                  'The backend is experiencing high traffic. Please wait a moment and try again.',
+                  [{ text: 'OK', onPress: () => { rateLimitWarningShown = false; } }]
+                );
+              }, 100);
+            }
+            throw new Error('Rate limit exceeded. Please wait a moment and try again.');
+          }
+          
           if (!contentType?.includes('application/json')) {
             const text = await res.text();
             console.error('[tRPC Client] Non-JSON response:', text.substring(0, 500));
+            
+            if (res.status >= 500) {
+              throw new Error('Backend server error. Please try again later.');
+            }
+            
             throw new Error(`Server returned non-JSON response. Status: ${res.status}. The backend may not be properly deployed.`);
           }
           

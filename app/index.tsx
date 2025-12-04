@@ -29,18 +29,31 @@ type Project = {
 export default function ProjectsScreen() {
   const router = useRouter();
   const { user } = useAuth();
-  const projectsQuery = trpc.projects.list.useQuery();
+  const projectsQuery = trpc.projects.list.useQuery(undefined, {
+    retry: 2,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000),
+    staleTime: 30000,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+  });
+  const utils = trpc.useUtils();
   const createProjectMutation = trpc.projects.create.useMutation({
     onSuccess: () => {
       console.log('[Projects] Project created successfully');
       setNewProjectName('');
       setNewProjectDesc('');
       setModalVisible(false);
+      utils.projects.list.invalidate();
     },
     onError: (error) => {
       console.error('[Projects] Failed to create project:', error);
-      Alert.alert('Error', `Failed to create project: ${error.message}`);
+      const message = error.message.includes('Rate limit') 
+        ? 'Too many requests. Please wait a moment and try again.'
+        : `Failed to create project: ${error.message}`;
+      Alert.alert('Error', message);
     },
+    retry: 1,
+    retryDelay: 2000,
   });
   const [modalVisible, setModalVisible] = useState<boolean>(false);
   const [newProjectName, setNewProjectName] = useState<string>('');
@@ -63,7 +76,7 @@ export default function ProjectsScreen() {
         },
         (payload) => {
           console.log('[Projects] Realtime update:', payload);
-          projectsQuery.refetch();
+          utils.projects.list.invalidate();
         }
       )
       .subscribe((status) => {
@@ -74,7 +87,7 @@ export default function ProjectsScreen() {
       console.log('[Projects] Cleaning up realtime subscription');
       supabase.removeChannel(channel);
     };
-  }, [user, projectsQuery]);
+  }, [user, utils]);
 
   const handleCreateProject = () => {
     if (newProjectName.trim()) {
