@@ -27,7 +27,7 @@ export type HalfBlockPosition = 'north' | 'south';
 export type HalfBlockType = 'villas' | 'apartments';
 export type VillaLayout = '200_300_mix' | '500' | '1000';
 export type ApartmentLayout = 'AB1' | 'AB2' | 'ABH';
-export type BuildingType = 'AB1' | 'AB2' | 'ABH' | 'equipment' | 'utility';
+export type BuildingType = 'AB1' | 'AB2' | 'ABH' | 'EQS' | 'EQL' | 'UTL';
 
 export interface DbHalfBlock {
   id: string;
@@ -108,6 +108,8 @@ export interface BuildingTypeConfig {
   id: BuildingType;
   name: string;
   category: 'apartment' | 'equipment' | 'utility';
+  landArea?: number;
+  buildingOccupation?: number;
   units?: {
     XM?: number;
     XH?: number;

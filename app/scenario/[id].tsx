@@ -127,6 +127,22 @@ export default function ScenarioScreen() {
               totalRevenue += rentMonthly * 12 * DEFAULT_LEASE_YEARS * totalCount;
             });
           }
+
+          units.forEach(unit => {
+            if (unit.unit_type === 'equipment' || unit.unit_type === 'utility') {
+              const buildingTypeConfig = BUILDING_TYPES.find(bt => bt.id === unit.building_type);
+              if (buildingTypeConfig) {
+                const landArea = buildingTypeConfig.landArea || 1800;
+                const occupation = buildingTypeConfig.buildingOccupation || 0.3;
+                const buildArea = landArea * occupation;
+                const costParam = costParams.find(cp => cp.unit_type === 'ZMER');
+                const costPerM2 = costParam ? costParam.cost_per_m2 : 0;
+
+                totalBuildArea += buildArea;
+                totalCosts += buildArea * costPerM2;
+              }
+            }
+          });
         }
       });
     });

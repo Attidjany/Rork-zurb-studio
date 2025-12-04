@@ -93,10 +93,10 @@ export default function SiteScreen() {
         
         if (i >= apartmentConfig.apartmentBuildings && i < apartmentConfig.apartmentBuildings + apartmentConfig.equipmentSpots) {
           unitType = 'equipment';
-          buildingType = 'equipment';
+          buildingType = 'EQS';
         } else if (i >= apartmentConfig.apartmentBuildings + apartmentConfig.equipmentSpots) {
           unitType = 'utility';
-          buildingType = 'utility';
+          buildingType = 'UTL';
         }
         
         await createUnit(

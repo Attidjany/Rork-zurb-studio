@@ -96,6 +96,27 @@ export const BUILDING_TYPES: BuildingTypeConfig[] = [
       XH: 6,
     },
   },
+  {
+    id: 'EQS',
+    name: 'Equipment Small',
+    category: 'equipment',
+    landArea: 1800,
+    buildingOccupation: 0.3,
+  },
+  {
+    id: 'EQL',
+    name: 'Equipment Large',
+    category: 'equipment',
+    landArea: 2400,
+    buildingOccupation: 0.3,
+  },
+  {
+    id: 'UTL',
+    name: 'Utility',
+    category: 'utility',
+    landArea: 1800,
+    buildingOccupation: 0.3,
+  },
 ];
 
 export const EQUIPMENT_OPTIONS: EquipmentOption[] = [
