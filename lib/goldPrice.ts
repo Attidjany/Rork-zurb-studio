@@ -89,3 +89,7 @@ export function getDefaultGoldPrice(): GoldPriceData {
     currency: 'USD',
   };
 }
+
+export function calculateCostPerM2(goldGramsPerM2: number, goldPricePerGram: number): number {
+  return goldGramsPerM2 * goldPricePerGram;
+}

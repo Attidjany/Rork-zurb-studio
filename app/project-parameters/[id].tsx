@@ -134,6 +134,7 @@ export default function ProjectParametersScreen() {
   const renderHousingTypeCard = useCallback((param: any, type: string) => {
     const isEditing = editingParam === param.id;
     const config = HOUSING_TYPES[type];
+    const costTypeConfig = CONSTRUCTION_COSTS[config.defaultCostType];
 
     return (
       <View key={param.id} style={styles.paramCard}>
@@ -144,6 +145,9 @@ export default function ProjectParametersScreen() {
           <View style={styles.paramHeaderText}>
             <Text style={styles.paramTitle}>{type}</Text>
             <Text style={styles.paramSubtitle}>{config.name}</Text>
+            <View style={styles.costTypeBadge}>
+              <Text style={styles.costTypeBadgeText}>Cost Type: {config.defaultCostType}</Text>
+            </View>
           </View>
         </View>
 
@@ -209,8 +213,13 @@ export default function ProjectParametersScreen() {
               <View style={styles.paramItem}>
                 <Text style={styles.paramItemLabel}>Cost/m²</Text>
                 <Text style={styles.paramItemValue}>
-                  ${param.cost_per_m2.toLocaleString()}
+                  ${param.cost_per_m2.toFixed(2)}
                 </Text>
+                {costTypeConfig && (
+                  <Text style={styles.paramItemSubtext}>
+                    {costTypeConfig.goldGramsPerM2.toFixed(2)} g Au/m²
+                  </Text>
+                )}
               </View>
               <View style={styles.paramItem}>
                 <Text style={styles.paramItemLabel}>Monthly Rent</Text>
@@ -346,7 +355,6 @@ export default function ProjectParametersScreen() {
             const param = costParams.find(p => p.unit_type === type);
             if (!param) return null;
 
-            const isEditing = editingParam === param.id;
             const config = CONSTRUCTION_COSTS[type];
 
             return (
@@ -356,49 +364,22 @@ export default function ProjectParametersScreen() {
                   <Text style={styles.costName}>{config.name}</Text>
                 </View>
 
-                {isEditing ? (
-                  <View style={styles.editForm}>
-                    <View style={styles.inputGroup}>
-                      <Text style={styles.inputLabel}>Cost per m² ($)</Text>
-                      <TextInput
-                        style={styles.input}
-                        value={editValues.cost_per_m2}
-                        onChangeText={(text) => setEditValues(prev => ({ ...prev, cost_per_m2: text }))}
-                        keyboardType="decimal-pad"
-                        placeholder="Cost per m²"
-                      />
-                    </View>
-
-                    <View style={styles.editButtons}>
-                      <TouchableOpacity
-                        style={[styles.editButton, styles.cancelButton]}
-                        onPress={cancelEditing}
-                      >
-                        <Text style={styles.cancelButtonText}>Cancel</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={[styles.editButton, styles.saveButton]}
-                        onPress={() => saveParam(param.id)}
-                      >
-                        <Text style={styles.saveButtonText}>Save</Text>
-                      </TouchableOpacity>
-                    </View>
+                <View style={styles.costDetails}>
+                  <View style={styles.costDetailRow}>
+                    <Text style={styles.costDetailLabel}>Gold Content:</Text>
+                    <Text style={styles.costDetailValue}>{config.goldGramsPerM2.toFixed(2)} g Au/m²</Text>
                   </View>
-                ) : (
-                  <>
-                    <Text style={styles.costValue}>${param.cost_per_m2.toLocaleString()}/m²</Text>
-                    <TouchableOpacity
-                      style={styles.editTriggerSmall}
-                      onPress={() => startEditing(param.id, {
-                        build_area_m2: param.build_area_m2,
-                        cost_per_m2: param.cost_per_m2,
-                        rent_monthly: param.rent_monthly,
-                      })}
-                    >
-                      <Text style={styles.editTriggerTextSmall}>Edit</Text>
-                    </TouchableOpacity>
-                  </>
-                )}
+                  <View style={styles.costDetailRow}>
+                    <Text style={styles.costDetailLabel}>Cost per m²:</Text>
+                    <Text style={styles.costDetailValue}>${param.cost_per_m2.toFixed(2)}/m²</Text>
+                  </View>
+                  <View style={styles.costDetailRow}>
+                    <Text style={styles.costDetailLabel}>Calculated at:</Text>
+                    <Text style={styles.costDetailValueSmall}>
+                      {config.goldGramsPerM2.toFixed(2)} g × ${goldPrice.pricePerGram.toFixed(2)}/g
+                    </Text>
+                  </View>
+                </View>
               </View>
             );
           })}
@@ -781,6 +762,47 @@ const styles = StyleSheet.create({
   paramSubtitle: {
     fontSize: 13,
     color: '#6C757D',
+    marginTop: 2,
+  },
+  costTypeBadge: {
+    backgroundColor: '#E3F2FD',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    marginTop: 6,
+    alignSelf: 'flex-start',
+  },
+  costTypeBadgeText: {
+    fontSize: 11,
+    fontWeight: '600' as const,
+    color: '#007AFF',
+  },
+  costDetails: {
+    gap: 8,
+  },
+  costDetailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  costDetailLabel: {
+    fontSize: 13,
+    color: '#6C757D',
+    fontWeight: '500' as const,
+  },
+  costDetailValue: {
+    fontSize: 15,
+    fontWeight: '700' as const,
+    color: '#212529',
+  },
+  costDetailValueSmall: {
+    fontSize: 12,
+    fontWeight: '600' as const,
+    color: '#6C757D',
+  },
+  paramItemSubtext: {
+    fontSize: 11,
+    color: '#007AFF',
     marginTop: 2,
   },
 });
