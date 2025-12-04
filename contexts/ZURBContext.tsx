@@ -8,6 +8,8 @@ import {
   MixRule,
   RentConfig,
   OverheadConfig,
+  Scenario,
+  ScenarioItem,
 } from '@/types';
 import {
   DEFAULT_COST_PARAMS,
@@ -42,6 +44,7 @@ export const [ZURBContext, useZURB] = createContextHook(() => {
   const [mixRules, setMixRules] = useState<MixRule[]>(DEFAULT_MIX_RULES);
   const [rents, setRents] = useState<RentConfig[]>(DEFAULT_RENTS);
   const [overheads, setOverheads] = useState<OverheadConfig>(DEFAULT_OVERHEADS);
+  const [scenarios, setScenarios] = useState<{ [siteId: string]: Scenario[] }>({});
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   const loadProjects = useCallback(async () => {
@@ -257,6 +260,37 @@ export const [ZURBContext, useZURB] = createContextHook(() => {
     setOverheads(newOverheads);
   }, []);
 
+  const createScenario = useCallback((siteId: string, name: string, notes: string) => {
+    const newScenario: Scenario = {
+      id: Date.now().toString(),
+      siteId,
+      name,
+      notes,
+      createdAt: new Date(),
+      items: [],
+    };
+    setScenarios(prev => ({
+      ...prev,
+      [siteId]: [...(prev[siteId] || []), newScenario],
+    }));
+    return newScenario;
+  }, []);
+
+  const updateScenario = useCallback(
+    (scenarioId: string, updates: { name?: string; notes?: string; items?: ScenarioItem[] }) => {
+      setScenarios(prev => {
+        const newScenarios = { ...prev };
+        for (const siteId in newScenarios) {
+          newScenarios[siteId] = newScenarios[siteId].map(scenario =>
+            scenario.id === scenarioId ? { ...scenario, ...updates } : scenario
+          );
+        }
+        return newScenarios;
+      });
+    },
+    []
+  );
+
   const getSitesByProjectId = useCallback(
     (projectId: string) => {
       return sites.filter(s => s.project_id === projectId);
@@ -278,6 +312,7 @@ export const [ZURBContext, useZURB] = createContextHook(() => {
     mixRules,
     rents,
     overheads,
+    scenarios,
     isLoading,
     createProject,
     updateProject,
@@ -289,5 +324,7 @@ export const [ZURBContext, useZURB] = createContextHook(() => {
     updateRents,
     updateOverheads,
     getRentsMap,
+    createScenario,
+    updateScenario,
   };
 });

@@ -1,27 +1,22 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Plus, FileText } from 'lucide-react-native';
 import React, { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform, Modal, TextInput } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import MapView, { Marker, PROVIDER_DEFAULT } from 'react-native-maps';
 import { useZURB } from '@/contexts/ZURBContext';
 import { DEFAULT_TYPOLOGIES } from '@/constants/typologies';
 
 export default function SiteScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { projects, scenarios, createScenario } = useZURB();
+  const { sites, scenarios, createScenario } = useZURB();
   const [modalVisible, setModalVisible] = useState<boolean>(false);
   const [scenarioName, setScenarioName] = useState<string>('');
   const [scenarioNotes, setScenarioNotes] = useState<string>('');
 
   const site = useMemo(() => {
-    for (const project of projects) {
-      const found = project.sites.find(s => s.id === id);
-      if (found) return found;
-    }
-    return null;
-  }, [projects, id]);
+    return sites.find(s => s.id === id) || null;
+  }, [sites, id]);
 
   const siteScenarios = useMemo(() => {
     return scenarios[id || ''] || [];
@@ -55,49 +50,11 @@ export default function SiteScreen() {
       />
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.mapContainer}>
-          {Platform.OS !== 'web' ? (
-            <MapView
-              style={styles.map}
-              provider={PROVIDER_DEFAULT}
-              initialRegion={{
-                latitude: site.location.latitude,
-                longitude: site.location.longitude,
-                latitudeDelta: 0.01,
-                longitudeDelta: 0.01,
-              }}
-            >
-              <Marker
-                coordinate={{
-                  latitude: site.location.latitude,
-                  longitude: site.location.longitude,
-                }}
-                title={site.name}
-              />
-            </MapView>
-          ) : (
-            <View style={[styles.map, styles.mapPlaceholder]}>
-              <Text style={styles.mapPlaceholderText}>
-                Map view (available on mobile)
-              </Text>
-            </View>
-          )}
-        </View>
 
         <View style={styles.infoCard}>
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Area</Text>
-            <Text style={styles.infoValue}>{site.areaHa.toFixed(2)} ha</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Blocks</Text>
-            <Text style={styles.infoValue}>{site.blocks.length}</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Location</Text>
-            <Text style={styles.infoValue}>
-              {site.location.latitude.toFixed(4)}, {site.location.longitude.toFixed(4)}
-            </Text>
+            <Text style={styles.infoValue}>{site.area_ha ? site.area_ha.toFixed(2) : '0.00'} ha</Text>
           </View>
         </View>
 
