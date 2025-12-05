@@ -41,7 +41,7 @@ export default function SiteScreen() {
 
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [configModalVisible, setConfigModalVisible] = useState<boolean>(false);
-  const [selectedHalfBlock, setSelectedHalfBlock] = useState<DbHalfBlock | null>(null);
+  const [selectedHalfBlockId, setSelectedHalfBlockId] = useState<string | null>(null);
   const [selectedBlock, setSelectedBlock] = useState<DbBlock | null>(null);
   const [bulkEditMode, setBulkEditMode] = useState<boolean>(false);
   const [selectedHalfBlocks, setSelectedHalfBlocks] = useState<Set<string>>(new Set());
@@ -64,29 +64,32 @@ export default function SiteScreen() {
   }, [getBlocksBySiteId, id]);
 
   const openHalfBlockConfig = useCallback((halfBlock: DbHalfBlock, block: DbBlock) => {
-    setSelectedHalfBlock(halfBlock);
+    setSelectedHalfBlockId(halfBlock.id);
     setSelectedBlock(block);
     setConfigModalVisible(true);
   }, []);
 
   const handleSelectType = useCallback(async (type: HalfBlockType) => {
-    if (!selectedHalfBlock) return;
-    await updateHalfBlock(selectedHalfBlock.id, type);
-  }, [selectedHalfBlock, updateHalfBlock]);
+    if (!selectedHalfBlockId) return;
+    console.log('[Site] Selecting type:', type, 'for half block:', selectedHalfBlockId);
+    await updateHalfBlock(selectedHalfBlockId, type);
+  }, [selectedHalfBlockId, updateHalfBlock]);
 
   const handleSelectVillaLayout = useCallback(async (layout: VillaLayout) => {
-    if (!selectedHalfBlock) return;
-    await updateHalfBlock(selectedHalfBlock.id, 'villas', layout);
+    if (!selectedHalfBlockId) return;
+    console.log('[Site] Selecting villa layout:', layout, 'for half block:', selectedHalfBlockId);
+    await updateHalfBlock(selectedHalfBlockId, 'villas', layout);
     
     const villaConfig = VILLA_LAYOUTS.find(l => l.id === layout);
-    const units = getUnitsByHalfBlockId(selectedHalfBlock.id);
+    const units = getUnitsByHalfBlockId(selectedHalfBlockId);
     
     if (units.length === 0 && villaConfig) {
+      console.log('[Site] Creating', villaConfig.plots.length, 'villa units');
       let unitNumber = 1;
       for (const plot of villaConfig.plots) {
         for (let i = 0; i < plot.count; i++) {
           await createUnit(
-            selectedHalfBlock.id,
+            selectedHalfBlockId,
             unitNumber++,
             'villa',
             plot.size,
@@ -96,21 +99,24 @@ export default function SiteScreen() {
           );
         }
       }
+      await loadUnits();
     }
     
     setConfigModalVisible(false);
-    setSelectedHalfBlock(null);
+    setSelectedHalfBlockId(null);
     setSelectedBlock(null);
-  }, [selectedHalfBlock, updateHalfBlock, getUnitsByHalfBlockId, createUnit]);
+  }, [selectedHalfBlockId, updateHalfBlock, getUnitsByHalfBlockId, createUnit, loadUnits]);
 
   const handleSelectApartmentLayout = useCallback(async (layout: ApartmentLayout) => {
-    if (!selectedHalfBlock) return;
-    await updateHalfBlock(selectedHalfBlock.id, 'apartments', undefined, layout);
+    if (!selectedHalfBlockId) return;
+    console.log('[Site] Selecting apartment layout:', layout, 'for half block:', selectedHalfBlockId);
+    await updateHalfBlock(selectedHalfBlockId, 'apartments', undefined, layout);
     
-    const units = getUnitsByHalfBlockId(selectedHalfBlock.id);
+    const units = getUnitsByHalfBlockId(selectedHalfBlockId);
     const apartmentConfig = APARTMENT_LAYOUTS.find(l => l.id === layout);
     
     if (units.length === 0 && apartmentConfig) {
+      console.log('[Site] Creating', apartmentConfig.totalBuildings, 'apartment units');
       for (let i = 0; i < apartmentConfig.totalBuildings; i++) {
         let unitType = 'apartment';
         let buildingType: BuildingType = layout;
@@ -124,7 +130,7 @@ export default function SiteScreen() {
         }
         
         await createUnit(
-          selectedHalfBlock.id,
+          selectedHalfBlockId,
           i + 1,
           unitType,
           undefined,
@@ -133,12 +139,13 @@ export default function SiteScreen() {
           undefined
         );
       }
+      await loadUnits();
     }
     
     setConfigModalVisible(false);
-    setSelectedHalfBlock(null);
+    setSelectedHalfBlockId(null);
     setSelectedBlock(null);
-  }, [selectedHalfBlock, updateHalfBlock, getUnitsByHalfBlockId, createUnit]);
+  }, [selectedHalfBlockId, updateHalfBlock, getUnitsByHalfBlockId, createUnit, loadUnits]);
 
   const toggleBulkSelect = useCallback((halfBlockId: string) => {
     setSelectedHalfBlocks(prev => {
@@ -177,6 +184,12 @@ export default function SiteScreen() {
   const handleUpdateUtilityName = useCallback(async (unitId: string, utilityName: string) => {
     await updateUnit(unitId, { utility_name: utilityName });
   }, [updateUnit]);
+
+  const selectedHalfBlock = useMemo(() => {
+    if (!selectedHalfBlockId) return null;
+    const allHalfBlocks = siteBlocks.flatMap(block => getHalfBlocksByBlockId(block.id));
+    return allHalfBlocks.find(hb => hb.id === selectedHalfBlockId) || null;
+  }, [selectedHalfBlockId, siteBlocks, getHalfBlocksByBlockId]);
 
   if (!site) {
     return (
@@ -305,7 +318,7 @@ export default function SiteScreen() {
                                       style={styles.editBuildingsButton}
                                       onPress={(e) => {
                                         e.stopPropagation();
-                                        setSelectedHalfBlock(northHB);
+                                        setSelectedHalfBlockId(northHB.id);
                                         setSelectedBlock(block);
                                         setVillaTypeModalVisible(true);
                                       }}
@@ -323,7 +336,7 @@ export default function SiteScreen() {
                                       style={styles.editBuildingsButton}
                                       onPress={(e) => {
                                         e.stopPropagation();
-                                        setSelectedHalfBlock(northHB);
+                                        setSelectedHalfBlockId(northHB.id);
                                         setSelectedBlock(block);
                                         setBuildingAssignModalVisible(true);
                                       }}
@@ -389,7 +402,7 @@ export default function SiteScreen() {
                                       style={styles.editBuildingsButton}
                                       onPress={(e) => {
                                         e.stopPropagation();
-                                        setSelectedHalfBlock(southHB);
+                                        setSelectedHalfBlockId(southHB.id);
                                         setSelectedBlock(block);
                                         setVillaTypeModalVisible(true);
                                       }}
@@ -407,7 +420,7 @@ export default function SiteScreen() {
                                       style={styles.editBuildingsButton}
                                       onPress={(e) => {
                                         e.stopPropagation();
-                                        setSelectedHalfBlock(southHB);
+                                        setSelectedHalfBlockId(southHB.id);
                                         setSelectedBlock(block);
                                         setBuildingAssignModalVisible(true);
                                       }}
@@ -516,7 +529,7 @@ export default function SiteScreen() {
               style={styles.closeButton}
               onPress={() => {
                 setConfigModalVisible(false);
-                setSelectedHalfBlock(null);
+                setSelectedHalfBlockId(null);
                 setSelectedBlock(null);
               }}
               testID="close-config"
@@ -630,7 +643,7 @@ export default function SiteScreen() {
               style={styles.closeButton}
               onPress={() => {
                 setBuildingAssignModalVisible(false);
-                setSelectedHalfBlock(null);
+                setSelectedHalfBlockId(null);
                 setSelectedBlock(null);
               }}
             >
@@ -725,7 +738,7 @@ export default function SiteScreen() {
               style={styles.closeButton}
               onPress={() => {
                 setVillaTypeModalVisible(false);
-                setSelectedHalfBlock(null);
+                setSelectedHalfBlockId(null);
                 setSelectedBlock(null);
               }}
             >

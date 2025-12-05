@@ -735,14 +735,20 @@ export const [ZURBContext, useZURB] = createContextHook(() => {
       villaLayout?: VillaLayout,
       apartmentLayout?: ApartmentLayout
     ) => {
+      const updates = {
+        type,
+        villa_layout: villaLayout || null,
+        apartment_layout: apartmentLayout || null,
+      };
+
+      setHalfBlocks(prev => 
+        prev.map(hb => hb.id === halfBlockId ? { ...hb, ...updates } : hb)
+      );
+      
       try {
         const { error } = await supabase
           .from('half_blocks')
-          .update({
-            type,
-            villa_layout: villaLayout || null,
-            apartment_layout: apartmentLayout || null,
-          })
+          .update(updates)
           .eq('id', halfBlockId);
 
         if (error) throw error;
@@ -751,9 +757,10 @@ export const [ZURBContext, useZURB] = createContextHook(() => {
       } catch (error: any) {
         console.error('[ZURB] Error updating half block:', error);
         Alert.alert('Error', error.message || 'Failed to update half block');
+        await loadHalfBlocks();
       }
     },
-    []
+    [loadHalfBlocks]
   );
 
   const createUnit = useCallback(
