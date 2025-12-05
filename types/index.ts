@@ -3,6 +3,7 @@ export interface DbProject {
   owner_id: string;
   name: string;
   description: string | null;
+  max_rental_period_years: number;
   created_at: string;
   updated_at: string;
 }

@@ -73,6 +73,7 @@ export default function ProjectParametersScreen() {
   const [projectEditModalVisible, setProjectEditModalVisible] = useState<boolean>(false);
   const [newProjectName, setNewProjectName] = useState<string>('');
   const [newProjectDesc, setNewProjectDesc] = useState<string>('');
+  const [newMaxRentalPeriod, setNewMaxRentalPeriod] = useState<string>('20');
 
   const project = useMemo(() => {
     return projects.find(p => p.id === id) || null;
@@ -312,12 +313,19 @@ export default function ProjectParametersScreen() {
       return;
     }
 
+    const maxRental = parseInt(newMaxRentalPeriod);
+    if (isNaN(maxRental) || maxRental <= 0) {
+      Alert.alert('Error', 'Please enter a valid max rental period');
+      return;
+    }
+
     await updateProject(id, {
       name: newProjectName.trim(),
       description: newProjectDesc.trim() || undefined,
+      max_rental_period_years: maxRental,
     });
     setProjectEditModalVisible(false);
-  }, [id, newProjectName, newProjectDesc, updateProject]);
+  }, [id, newProjectName, newProjectDesc, newMaxRentalPeriod, updateProject]);
 
   const handleSaveEditEquipment = useCallback(async () => {
     if (!editingEquipment || !newEquipmentCode || !newEquipmentName || !newEquipmentLandArea || !newEquipmentOccupation) {
@@ -384,6 +392,7 @@ export default function ProjectParametersScreen() {
               onPress={() => {
                 setNewProjectName(project.name);
                 setNewProjectDesc(project.description || '');
+                setNewMaxRentalPeriod((project.max_rental_period_years || 20).toString());
                 setProjectEditModalVisible(true);
               }}
             >
@@ -817,6 +826,16 @@ export default function ProjectParametersScreen() {
               multiline
               numberOfLines={3}
             />
+            <View style={styles.rentalPeriodInputWrapper}>
+              <Text style={styles.rentalPeriodLabel}>Max Rental Period (years):</Text>
+              <TextInput
+                style={styles.rentalPeriodInput}
+                placeholder="20"
+                value={newMaxRentalPeriod}
+                onChangeText={setNewMaxRentalPeriod}
+                keyboardType="numeric"
+              />
+            </View>
             <View style={styles.modalButtons}>
               <TouchableOpacity
                 style={[styles.modalButton, styles.modalCancelButton]}
@@ -824,6 +843,7 @@ export default function ProjectParametersScreen() {
                   setProjectEditModalVisible(false);
                   setNewProjectName('');
                   setNewProjectDesc('');
+                  setNewMaxRentalPeriod('20');
                 }}
               >
                 <Text style={styles.modalCancelButtonText}>Cancel</Text>
@@ -1783,6 +1803,28 @@ const styles = StyleSheet.create({
   },
   modalSaveButton: {
     backgroundColor: '#007AFF',
+  },
+  rentalPeriodInputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  rentalPeriodLabel: {
+    fontSize: 14,
+    fontWeight: '600' as const,
+    color: '#212529',
+  },
+  rentalPeriodInput: {
+    backgroundColor: '#F8F9FA',
+    borderRadius: 10,
+    padding: 14,
+    fontSize: 16,
+    color: '#212529',
+    borderWidth: 1,
+    borderColor: '#E9ECEF',
+    flex: 1,
+    marginLeft: 12,
   },
   modalSaveButtonText: {
     fontSize: 16,

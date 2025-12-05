@@ -646,7 +646,7 @@ export const [ZURBContext, useZURB] = createContextHook(() => {
   );
 
   const updateProject = useCallback(
-    async (projectId: string, updates: { name?: string; description?: string }) => {
+    async (projectId: string, updates: { name?: string; description?: string; max_rental_period_years?: number }) => {
       setProjects(prev => 
         prev.map(project => project.id === projectId ? { ...project, ...updates } : project)
       );
