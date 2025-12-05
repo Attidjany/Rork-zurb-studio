@@ -1,6 +1,5 @@
 import { Stack, useRouter } from 'expo-router';
-import { Plus, Copy, Trash2, LogOut, Edit3 } from 'lucide-react-native';
-import { useAuth } from '@/contexts/AuthContext';
+import { Plus, Copy, Trash2, Settings, Edit3 } from 'lucide-react-native';
 import React, { useState } from 'react';
 import {
   View,
@@ -28,7 +27,6 @@ type Project = {
 
 export default function ProjectsScreen() {
   const router = useRouter();
-  const { signOut } = useAuth();
   const { projects, isLoading, createProject, loadProjects, deleteProject, duplicateProject, updateProject } = useZURB();
   const [modalVisible, setModalVisible] = useState<boolean>(false);
   const [newProjectName, setNewProjectName] = useState<string>('');
@@ -146,11 +144,9 @@ export default function ProjectsScreen() {
           headerRight: () => (
             <TouchableOpacity
               style={styles.headerButton}
-              onPress={async () => {
-                await signOut();
-              }}
+              onPress={() => router.push('/settings' as any)}
             >
-              <LogOut size={20} color="#FF3B30" />
+              <Settings size={22} color="#007AFF" />
             </TouchableOpacity>
           ),
         }}

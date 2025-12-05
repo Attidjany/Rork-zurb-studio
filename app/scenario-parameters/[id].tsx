@@ -362,7 +362,7 @@ export default function ScenarioParametersScreen() {
 
   const renderEquipmentUtilityType = (type: any, category: 'equipment' | 'utility') => {
     const costConfig = mergedConstructionCosts.find(c => c.code === type.cost_type);
-    const buildAreaM2 = type.land_area_m2 * (type.building_occupation_pct / 100);
+    const buildAreaM2 = type.land_area_m2 * type.building_occupation_pct;
     const costPerM2XOF = costConfig
       ? costConfig.gold_grams_per_m2 * goldPrice.pricePerGram * USD_TO_XOF
       : 0;
