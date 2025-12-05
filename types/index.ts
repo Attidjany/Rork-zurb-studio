@@ -58,6 +58,7 @@ export interface DbScenario {
   name: string;
   notes: string | null;
   rental_period_years: number;
+  is_auto_scenario: boolean;
   created_by: string;
   created_at: string;
   updated_at: string;

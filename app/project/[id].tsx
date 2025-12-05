@@ -195,12 +195,18 @@ export default function ProjectScreen() {
             {siteScenarios.map(scenario => (
               <TouchableOpacity
                 key={scenario.id}
-                style={styles.scenarioItem}
+                style={[
+                  styles.scenarioItem,
+                  scenario.is_auto_scenario && styles.scenarioItemAuto,
+                ]}
                 onPress={() => router.push({ pathname: '/scenario/[id]', params: { id: scenario.id } } as any)}
                 testID={`scenario-${scenario.id}`}
               >
-                <FileText size={14} color="#6C757D" />
-                <Text style={styles.scenarioItemName} numberOfLines={1}>{scenario.name}</Text>
+                <FileText size={14} color={scenario.is_auto_scenario ? "#FF9500" : "#6C757D"} />
+                <Text style={[
+                  styles.scenarioItemName,
+                  scenario.is_auto_scenario && styles.scenarioItemNameAuto,
+                ]} numberOfLines={1}>{scenario.name}</Text>
                 <View style={styles.scenarioItemActions}>
                   <TouchableOpacity
                     onPress={(e) => {
@@ -717,11 +723,19 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E9ECEF',
   },
+  scenarioItemAuto: {
+    backgroundColor: '#FFF8F0',
+    borderColor: '#FFD3A0',
+  },
   scenarioItemName: {
     flex: 1,
     fontSize: 13,
     color: '#333333',
     fontWeight: '500' as const,
+  },
+  scenarioItemNameAuto: {
+    color: '#FF9500',
+    fontWeight: '600' as const,
   },
   scenarioItemActions: {
     flexDirection: 'row',

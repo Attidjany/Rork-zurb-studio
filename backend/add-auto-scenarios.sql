@@ -1,6 +1,9 @@
 -- Add max_rental_period to projects table
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS max_rental_period_years INT DEFAULT 20;
 
+-- Add is_auto_scenario to scenarios table
+ALTER TABLE scenarios ADD COLUMN IF NOT EXISTS is_auto_scenario BOOLEAN DEFAULT FALSE;
+
 -- Function to check if all half blocks in a site are fully configured
 CREATE OR REPLACE FUNCTION check_site_blocks_configured(p_site_id UUID)
 RETURNS BOOLEAN AS $$
@@ -63,16 +66,17 @@ BEGIN
   -- Delete existing auto-scenarios for this site
   DELETE FROM scenarios
   WHERE site_id = p_site_id
-    AND name IN ('Auto: Most Profit', 'Auto: Lowest Rents', 'Auto: Balanced');
+    AND is_auto_scenario = TRUE;
   
   -- Scenario 1: Most Profit
   -- Max rental period, highest rents (+20%), highest costs (+10%)
-  INSERT INTO scenarios (site_id, name, notes, rental_period_years, created_by)
+  INSERT INTO scenarios (site_id, name, notes, rental_period_years, is_auto_scenario, created_by)
   VALUES (
     p_site_id,
     'Auto: Most Profit',
     'Maximum profit scenario: Longer rental period, premium rents, quality construction',
     v_max_rental_years,
+    TRUE,
     v_user_id
   )
   RETURNING id INTO v_scenario_id;
@@ -133,12 +137,13 @@ BEGIN
   
   -- Scenario 2: Lowest Rents
   -- Min rental period (10 years), lowest rents (-20%), lowest costs (-10%)
-  INSERT INTO scenarios (site_id, name, notes, rental_period_years, created_by)
+  INSERT INTO scenarios (site_id, name, notes, rental_period_years, is_auto_scenario, created_by)
   VALUES (
     p_site_id,
     'Auto: Lowest Rents',
     'Affordable scenario: Shorter rental period, reduced rents, economical construction',
     10,
+    TRUE,
     v_user_id
   )
   RETURNING id INTO v_scenario_id;
@@ -198,12 +203,13 @@ BEGIN
   
   -- Scenario 3: Balanced
   -- Mid rental period (15 years), standard rents and costs (no adjustment)
-  INSERT INTO scenarios (site_id, name, notes, rental_period_years, created_by)
+  INSERT INTO scenarios (site_id, name, notes, rental_period_years, is_auto_scenario, created_by)
   VALUES (
     p_site_id,
     'Auto: Balanced',
     'Balanced scenario: Moderate rental period, standard market rents, standard construction',
     15,
+    TRUE,
     v_user_id
   )
   RETURNING id INTO v_scenario_id;
