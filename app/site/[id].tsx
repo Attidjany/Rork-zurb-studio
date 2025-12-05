@@ -1,5 +1,5 @@
 import { Stack, useLocalSearchParams } from 'expo-router';
-import { Settings } from 'lucide-react-native';
+import { Settings, Sparkles } from 'lucide-react-native';
 import React, { useMemo, useState, useCallback } from 'react';
 import {
   View,
@@ -27,7 +27,6 @@ export default function SiteScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const {
     sites,
-    units,
     getBlocksBySiteId,
     getHalfBlocksByBlockId,
     getUnitsByHalfBlockId,
@@ -38,6 +37,7 @@ export default function SiteScreen() {
     updateHalfBlock,
     createUnit,
     updateUnit,
+    generateAutoScenarios,
   } = useZURB();
 
   const [refreshing, setRefreshing] = useState<boolean>(false);
@@ -48,6 +48,7 @@ export default function SiteScreen() {
   const [selectedHalfBlocks, setSelectedHalfBlocks] = useState<Set<string>>(new Set());
   const [buildingAssignModalVisible, setBuildingAssignModalVisible] = useState<boolean>(false);
   const [villaTypeModalVisible, setVillaTypeModalVisible] = useState<boolean>(false);
+  const [isGeneratingScenarios, setIsGeneratingScenarios] = useState<boolean>(false);
 
   const handleRefresh = useCallback(async () => {
     console.log('[Site] Manual refresh triggered');
@@ -187,6 +188,13 @@ export default function SiteScreen() {
     await updateUnit(unitId, { utility_name: utilityName });
   }, [updateUnit]);
 
+  const handleGenerateAutoScenarios = useCallback(async () => {
+    if (!id) return;
+    setIsGeneratingScenarios(true);
+    await generateAutoScenarios(id);
+    setIsGeneratingScenarios(false);
+  }, [id, generateAutoScenarios]);
+
   const selectedHalfBlock = useMemo(() => {
     if (!selectedHalfBlockId) return null;
     const allHalfBlocks = siteBlocks.flatMap(block => getHalfBlocksByBlockId(block.id));
@@ -196,7 +204,7 @@ export default function SiteScreen() {
   const villaUnitsForCurrentLayout = useMemo(() => {
     if (!selectedHalfBlock || !villaTypeModalVisible) return [];
     return getUnitsByHalfBlockId(selectedHalfBlock.id);
-  }, [selectedHalfBlock, villaTypeModalVisible, getUnitsByHalfBlockId, units]);
+  }, [selectedHalfBlock, villaTypeModalVisible, getUnitsByHalfBlockId]);
 
   if (!site) {
     return (
@@ -268,7 +276,27 @@ export default function SiteScreen() {
         )}
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Block Configuration</Text>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Block Configuration</Text>
+            <TouchableOpacity
+              style={[
+                styles.generateButton,
+                isGeneratingScenarios && styles.generateButtonDisabled,
+              ]}
+              onPress={handleGenerateAutoScenarios}
+              disabled={isGeneratingScenarios}
+              testID="generate-auto-scenarios"
+            >
+              {isGeneratingScenarios ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <>
+                  <Sparkles size={18} color="#FFFFFF" />
+                  <Text style={styles.generateButtonText}>Smart Scenarios</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
           {siteBlocks.length === 0 ? (
             <View style={styles.emptyContainer}>
               <ActivityIndicator size="small" color="#007AFF" />
@@ -847,11 +875,38 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingBottom: 32,
   },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
   sectionTitle: {
     fontSize: 20,
     fontWeight: '700' as const,
     color: '#212529',
-    marginBottom: 16,
+  },
+  generateButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: '#007AFF',
+    shadowColor: '#007AFF',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  generateButtonDisabled: {
+    opacity: 0.6,
+  },
+  generateButtonText: {
+    fontSize: 14,
+    fontWeight: '600' as const,
+    color: '#FFFFFF',
   },
   emptyContainer: {
     padding: 40,

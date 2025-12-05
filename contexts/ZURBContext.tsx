@@ -1638,6 +1638,42 @@ export const [ZURBContext, useZURB] = createContextHook(() => {
     [loadScenarioEquipmentUtilityTypes]
   );
 
+  const generateAutoScenarios = useCallback(
+    async (siteId: string) => {
+      try {
+        console.log('[ZURB] Generating auto-scenarios for site:', siteId);
+        const { data, error } = await supabase.rpc('generate_auto_scenarios', {
+          p_site_id: siteId
+        });
+
+        if (error) throw error;
+
+        const result = data && data.length > 0 ? data[0] : { success: false, message: 'Unknown error' };
+        
+        if (!result.success) {
+          console.error('[ZURB] Auto-scenario generation failed:', result.message);
+          Alert.alert('Error', result.message || 'Failed to generate auto-scenarios');
+          return false;
+        }
+
+        console.log('[ZURB] Auto-scenarios generated:', result.message);
+        Alert.alert('Success', result.message || 'Auto-scenarios generated successfully');
+        
+        await loadScenarios();
+        await loadScenarioConstructionCosts();
+        await loadScenarioHousingTypes();
+        await loadScenarioEquipmentUtilityTypes();
+        
+        return true;
+      } catch (error: any) {
+        console.error('[ZURB] Error generating auto-scenarios:', error);
+        Alert.alert('Error', error.message || 'Failed to generate auto-scenarios');
+        return false;
+      }
+    },
+    [loadScenarios, loadScenarioConstructionCosts, loadScenarioHousingTypes, loadScenarioEquipmentUtilityTypes]
+  );
+
   return {
     projects,
     sites,
@@ -1667,6 +1703,7 @@ export const [ZURBContext, useZURB] = createContextHook(() => {
     updateScenario,
     deleteScenario,
     duplicateScenario,
+    generateAutoScenarios,
     getSitesByProjectId,
     getBlocksBySiteId,
     getHalfBlocksByBlockId,
