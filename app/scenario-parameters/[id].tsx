@@ -1,5 +1,5 @@
 import { Stack, useLocalSearchParams, router } from 'expo-router';
-import { Settings, DollarSign, Building2, Home, ShoppingBag, Edit2, Trash2, RotateCcw } from 'lucide-react-native';
+import { Settings, DollarSign, Building2, Home, ShoppingBag, Edit2, Trash2, RotateCcw, Calendar } from 'lucide-react-native';
 import React, { useMemo, useState, useCallback, useEffect } from 'react';
 import {
   View,
@@ -33,12 +33,14 @@ export default function ScenarioParametersScreen() {
     loadScenarioHousingTypes,
     loadProjectEquipmentUtilityTypes,
     loadScenarioEquipmentUtilityTypes,
+    updateScenario,
     updateScenarioConstructionCost,
     updateScenarioHousingType,
     updateScenarioEquipmentUtilityType,
     deleteScenarioConstructionCost,
     deleteScenarioHousingType,
     deleteScenarioEquipmentUtilityType,
+    loadScenarios,
   } = useZURB();
 
   const [refreshing, setRefreshing] = useState<boolean>(false);
@@ -130,6 +132,7 @@ export default function ScenarioParametersScreen() {
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     await Promise.all([
+      loadScenarios(),
       loadProjectConstructionCosts(),
       loadScenarioConstructionCosts(),
       loadProjectHousingTypes(),
@@ -139,6 +142,7 @@ export default function ScenarioParametersScreen() {
     ]);
     setRefreshing(false);
   }, [
+    loadScenarios,
     loadProjectConstructionCosts,
     loadScenarioConstructionCosts,
     loadProjectHousingTypes,
@@ -550,6 +554,65 @@ export default function ScenarioParametersScreen() {
           >
             <Text style={styles.viewScenarioButtonText}>View Scenario Summary</Text>
           </TouchableOpacity>
+        </View>
+
+        <View style={styles.rentalPeriodCard}>
+          <View style={styles.rentalPeriodHeader}>
+            <View style={styles.rentalPeriodIcon}>
+              <Calendar size={20} color="#007AFF" />
+            </View>
+            <Text style={styles.rentalPeriodTitle}>Rental Period</Text>
+          </View>
+          <View style={styles.rentalPeriodContent}>
+            {editingId === 'rental_period' ? (
+              <View style={styles.rentalPeriodEditForm}>
+                <TextInput
+                  style={styles.rentalPeriodInput}
+                  value={String(editValues.rental_period_years !== undefined ? editValues.rental_period_years : scenario.rental_period_years || 20)}
+                  onChangeText={(text) => setEditValues({rental_period_years: parseInt(text) || 20})}
+                  placeholder="Years"
+                  keyboardType="numeric"
+                />
+                <View style={styles.rentalPeriodActions}>
+                  <TouchableOpacity
+                    style={styles.saveButton}
+                    onPress={async () => {
+                      await updateScenario(scenario.id, { rental_period_years: editValues.rental_period_years });
+                      setEditingId(null);
+                      setEditValues({});
+                      await loadScenarios();
+                    }}
+                  >
+                    <Text style={styles.saveButtonText}>Save</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.cancelButton}
+                    onPress={() => {
+                      setEditingId(null);
+                      setEditValues({});
+                    }}
+                  >
+                    <Text style={styles.cancelButtonText}>Cancel</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ) : (
+              <View style={styles.rentalPeriodDisplay}>
+                <Text style={styles.rentalPeriodValue}>
+                  {scenario.rental_period_years || 20} years
+                </Text>
+                <TouchableOpacity
+                  style={styles.iconButton}
+                  onPress={() => {
+                    setEditingId('rental_period');
+                    setEditValues({ rental_period_years: scenario.rental_period_years || 20 });
+                  }}
+                >
+                  <Edit2 size={18} color="#007AFF" />
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
         </View>
 
         <View style={styles.infoBox}>
@@ -1136,5 +1199,66 @@ const styles = StyleSheet.create({
     color: '#6C757D',
     fontSize: 14,
     fontWeight: '600' as const,
+  },
+  rentalPeriodCard: {
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 16,
+    marginTop: 16,
+    borderRadius: 16,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  rentalPeriodHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+    gap: 12,
+  },
+  rentalPeriodIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#E3F2FD',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rentalPeriodTitle: {
+    fontSize: 18,
+    fontWeight: '700' as const,
+    color: '#212529',
+  },
+  rentalPeriodContent: {
+    flex: 1,
+  },
+  rentalPeriodDisplay: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  rentalPeriodValue: {
+    fontSize: 24,
+    fontWeight: '700' as const,
+    color: '#007AFF',
+  },
+  rentalPeriodEditForm: {
+    gap: 12,
+  },
+  rentalPeriodInput: {
+    backgroundColor: '#F8F9FA',
+    borderRadius: 12,
+    padding: 16,
+    fontSize: 18,
+    fontWeight: '600' as const,
+    color: '#212529',
+    borderWidth: 2,
+    borderColor: '#007AFF',
+  },
+  rentalPeriodActions: {
+    flexDirection: 'row',
+    gap: 12,
   },
 });

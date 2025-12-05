@@ -7,7 +7,6 @@ import { useZURB } from '@/contexts/ZURBContext';
 
 import {
   UNIT_BUILD_AREAS,
-  DEFAULT_LEASE_YEARS,
   BUILDING_TYPES,
   VILLA_LAYOUTS,
   HOUSING_TYPES,
@@ -111,6 +110,21 @@ export default function ScenarioScreen() {
   }, [getBlocksBySiteId, scenario]);
 
   const summary = useMemo(() => {
+    if (!scenario) {
+      return {
+        totalResidentialUnits: 0,
+        totalBuildArea: 0,
+        totalCosts: 0,
+        totalRevenue: 0,
+        unitsByType: {},
+        equipmentByType: {},
+        utilityByType: {},
+        equipmentCount: 0,
+        utilityCount: 0,
+        rentalPeriodYears: 20,
+      };
+    }
+
     let totalResidentialUnits = 0;
     let totalBuildArea = 0;
     let totalCosts = 0;
@@ -144,7 +158,7 @@ export default function ScenarioScreen() {
 
               totalBuildArea += buildArea * plot.count;
               totalCosts += buildArea * costPerM2 * plot.count;
-              totalRevenue += rentMonthly * 12 * DEFAULT_LEASE_YEARS * plot.count;
+              totalRevenue += rentMonthly * 12 * (scenario.rental_period_years || 20) * plot.count;
             });
           }
         } else if (hb.type === 'apartments' && hb.apartment_layout) {
@@ -166,7 +180,7 @@ export default function ScenarioScreen() {
 
               totalBuildArea += buildArea * totalCount;
               totalCosts += buildArea * costPerM2 * totalCount;
-              totalRevenue += rentMonthly * 12 * DEFAULT_LEASE_YEARS * totalCount;
+              totalRevenue += rentMonthly * 12 * (scenario.rental_period_years || 20) * totalCount;
             });
           }
 
@@ -213,7 +227,7 @@ export default function ScenarioScreen() {
       });
     });
 
-    const rentalPeriodYears = DEFAULT_LEASE_YEARS;
+    const rentalPeriodYears = scenario.rental_period_years || 20;
 
     return {
       totalResidentialUnits,
@@ -227,7 +241,7 @@ export default function ScenarioScreen() {
       utilityCount,
       rentalPeriodYears,
     };
-  }, [siteBlocks, getHalfBlocksByBlockId, getUnitsByHalfBlockId, mergedConstructionCosts, mergedHousingTypes, mergedEquipmentUtilityTypes, projectHousingTypes]);
+  }, [scenario, siteBlocks, getHalfBlocksByBlockId, getUnitsByHalfBlockId, mergedConstructionCosts, mergedHousingTypes, mergedEquipmentUtilityTypes, projectHousingTypes]);
 
   if (!scenario || !site) {
     return (

@@ -56,6 +56,7 @@ export interface DbScenario {
   site_id: string;
   name: string;
   notes: string | null;
+  rental_period_years: number;
   created_by: string;
   created_at: string;
   updated_at: string;

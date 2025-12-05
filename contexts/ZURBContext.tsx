@@ -859,7 +859,7 @@ export const [ZURBContext, useZURB] = createContextHook(() => {
   );
 
   const updateScenario = useCallback(
-    async (scenarioId: string, updates: { name?: string; notes?: string }) => {
+    async (scenarioId: string, updates: { name?: string; notes?: string; rental_period_years?: number }) => {
       try {
         const { error } = await supabase
           .from('scenarios')
