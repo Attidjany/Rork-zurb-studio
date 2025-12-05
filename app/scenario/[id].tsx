@@ -398,6 +398,7 @@ export default function ScenarioScreen() {
               const housingConfig = HOUSING_TYPES[type];
               const name = projectHousing ? projectHousing.name : (housingConfig?.name || type);
               const area = projectHousing ? projectHousing.default_area_m2 : (housingConfig?.defaultArea || 0);
+              const rentMonthly = projectHousing ? projectHousing.default_rent_monthly : (housingConfig?.defaultRent || 0);
               return (
                 <View key={type} style={styles.breakdownRow}>
                   <View style={styles.breakdownLabelContainer}>
@@ -409,6 +410,11 @@ export default function ScenarioScreen() {
                     {area > 0 && (
                       <Text style={styles.breakdownSubValue}>
                         {area.toFixed(0)} m² each
+                      </Text>
+                    )}
+                    {rentMonthly > 0 && (
+                      <Text style={styles.breakdownSubValue}>
+                        {rentMonthly.toLocaleString(undefined, {maximumFractionDigits: 0})} XOF/month
                       </Text>
                     )}
                   </View>
