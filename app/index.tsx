@@ -1,5 +1,6 @@
 import { Stack, useRouter } from 'expo-router';
-import { Plus, Copy, Trash2 } from 'lucide-react-native';
+import { Plus, Copy, Trash2, LogOut, Edit3 } from 'lucide-react-native';
+import { useAuth } from '@/contexts/AuthContext';
 import React, { useState } from 'react';
 import {
   View,
@@ -27,12 +28,15 @@ type Project = {
 
 export default function ProjectsScreen() {
   const router = useRouter();
-  const { projects, isLoading, createProject, loadProjects, deleteProject, duplicateProject } = useZURB();
+  const { signOut } = useAuth();
+  const { projects, isLoading, createProject, loadProjects, deleteProject, duplicateProject, updateProject } = useZURB();
   const [modalVisible, setModalVisible] = useState<boolean>(false);
   const [newProjectName, setNewProjectName] = useState<string>('');
   const [newProjectDesc, setNewProjectDesc] = useState<string>('');
   const [isCreating, setIsCreating] = useState<boolean>(false);
   const [refreshing, setRefreshing] = useState<boolean>(false);
+  const [renameModalVisible, setRenameModalVisible] = useState<string | null>(null);
+  const [renameName, setRenameName] = useState<string>('');
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -86,6 +90,16 @@ export default function ProjectsScreen() {
       >
         <View style={styles.projectHeader}>
           <Text style={styles.projectName}>{item.name}</Text>
+          <TouchableOpacity
+            onPress={(e) => {
+              e.stopPropagation();
+              setRenameModalVisible(item.id);
+              setRenameName(item.name);
+            }}
+            style={styles.renameButton}
+          >
+            <Edit3 size={16} color="#007AFF" />
+          </TouchableOpacity>
         </View>
         {item.description ? (
           <Text style={styles.projectDesc} numberOfLines={2}>
@@ -129,6 +143,16 @@ export default function ProjectsScreen() {
         options={{
           headerShown: true,
           title: 'ZURB Studio',
+          headerRight: () => (
+            <TouchableOpacity
+              style={styles.headerButton}
+              onPress={async () => {
+                await signOut();
+              }}
+            >
+              <LogOut size={20} color="#FF3B30" />
+            </TouchableOpacity>
+          ),
         }}
       />
 
@@ -220,6 +244,45 @@ export default function ProjectsScreen() {
           </View>
         </View>
       </Modal>
+
+      <Modal
+        visible={renameModalVisible !== null}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setRenameModalVisible(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Rename Project</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Project Name"
+              value={renameName}
+              onChangeText={setRenameName}
+            />
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={() => setRenameModalVisible(null)}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.createButton]}
+                onPress={async () => {
+                  if (renameModalVisible && renameName.trim()) {
+                    await updateProject(renameModalVisible, { name: renameName.trim() });
+                    setRenameModalVisible(null);
+                  }
+                }}
+                disabled={!renameName.trim()}
+              >
+                <Text style={styles.createButtonText}>Rename</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -287,6 +350,9 @@ const styles = StyleSheet.create({
     fontWeight: '600' as const,
     color: '#000000',
     flex: 1,
+  },
+  renameButton: {
+    padding: 4,
   },
   projectSites: {
     fontSize: 14,

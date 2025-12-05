@@ -27,6 +27,7 @@ export default function SiteScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const {
     sites,
+    units,
     getBlocksBySiteId,
     getHalfBlocksByBlockId,
     getUnitsByHalfBlockId,
@@ -195,7 +196,7 @@ export default function SiteScreen() {
   const villaUnitsForCurrentLayout = useMemo(() => {
     if (!selectedHalfBlock || !villaTypeModalVisible) return [];
     return getUnitsByHalfBlockId(selectedHalfBlock.id);
-  }, [selectedHalfBlock, villaTypeModalVisible, getUnitsByHalfBlockId]);
+  }, [selectedHalfBlock, villaTypeModalVisible, getUnitsByHalfBlockId, units]);
 
   if (!site) {
     return (

@@ -142,25 +142,30 @@ export default function ScenarioScreen() {
         const units = getUnitsByHalfBlockId(hb.id);
 
         if (hb.type === 'villas' && hb.villa_layout) {
-          const layout = VILLA_LAYOUTS.find(l => l.id === hb.villa_layout);
-          if (layout) {
-            layout.plots.forEach(plot => {
-              const plotSizeKey = `villa_${plot.size}`;
-              totalResidentialUnits += plot.count;
-              unitsByType[plotSizeKey] = (unitsByType[plotSizeKey] || 0) + plot.count;
-
-              const projectHousing = projectHousingTypes.find(h => h.code === plotSizeKey);
-              const buildArea = projectHousing ? projectHousing.default_area_m2 : (UNIT_BUILD_AREAS[plotSizeKey] || plot.size * 0.3);
+          const units = getUnitsByHalfBlockId(hb.id);
+          
+          units.forEach(unit => {
+            if (unit.unit_type === 'villa' && unit.size_m2) {
+              totalResidentialUnits++;
               
-              const costParam = mergedConstructionCosts.find((c) => c.code === projectHousing?.default_cost_type);
+              const villaType = unit.building_type || 'BMS';
+              unitsByType[villaType] = (unitsByType[villaType] || 0) + 1;
+              
+              const projectHousing = mergedHousingTypes.find(h => h.code === villaType);
+              const housingConfig = HOUSING_TYPES[villaType];
+              const buildArea = projectHousing ? projectHousing.default_area_m2 : (housingConfig?.defaultArea || unit.size_m2 * 0.3);
+              
+              const costTypeCode = projectHousing?.default_cost_type || housingConfig?.defaultCostType || 'ZME';
+              const costParam = mergedConstructionCosts.find((c) => c.code === costTypeCode);
               const costPerM2 = costParam ? costParam.gold_grams_per_m2 * 85 * 656 : 1000;
-              const rentMonthly = projectHousing?.default_rent_monthly || 500;
+              
+              const rentMonthly = projectHousing ? projectHousing.default_rent_monthly : (housingConfig?.defaultRent || 500000);
 
-              totalBuildArea += buildArea * plot.count;
-              totalCosts += buildArea * costPerM2 * plot.count;
-              totalRevenue += rentMonthly * 12 * (scenario.rental_period_years || 20) * plot.count;
-            });
-          }
+              totalBuildArea += buildArea;
+              totalCosts += buildArea * costPerM2;
+              totalRevenue += rentMonthly * 12 * (scenario.rental_period_years || 20);
+            }
+          });
         } else if (hb.type === 'apartments' && hb.apartment_layout) {
           const buildingConfig = BUILDING_TYPES.find(bt => bt.id === hb.apartment_layout);
           if (buildingConfig?.units) {

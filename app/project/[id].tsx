@@ -1,5 +1,5 @@
 import { Stack, useRouter, useLocalSearchParams } from 'expo-router';
-import { Plus, MapPin, Copy, Trash2, Settings, FileText } from 'lucide-react-native';
+import { Plus, MapPin, Copy, Trash2, Settings, FileText, Edit3 } from 'lucide-react-native';
 import React, { useState } from 'react';
 import {
   View,
@@ -29,7 +29,7 @@ type Site = {
 export default function ProjectScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { projects, getSitesByProjectId, getScenariosBySiteId, createSite, createScenario, deleteScenario, duplicateScenario, isLoading, loadSites, loadProjects, loadScenarios, deleteSite, duplicateSite } = useZURB();
+  const { projects, getSitesByProjectId, getScenariosBySiteId, createSite, createScenario, deleteScenario, duplicateScenario, isLoading, loadSites, loadProjects, loadScenarios, deleteSite, duplicateSite, updateSite, updateScenario } = useZURB();
   const [modalVisible, setModalVisible] = useState<boolean>(false);
   const [siteName, setSiteName] = useState<string>('');
   const [siteArea, setSiteArea] = useState<string>('');
@@ -39,6 +39,8 @@ export default function ProjectScreen() {
   const [scenarioName, setScenarioName] = useState<string>('');
   const [scenarioNotes, setScenarioNotes] = useState<string>('');
   const [isCreatingScenario, setIsCreatingScenario] = useState<boolean>(false);
+  const [renameModalVisible, setRenameModalVisible] = useState<{ type: 'site' | 'scenario'; id: string; currentName: string } | null>(null);
+  const [renameName, setRenameName] = useState<string>('');
 
   const handleRefresh = async () => {
     setRefreshing(true);
