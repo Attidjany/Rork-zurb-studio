@@ -334,7 +334,7 @@ export default function ScenarioScreen() {
               const projectHousing = mergedHousingTypes.find(h => h.code === type);
               const housingConfig = HOUSING_TYPES[type];
               const name = projectHousing ? projectHousing.name : (housingConfig?.name || type);
-              const area = projectHousing ? projectHousing.default_area_m2 : 0;
+              const area = projectHousing ? projectHousing.default_area_m2 : (housingConfig?.defaultArea || 0);
               return (
                 <View key={type} style={styles.breakdownRow}>
                   <View style={styles.breakdownLabelContainer}>

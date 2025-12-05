@@ -196,7 +196,7 @@ export default function SiteScreen() {
   const villaUnitsForCurrentLayout = useMemo(() => {
     if (!selectedHalfBlock || !villaTypeModalVisible) return [];
     return getUnitsByHalfBlockId(selectedHalfBlock.id);
-  }, [selectedHalfBlock, villaTypeModalVisible, getUnitsByHalfBlockId, units]);
+  }, [selectedHalfBlock, villaTypeModalVisible, getUnitsByHalfBlockId]);
 
   if (!site) {
     return (

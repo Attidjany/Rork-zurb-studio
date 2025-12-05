@@ -731,6 +731,58 @@ export const [ZURBContext, useZURB] = createContextHook(() => {
               continue;
             }
 
+            const originalBlocks = getBlocksBySiteId(site.id);
+            const blockIdMap: { [oldId: string]: string } = {};
+            
+            for (const block of originalBlocks) {
+              const { data: newBlock, error: blockError } = await supabase
+                .from('blocks')
+                .insert({
+                  site_id: newSite.id,
+                  block_number: block.block_number,
+                })
+                .select()
+                .single();
+
+              if (!blockError && newBlock) {
+                blockIdMap[block.id] = newBlock.id;
+                
+                const originalHalfBlocks = getHalfBlocksByBlockId(block.id);
+                const halfBlockIdMap: { [oldId: string]: string } = {};
+                
+                for (const halfBlock of originalHalfBlocks) {
+                  const { data: newHalfBlock, error: hbError } = await supabase
+                    .from('half_blocks')
+                    .insert({
+                      block_id: newBlock.id,
+                      position: halfBlock.position,
+                      type: halfBlock.type,
+                      villa_layout: halfBlock.villa_layout,
+                      apartment_layout: halfBlock.apartment_layout,
+                    })
+                    .select()
+                    .single();
+
+                  if (!hbError && newHalfBlock) {
+                    halfBlockIdMap[halfBlock.id] = newHalfBlock.id;
+                    
+                    const originalUnits = getUnitsByHalfBlockId(halfBlock.id);
+                    for (const unit of originalUnits) {
+                      await supabase.from('units').insert({
+                        half_block_id: newHalfBlock.id,
+                        unit_number: unit.unit_number,
+                        unit_type: unit.unit_type,
+                        size_m2: unit.size_m2,
+                        building_type: unit.building_type,
+                        equipment_name: unit.equipment_name,
+                        utility_name: unit.utility_name,
+                      });
+                    }
+                  }
+                }
+              }
+            }
+
             const originalScenarios = getScenariosBySiteId(site.id);
             for (const scenario of originalScenarios) {
               const { error: scenarioError } = await supabase
@@ -752,7 +804,7 @@ export const [ZURBContext, useZURB] = createContextHook(() => {
           }
         }
 
-        await Promise.all([loadSites(), loadBlocks(), loadHalfBlocks(), loadScenarios()]);
+        await Promise.all([loadSites(), loadBlocks(), loadHalfBlocks(), loadUnits(), loadScenarios()]);
         return newProject;
       } catch (error: any) {
         console.error('[ZURB] Error duplicating project:', error);
@@ -760,7 +812,7 @@ export const [ZURBContext, useZURB] = createContextHook(() => {
         return null;
       }
     },
-    [projects, user, getSitesByProjectId, getScenariosBySiteId, loadSites, loadBlocks, loadHalfBlocks, loadScenarios]
+    [projects, user, getSitesByProjectId, getScenariosBySiteId, getBlocksBySiteId, getHalfBlocksByBlockId, getUnitsByHalfBlockId, loadSites, loadBlocks, loadHalfBlocks, loadUnits, loadScenarios]
   );
 
   const createSite = useCallback(
@@ -867,6 +919,51 @@ export const [ZURBContext, useZURB] = createContextHook(() => {
 
         console.log('[ZURB] Site duplicated:', newSite);
 
+        const originalBlocks = getBlocksBySiteId(siteId);
+        for (const block of originalBlocks) {
+          const { data: newBlock, error: blockError } = await supabase
+            .from('blocks')
+            .insert({
+              site_id: newSite.id,
+              block_number: block.block_number,
+            })
+            .select()
+            .single();
+
+          if (!blockError && newBlock) {
+            const originalHalfBlocks = getHalfBlocksByBlockId(block.id);
+            
+            for (const halfBlock of originalHalfBlocks) {
+              const { data: newHalfBlock, error: hbError } = await supabase
+                .from('half_blocks')
+                .insert({
+                  block_id: newBlock.id,
+                  position: halfBlock.position,
+                  type: halfBlock.type,
+                  villa_layout: halfBlock.villa_layout,
+                  apartment_layout: halfBlock.apartment_layout,
+                })
+                .select()
+                .single();
+
+              if (!hbError && newHalfBlock) {
+                const originalUnits = getUnitsByHalfBlockId(halfBlock.id);
+                for (const unit of originalUnits) {
+                  await supabase.from('units').insert({
+                    half_block_id: newHalfBlock.id,
+                    unit_number: unit.unit_number,
+                    unit_type: unit.unit_type,
+                    size_m2: unit.size_m2,
+                    building_type: unit.building_type,
+                    equipment_name: unit.equipment_name,
+                    utility_name: unit.utility_name,
+                  });
+                }
+              }
+            }
+          }
+        }
+
         const originalScenarios = getScenariosBySiteId(siteId);
         for (const scenario of originalScenarios) {
           const { error: scenarioError } = await supabase
@@ -886,7 +983,7 @@ export const [ZURBContext, useZURB] = createContextHook(() => {
           }
         }
 
-        await loadScenarios();
+        await Promise.all([loadBlocks(), loadHalfBlocks(), loadUnits(), loadScenarios()]);
         return newSite;
       } catch (error: any) {
         console.error('[ZURB] Error duplicating site:', error);
@@ -894,7 +991,7 @@ export const [ZURBContext, useZURB] = createContextHook(() => {
         return null;
       }
     },
-    [sites, user, getScenariosBySiteId, loadScenarios]
+    [sites, user, getScenariosBySiteId, getBlocksBySiteId, getHalfBlocksByBlockId, getUnitsByHalfBlockId, loadBlocks, loadHalfBlocks, loadUnits, loadScenarios]
   );
 
   const updateHalfBlock = useCallback(

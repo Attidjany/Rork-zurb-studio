@@ -155,6 +155,16 @@ export default function ProjectScreen() {
       <View style={styles.siteActions}>
         <TouchableOpacity
           style={styles.actionBtn}
+          onPress={() => {
+            setRenameModalVisible({ type: 'site', id: item.id, currentName: item.name });
+            setRenameName(item.name);
+          }}
+          testID={`rename-site-${item.id}`}
+        >
+          <Edit3 size={16} color="#007AFF" />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.actionBtn}
           onPress={() => handleDuplicateSite(item.id)}
           testID={`duplicate-site-${item.id}`}
         >
@@ -192,6 +202,16 @@ export default function ProjectScreen() {
                 <FileText size={14} color="#6C757D" />
                 <Text style={styles.scenarioItemName} numberOfLines={1}>{scenario.name}</Text>
                 <View style={styles.scenarioItemActions}>
+                  <TouchableOpacity
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      setRenameModalVisible({ type: 'scenario', id: scenario.id, currentName: scenario.name });
+                      setRenameName(scenario.name);
+                    }}
+                    style={styles.scenarioItemAction}
+                  >
+                    <Edit3 size={12} color="#007AFF" />
+                  </TouchableOpacity>
                   <TouchableOpacity
                     onPress={(e) => {
                       e.stopPropagation();
@@ -401,6 +421,49 @@ export default function ProjectScreen() {
                 ) : (
                   <Text style={styles.createButtonText}>Create</Text>
                 )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={renameModalVisible !== null}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setRenameModalVisible(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Rename {renameModalVisible?.type === 'site' ? 'Site' : 'Scenario'}</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Name"
+              value={renameName}
+              onChangeText={setRenameName}
+            />
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={() => setRenameModalVisible(null)}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.createButton]}
+                onPress={async () => {
+                  if (renameModalVisible && renameName.trim()) {
+                    if (renameModalVisible.type === 'site') {
+                      await updateSite(renameModalVisible.id, { name: renameName.trim() });
+                    } else {
+                      await updateScenario(renameModalVisible.id, { name: renameName.trim() });
+                    }
+                    setRenameModalVisible(null);
+                  }
+                }}
+                disabled={!renameName.trim()}
+              >
+                <Text style={styles.createButtonText}>Rename</Text>
               </TouchableOpacity>
             </View>
           </View>
