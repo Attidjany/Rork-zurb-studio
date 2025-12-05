@@ -1,5 +1,5 @@
 import { Stack, router } from 'expo-router';
-import { LogOut, Edit2, DollarSign } from 'lucide-react-native';
+import { LogOut, Edit2, DollarSign, Users } from 'lucide-react-native';
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
@@ -17,7 +17,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { calculateCostPerM2 } from '@/lib/goldPrice';
 
-type EditMode = 'construction' | 'housing' | 'equipment' | null;
+type EditMode = 'construction' | 'housing' | 'equipment' | 'occupancy' | null;
 type EditItem = any;
 
 type ConstructionCost = {
@@ -47,10 +47,19 @@ type EquipmentUtilityType = {
   cost_type: string;
 };
 
+type OccupancyRate = {
+  id: string;
+  min_area_m2: number;
+  max_area_m2: number | null;
+  people_per_unit: number;
+  category: string;
+};
+
 type Settings = {
   constructionCosts: ConstructionCost[];
   housingTypes: HousingType[];
   equipmentTypes: EquipmentUtilityType[];
+  occupancyRates: OccupancyRate[];
 };
 
 export default function SettingsScreen() {
@@ -77,7 +86,7 @@ export default function SettingsScreen() {
 
       const accountSettingsId = accountSettings.id;
 
-      const [costsResult, housingResult, equipmentResult] = await Promise.all([
+      const [costsResult, housingResult, equipmentResult, occupancyResult] = await Promise.all([
         supabase
           .from('account_construction_costs')
           .select('*')
@@ -93,16 +102,24 @@ export default function SettingsScreen() {
           .select('*')
           .eq('account_settings_id', accountSettingsId)
           .order('code', { ascending: true }),
+        supabase
+          .from('account_occupancy_rates')
+          .select('*')
+          .eq('account_settings_id', accountSettingsId)
+          .order('category', { ascending: true })
+          .order('min_area_m2', { ascending: true }),
       ]);
 
       if (costsResult.error) throw costsResult.error;
       if (housingResult.error) throw housingResult.error;
       if (equipmentResult.error) throw equipmentResult.error;
+      if (occupancyResult.error) throw occupancyResult.error;
 
       setSettings({
         constructionCosts: costsResult.data || [],
         housingTypes: housingResult.data || [],
         equipmentTypes: equipmentResult.data || [],
+        occupancyRates: occupancyResult.data || [],
       });
     } catch (error: any) {
       console.error('[Settings] Error loading settings:', error);
@@ -162,6 +179,16 @@ export default function SettingsScreen() {
     });
   };
 
+  const openEditOccupancyRate = (item: any) => {
+    setEditMode('occupancy');
+    setEditItem(item);
+    setEditValues({
+      min_area_m2: item.min_area_m2.toString(),
+      max_area_m2: item.max_area_m2 ? item.max_area_m2.toString() : '',
+      people_per_unit: item.people_per_unit.toString(),
+    });
+  };
+
   const handleSave = async () => {
     if (!editItem) return;
     
@@ -215,6 +242,31 @@ export default function SettingsScreen() {
             land_area_m2: land,
             building_occupation_pct: pct,
             cost_type: editValues.cost_type,
+          })
+          .eq('id', editItem.id);
+          
+        if (error) throw error;
+      } else if (editMode === 'occupancy') {
+        const minArea = parseFloat(editValues.min_area_m2);
+        const maxArea = editValues.max_area_m2 ? parseFloat(editValues.max_area_m2) : null;
+        const people = parseFloat(editValues.people_per_unit);
+        
+        if (isNaN(minArea) || minArea < 0 || isNaN(people) || people <= 0) {
+          Alert.alert('Error', 'Please enter valid values');
+          return;
+        }
+        
+        if (maxArea !== null && (isNaN(maxArea) || maxArea <= minArea)) {
+          Alert.alert('Error', 'Max area must be greater than min area');
+          return;
+        }
+        
+        const { error } = await supabase
+          .from('account_occupancy_rates')
+          .update({
+            min_area_m2: minArea,
+            max_area_m2: maxArea,
+            people_per_unit: people,
           })
           .eq('id', editItem.id);
           
@@ -373,6 +425,42 @@ export default function SettingsScreen() {
               </View>
             ))}
           </View>
+        </View>
+
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Occupancy Rates</Text>
+            <View style={styles.goldPriceBadge}>
+              <Users size={14} color="#10B981" />
+              <Text style={[styles.goldPriceText, { color: '#10B981' }]}>
+                People/Unit
+              </Text>
+            </View>
+          </View>
+          <View style={styles.card}>
+            {settings?.occupancyRates.map((rate: any, index: number) => (
+              <View key={rate.id}>
+                {index > 0 && <View style={styles.divider} />}
+                <TouchableOpacity
+                  style={styles.paramItem}
+                  onPress={() => openEditOccupancyRate(rate)}
+                >
+                  <View style={styles.paramItemContent}>
+                    <Text style={styles.paramItemCode}>{rate.category.toUpperCase()}</Text>
+                    <Text style={styles.paramItemName}>
+                      {rate.min_area_m2}m² - {rate.max_area_m2 ? `${rate.max_area_m2}m²` : '∞'}
+                    </Text>
+                  </View>
+                  <View style={styles.paramItemValues}>
+                    <Text style={styles.paramItemValue}>
+                      {rate.people_per_unit} people
+                    </Text>
+                    <Edit2 size={16} color="#C7C7CC" style={{ marginLeft: 8 }} />
+                  </View>
+                </TouchableOpacity>
+              </View>
+            ))}
+          </View>
           <Text style={styles.sectionHint}>
             These default parameters will be applied to all newly created projects. 
             You can still customize parameters for individual projects.
@@ -483,6 +571,44 @@ export default function SettingsScreen() {
                     value={editValues.cost_type}
                     onChangeText={(text) => setEditValues({ ...editValues, cost_type: text })}
                     placeholder="ZMER"
+                  />
+                </View>
+              </>
+            )}
+
+            {editMode === 'occupancy' && (
+              <>
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>Min Area (m²)</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={editValues.min_area_m2}
+                    onChangeText={(text) => setEditValues({ ...editValues, min_area_m2: text })}
+                    keyboardType="decimal-pad"
+                    placeholder="0"
+                  />
+                </View>
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>Max Area (m²)</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={editValues.max_area_m2}
+                    onChangeText={(text) => setEditValues({ ...editValues, max_area_m2: text })}
+                    keyboardType="decimal-pad"
+                    placeholder="Leave empty for unlimited"
+                  />
+                  <Text style={styles.inputHint}>
+                    Leave empty for unlimited (∞)
+                  </Text>
+                </View>
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>People per Unit</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={editValues.people_per_unit}
+                    onChangeText={(text) => setEditValues({ ...editValues, people_per_unit: text })}
+                    keyboardType="decimal-pad"
+                    placeholder="4"
                   />
                 </View>
               </>

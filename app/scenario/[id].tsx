@@ -1,9 +1,11 @@
 import { Stack, useLocalSearchParams, router } from 'expo-router';
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import { Settings2 } from 'lucide-react-native';
 import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useZURB } from '@/contexts/ZURBContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabase';
 
 import {
   UNIT_BUILD_AREAS,
@@ -41,6 +43,53 @@ export default function ScenarioScreen() {
   } = useZURB();
 
   const [refreshing, setRefreshing] = useState<boolean>(false);
+  const { user } = useAuth();
+  const [occupancyRates, setOccupancyRates] = useState<{
+    min_area_m2: number;
+    max_area_m2: number | null;
+    people_per_unit: number;
+    category: string;
+  }[]>([]);
+
+  useEffect(() => {
+    const loadOccupancyRates = async () => {
+      if (!user) return;
+      
+      try {
+        const { data: accountSettings, error: settingsError } = await supabase
+          .from('account_settings')
+          .select('id')
+          .eq('user_id', user.id)
+          .single();
+
+        if (settingsError) throw settingsError;
+
+        const { data: rates, error: ratesError } = await supabase
+          .from('account_occupancy_rates')
+          .select('*')
+          .eq('account_settings_id', accountSettings.id)
+          .order('category', { ascending: true })
+          .order('min_area_m2', { ascending: true });
+
+        if (ratesError) throw ratesError;
+
+        setOccupancyRates(rates || []);
+      } catch (error) {
+        console.error('[Scenario] Error loading occupancy rates:', error);
+      }
+    };
+
+    loadOccupancyRates();
+  }, [user]);
+
+  const getOccupancyRate = useCallback((area: number, category: 'villa' | 'apartment'): number => {
+    const rate = occupancyRates.find(
+      r => r.category === category &&
+           r.min_area_m2 <= area &&
+           (r.max_area_m2 === null || area <= r.max_area_m2)
+    );
+    return rate ? rate.people_per_unit : (category === 'villa' ? 4 : 3);
+  }, [occupancyRates]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -163,7 +212,7 @@ export default function ScenarioScreen() {
               
               const rentMonthly = projectHousing ? projectHousing.default_rent_monthly : (housingConfig?.defaultRent || 500000);
 
-              const occupancyRate = unit.size_m2 > 700 ? 6 : unit.size_m2 > 400 ? 5 : 4;
+              const occupancyRate = getOccupancyRate(unit.size_m2, 'villa');
               estimatedPopulation += occupancyRate;
 
               totalBuildArea += buildArea;
@@ -188,7 +237,7 @@ export default function ScenarioScreen() {
               const costPerM2 = costParam ? costParam.gold_grams_per_m2 * 85 * 656 : 900;
               const rentMonthly = projectHousing ? projectHousing.default_rent_monthly : (housingConfig?.defaultRent || 400);
 
-              const occupancyRate = buildArea > 120 ? 5 : buildArea > 80 ? 4 : 3;
+              const occupancyRate = getOccupancyRate(buildArea, 'apartment');
               estimatedPopulation += occupancyRate * totalCount;
 
               totalBuildArea += buildArea * totalCount;
@@ -255,7 +304,7 @@ export default function ScenarioScreen() {
       rentalPeriodYears,
       estimatedPopulation,
     };
-  }, [scenario, siteBlocks, getHalfBlocksByBlockId, getUnitsByHalfBlockId, mergedConstructionCosts, mergedHousingTypes, mergedEquipmentUtilityTypes, projectHousingTypes]);
+  }, [scenario, siteBlocks, getHalfBlocksByBlockId, getUnitsByHalfBlockId, mergedConstructionCosts, mergedHousingTypes, mergedEquipmentUtilityTypes, getOccupancyRate]);
 
   if (!scenario || !site) {
     return (
