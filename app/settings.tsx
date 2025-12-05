@@ -1,6 +1,6 @@
 import { Stack, router } from 'expo-router';
 import { LogOut, Edit2, DollarSign } from 'lucide-react-native';
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -14,11 +14,44 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '@/contexts/AuthContext';
-import { trpc } from '@/lib/trpc';
+import { supabase } from '@/lib/supabase';
 import { calculateCostPerM2 } from '@/lib/goldPrice';
 
 type EditMode = 'construction' | 'housing' | 'equipment' | null;
 type EditItem = any;
+
+type ConstructionCost = {
+  id: string;
+  code: string;
+  name: string;
+  gold_grams_per_m2: number;
+};
+
+type HousingType = {
+  id: string;
+  code: string;
+  name: string;
+  category: string;
+  default_area_m2: number;
+  default_cost_type: string;
+  default_rent_monthly: number;
+};
+
+type EquipmentUtilityType = {
+  id: string;
+  code: string;
+  name: string;
+  category: string;
+  land_area_m2: number;
+  building_occupation_pct: number;
+  cost_type: string;
+};
+
+type Settings = {
+  constructionCosts: ConstructionCost[];
+  housingTypes: HousingType[];
+  equipmentTypes: EquipmentUtilityType[];
+};
 
 export default function SettingsScreen() {
   const { signOut, user } = useAuth();
@@ -26,46 +59,62 @@ export default function SettingsScreen() {
   const [editMode, setEditMode] = useState<EditMode>(null);
   const [editItem, setEditItem] = useState<EditItem>(null);
   const [editValues, setEditValues] = useState<any>({});
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [settings, setSettings] = useState<Settings | null>(null);
 
-  const settingsQuery = trpc.settings.get.useQuery(undefined, {
-    enabled: !!user,
-  });
+  const loadSettings = useCallback(async () => {
+    if (!user) return;
+    
+    try {
+      const { data: accountSettings, error: settingsError } = await supabase
+        .from('account_settings')
+        .select('id')
+        .eq('user_id', user.id)
+        .single();
 
-  const updateConstructionCostMutation = trpc.settings.updateConstructionCost.useMutation({
-    onSuccess: () => {
-      settingsQuery.refetch();
-      setEditMode(null);
-      setEditItem(null);
-      Alert.alert('Success', 'Construction cost updated successfully');
-    },
-    onError: (error) => {
-      Alert.alert('Error', error.message);
-    },
-  });
+      if (settingsError) throw settingsError;
 
-  const updateHousingTypeMutation = trpc.settings.updateHousingType.useMutation({
-    onSuccess: () => {
-      settingsQuery.refetch();
-      setEditMode(null);
-      setEditItem(null);
-      Alert.alert('Success', 'Housing type updated successfully');
-    },
-    onError: (error) => {
-      Alert.alert('Error', error.message);
-    },
-  });
+      const accountSettingsId = accountSettings.id;
 
-  const updateEquipmentTypeMutation = trpc.settings.updateEquipmentType.useMutation({
-    onSuccess: () => {
-      settingsQuery.refetch();
-      setEditMode(null);
-      setEditItem(null);
-      Alert.alert('Success', 'Equipment type updated successfully');
-    },
-    onError: (error) => {
-      Alert.alert('Error', error.message);
-    },
-  });
+      const [costsResult, housingResult, equipmentResult] = await Promise.all([
+        supabase
+          .from('account_construction_costs')
+          .select('*')
+          .eq('account_settings_id', accountSettingsId)
+          .order('code', { ascending: true }),
+        supabase
+          .from('account_housing_types')
+          .select('*')
+          .eq('account_settings_id', accountSettingsId)
+          .order('code', { ascending: true }),
+        supabase
+          .from('account_equipment_utility_types')
+          .select('*')
+          .eq('account_settings_id', accountSettingsId)
+          .order('code', { ascending: true }),
+      ]);
+
+      if (costsResult.error) throw costsResult.error;
+      if (housingResult.error) throw housingResult.error;
+      if (equipmentResult.error) throw equipmentResult.error;
+
+      setSettings({
+        constructionCosts: costsResult.data || [],
+        housingTypes: housingResult.data || [],
+        equipmentTypes: equipmentResult.data || [],
+      });
+    } catch (error: any) {
+      console.error('[Settings] Error loading settings:', error);
+      Alert.alert('Error', 'Failed to load settings');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    loadSettings();
+  }, [loadSettings]);
 
   const handleLogout = () => {
     Alert.alert(
@@ -113,49 +162,79 @@ export default function SettingsScreen() {
     });
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!editItem) return;
-
-    if (editMode === 'construction') {
-      const goldGrams = parseFloat(editValues.gold_grams_per_m2);
-      if (isNaN(goldGrams) || goldGrams <= 0) {
-        Alert.alert('Error', 'Please enter a valid value');
-        return;
+    
+    setIsSaving(true);
+    
+    try {
+      if (editMode === 'construction') {
+        const goldGrams = parseFloat(editValues.gold_grams_per_m2);
+        if (isNaN(goldGrams) || goldGrams <= 0) {
+          Alert.alert('Error', 'Please enter a valid value');
+          return;
+        }
+        
+        const { error } = await supabase
+          .from('account_construction_costs')
+          .update({ gold_grams_per_m2: goldGrams })
+          .eq('id', editItem.id);
+          
+        if (error) throw error;
+        
+      } else if (editMode === 'housing') {
+        const area = parseFloat(editValues.default_area_m2);
+        const rent = parseFloat(editValues.default_rent_monthly);
+        if (isNaN(area) || area <= 0 || isNaN(rent) || rent < 0) {
+          Alert.alert('Error', 'Please enter valid values');
+          return;
+        }
+        
+        const { error } = await supabase
+          .from('account_housing_types')
+          .update({
+            default_area_m2: area,
+            default_cost_type: editValues.default_cost_type,
+            default_rent_monthly: rent,
+          })
+          .eq('id', editItem.id);
+          
+        if (error) throw error;
+        
+      } else if (editMode === 'equipment') {
+        const land = parseFloat(editValues.land_area_m2);
+        const pct = parseFloat(editValues.building_occupation_pct) / 100;
+        if (isNaN(land) || land <= 0 || isNaN(pct) || pct < 0 || pct > 1) {
+          Alert.alert('Error', 'Please enter valid values');
+          return;
+        }
+        
+        const { error } = await supabase
+          .from('account_equipment_utility_types')
+          .update({
+            land_area_m2: land,
+            building_occupation_pct: pct,
+            cost_type: editValues.cost_type,
+          })
+          .eq('id', editItem.id);
+          
+        if (error) throw error;
       }
-      updateConstructionCostMutation.mutate({
-        id: editItem.id,
-        gold_grams_per_m2: goldGrams,
-      });
-    } else if (editMode === 'housing') {
-      const area = parseFloat(editValues.default_area_m2);
-      const rent = parseFloat(editValues.default_rent_monthly);
-      if (isNaN(area) || area <= 0 || isNaN(rent) || rent < 0) {
-        Alert.alert('Error', 'Please enter valid values');
-        return;
-      }
-      updateHousingTypeMutation.mutate({
-        id: editItem.id,
-        default_area_m2: area,
-        default_cost_type: editValues.default_cost_type,
-        default_rent_monthly: rent,
-      });
-    } else if (editMode === 'equipment') {
-      const land = parseFloat(editValues.land_area_m2);
-      const pct = parseFloat(editValues.building_occupation_pct) / 100;
-      if (isNaN(land) || land <= 0 || isNaN(pct) || pct < 0 || pct > 1) {
-        Alert.alert('Error', 'Please enter valid values');
-        return;
-      }
-      updateEquipmentTypeMutation.mutate({
-        id: editItem.id,
-        land_area_m2: land,
-        building_occupation_pct: pct,
-        cost_type: editValues.cost_type,
-      });
+      
+      await loadSettings();
+      setEditMode(null);
+      setEditItem(null);
+      Alert.alert('Success', 'Settings updated successfully');
+      
+    } catch (error: any) {
+      console.error('[Settings] Error saving:', error);
+      Alert.alert('Error', error.message || 'Failed to update settings');
+    } finally {
+      setIsSaving(false);
     }
   };
 
-  if (settingsQuery.status === 'pending') {
+  if (isLoading) {
     return (
       <SafeAreaView style={styles.container} edges={['bottom']}>
         <Stack.Screen
@@ -171,8 +250,6 @@ export default function SettingsScreen() {
       </SafeAreaView>
     );
   }
-
-  const settings = settingsQuery.data;
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
@@ -421,15 +498,9 @@ export default function SettingsScreen() {
               <TouchableOpacity
                 style={styles.modalButtonSave}
                 onPress={handleSave}
-                disabled={
-                  updateConstructionCostMutation.status === 'pending' ||
-                  updateHousingTypeMutation.status === 'pending' ||
-                  updateEquipmentTypeMutation.status === 'pending'
-                }
+                disabled={isSaving}
               >
-                {(updateConstructionCostMutation.status === 'pending' ||
-                  updateHousingTypeMutation.status === 'pending' ||
-                  updateEquipmentTypeMutation.status === 'pending') ? (
+                {isSaving ? (
                   <ActivityIndicator color="#FFFFFF" />
                 ) : (
                   <Text style={styles.modalButtonSaveText}>Save</Text>
