@@ -103,6 +103,7 @@ export default function SiteScreen() {
     }
     
     setConfigModalVisible(false);
+    setVillaTypeModalVisible(false);
     setSelectedHalfBlockId(null);
     setSelectedBlock(null);
   }, [selectedHalfBlockId, updateHalfBlock, getUnitsByHalfBlockId, createUnit, loadUnits]);
@@ -190,6 +191,11 @@ export default function SiteScreen() {
     const allHalfBlocks = siteBlocks.flatMap(block => getHalfBlocksByBlockId(block.id));
     return allHalfBlocks.find(hb => hb.id === selectedHalfBlockId) || null;
   }, [selectedHalfBlockId, siteBlocks, getHalfBlocksByBlockId]);
+
+  const villaUnitsForCurrentLayout = useMemo(() => {
+    if (!selectedHalfBlock || !villaTypeModalVisible) return [];
+    return getUnitsByHalfBlockId(selectedHalfBlock.id);
+  }, [selectedHalfBlock, villaTypeModalVisible, getUnitsByHalfBlockId]);
 
   if (!site) {
     return (
@@ -670,13 +676,12 @@ export default function SiteScreen() {
 
             <ScrollView style={styles.buildingList} showsVerticalScrollIndicator={false}>
               {selectedHalfBlock && (() => {
-                const villaUnits = getUnitsByHalfBlockId(selectedHalfBlock.id);
                 const villaLayout = VILLA_LAYOUTS.find(l => l.id === selectedHalfBlock.villa_layout);
                 
                 if (!villaLayout) return null;
 
-                const groupedUnits: { [key: number]: typeof villaUnits } = {};
-                villaUnits.forEach((unit) => {
+                const groupedUnits: { [key: number]: typeof villaUnitsForCurrentLayout } = {};
+                villaUnitsForCurrentLayout.forEach((unit) => {
                   const plotSize = unit.size_m2 || 0;
                   if (!groupedUnits[plotSize]) {
                     groupedUnits[plotSize] = [];
