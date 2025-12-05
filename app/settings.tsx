@@ -1,6 +1,6 @@
 import { Stack, router } from 'expo-router';
-import { Settings as SettingsIcon, LogOut, ChevronRight } from 'lucide-react-native';
-import React from 'react';
+import { LogOut, Edit2, DollarSign } from 'lucide-react-native';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -8,12 +8,64 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
+  ActivityIndicator,
+  Modal,
+  TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '@/contexts/AuthContext';
+import { trpc } from '@/lib/trpc';
+import { calculateCostPerM2 } from '@/lib/goldPrice';
+
+type EditMode = 'construction' | 'housing' | 'equipment' | null;
+type EditItem = any;
 
 export default function SettingsScreen() {
   const { signOut, user } = useAuth();
+  const currentGoldPrice = 65;
+  const [editMode, setEditMode] = useState<EditMode>(null);
+  const [editItem, setEditItem] = useState<EditItem>(null);
+  const [editValues, setEditValues] = useState<any>({});
+
+  const settingsQuery = trpc.settings.get.useQuery(undefined, {
+    enabled: !!user,
+  });
+
+  const updateConstructionCostMutation = trpc.settings.updateConstructionCost.useMutation({
+    onSuccess: () => {
+      settingsQuery.refetch();
+      setEditMode(null);
+      setEditItem(null);
+      Alert.alert('Success', 'Construction cost updated successfully');
+    },
+    onError: (error) => {
+      Alert.alert('Error', error.message);
+    },
+  });
+
+  const updateHousingTypeMutation = trpc.settings.updateHousingType.useMutation({
+    onSuccess: () => {
+      settingsQuery.refetch();
+      setEditMode(null);
+      setEditItem(null);
+      Alert.alert('Success', 'Housing type updated successfully');
+    },
+    onError: (error) => {
+      Alert.alert('Error', error.message);
+    },
+  });
+
+  const updateEquipmentTypeMutation = trpc.settings.updateEquipmentType.useMutation({
+    onSuccess: () => {
+      settingsQuery.refetch();
+      setEditMode(null);
+      setEditItem(null);
+      Alert.alert('Success', 'Equipment type updated successfully');
+    },
+    onError: (error) => {
+      Alert.alert('Error', error.message);
+    },
+  });
 
   const handleLogout = () => {
     Alert.alert(
@@ -32,6 +84,95 @@ export default function SettingsScreen() {
       ]
     );
   };
+
+  const openEditConstructionCost = (item: any) => {
+    setEditMode('construction');
+    setEditItem(item);
+    setEditValues({
+      gold_grams_per_m2: item.gold_grams_per_m2.toString(),
+    });
+  };
+
+  const openEditHousingType = (item: any) => {
+    setEditMode('housing');
+    setEditItem(item);
+    setEditValues({
+      default_area_m2: item.default_area_m2.toString(),
+      default_cost_type: item.default_cost_type,
+      default_rent_monthly: item.default_rent_monthly.toString(),
+    });
+  };
+
+  const openEditEquipmentType = (item: any) => {
+    setEditMode('equipment');
+    setEditItem(item);
+    setEditValues({
+      land_area_m2: item.land_area_m2.toString(),
+      building_occupation_pct: (item.building_occupation_pct * 100).toString(),
+      cost_type: item.cost_type,
+    });
+  };
+
+  const handleSave = () => {
+    if (!editItem) return;
+
+    if (editMode === 'construction') {
+      const goldGrams = parseFloat(editValues.gold_grams_per_m2);
+      if (isNaN(goldGrams) || goldGrams <= 0) {
+        Alert.alert('Error', 'Please enter a valid value');
+        return;
+      }
+      updateConstructionCostMutation.mutate({
+        id: editItem.id,
+        gold_grams_per_m2: goldGrams,
+      });
+    } else if (editMode === 'housing') {
+      const area = parseFloat(editValues.default_area_m2);
+      const rent = parseFloat(editValues.default_rent_monthly);
+      if (isNaN(area) || area <= 0 || isNaN(rent) || rent < 0) {
+        Alert.alert('Error', 'Please enter valid values');
+        return;
+      }
+      updateHousingTypeMutation.mutate({
+        id: editItem.id,
+        default_area_m2: area,
+        default_cost_type: editValues.default_cost_type,
+        default_rent_monthly: rent,
+      });
+    } else if (editMode === 'equipment') {
+      const land = parseFloat(editValues.land_area_m2);
+      const pct = parseFloat(editValues.building_occupation_pct) / 100;
+      if (isNaN(land) || land <= 0 || isNaN(pct) || pct < 0 || pct > 1) {
+        Alert.alert('Error', 'Please enter valid values');
+        return;
+      }
+      updateEquipmentTypeMutation.mutate({
+        id: editItem.id,
+        land_area_m2: land,
+        building_occupation_pct: pct,
+        cost_type: editValues.cost_type,
+      });
+    }
+  };
+
+  if (settingsQuery.status === 'pending') {
+    return (
+      <SafeAreaView style={styles.container} edges={['bottom']}>
+        <Stack.Screen
+          options={{
+            title: 'Settings',
+            headerShown: true,
+          }}
+        />
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#007AFF" />
+          <Text style={styles.loadingText}>Loading settings...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  const settings = settingsQuery.data;
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
@@ -61,50 +202,104 @@ export default function SettingsScreen() {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Default Project Parameters</Text>
-          <View style={styles.card}>
-            <TouchableOpacity
-              style={styles.menuItem}
-              onPress={() => {
-                Alert.alert(
-                  'Coming Soon',
-                  'Default project parameters feature is under development. For now, new projects are created with standard defaults that you can customize in Project Settings.'
-                );
-              }}
-            >
-              <View style={styles.menuItemContent}>
-                <View style={styles.menuItemIcon}>
-                  <SettingsIcon size={20} color="#007AFF" />
-                </View>
-                <View style={styles.menuItemText}>
-                  <Text style={styles.menuItemTitle}>Configure Defaults</Text>
-                  <Text style={styles.menuItemSubtitle}>
-                    Set default parameters for new projects
-                  </Text>
-                </View>
-              </View>
-              <ChevronRight size={20} color="#C7C7CC" />
-            </TouchableOpacity>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Construction Costs</Text>
+            <View style={styles.goldPriceBadge}>
+              <DollarSign size={14} color="#F59E0B" />
+              <Text style={styles.goldPriceText}>
+                ${currentGoldPrice.toFixed(2)}/g
+              </Text>
+            </View>
           </View>
-          <Text style={styles.sectionHint}>
-            Configure default construction costs, housing types, and equipment settings that will be applied to all newly created projects. 
-            You can still customize parameters for individual projects.
-          </Text>
+          <View style={styles.card}>
+            {settings?.constructionCosts.map((cost: any, index: number) => (
+              <View key={cost.id}>
+                {index > 0 && <View style={styles.divider} />}
+                <TouchableOpacity
+                  style={styles.paramItem}
+                  onPress={() => openEditConstructionCost(cost)}
+                >
+                  <View style={styles.paramItemContent}>
+                    <Text style={styles.paramItemCode}>{cost.code}</Text>
+                    <Text style={styles.paramItemName}>{cost.name}</Text>
+                  </View>
+                  <View style={styles.paramItemValues}>
+                    <Text style={styles.paramItemValue}>
+                      {cost.gold_grams_per_m2.toFixed(2)} g/m²
+                    </Text>
+                    <Text style={styles.paramItemValueSecondary}>
+                      ${calculateCostPerM2(cost.gold_grams_per_m2, currentGoldPrice).toFixed(0)}/m²
+                    </Text>
+                    <Edit2 size={16} color="#C7C7CC" style={{ marginLeft: 8 }} />
+                  </View>
+                </TouchableOpacity>
+              </View>
+            ))}
+          </View>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>About</Text>
+          <Text style={styles.sectionTitle}>Housing Types</Text>
           <View style={styles.card}>
-            <View style={styles.aboutItem}>
-              <Text style={styles.aboutLabel}>Version</Text>
-              <Text style={styles.aboutValue}>1.0.0</Text>
-            </View>
-            <View style={styles.divider} />
-            <View style={styles.aboutItem}>
-              <Text style={styles.aboutLabel}>Application</Text>
-              <Text style={styles.aboutValue}>ZURB Studio</Text>
-            </View>
+            {settings?.housingTypes.map((type: any, index: number) => (
+              <View key={type.id}>
+                {index > 0 && <View style={styles.divider} />}
+                <TouchableOpacity
+                  style={styles.paramItem}
+                  onPress={() => openEditHousingType(type)}
+                >
+                  <View style={styles.paramItemContent}>
+                    <Text style={styles.paramItemCode}>{type.code}</Text>
+                    <Text style={styles.paramItemName}>{type.name}</Text>
+                    <Text style={styles.paramItemCategory}>{type.category}</Text>
+                  </View>
+                  <View style={styles.paramItemValues}>
+                    <Text style={styles.paramItemValue}>
+                      {type.default_area_m2}m² • {type.default_cost_type}
+                    </Text>
+                    <Text style={styles.paramItemValueSecondary}>
+                      {(type.default_rent_monthly / 1000).toFixed(0)}K XOF/mo
+                    </Text>
+                    <Edit2 size={16} color="#C7C7CC" style={{ marginLeft: 8 }} />
+                  </View>
+                </TouchableOpacity>
+              </View>
+            ))}
           </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Equipment & Utility Types</Text>
+          <View style={styles.card}>
+            {settings?.equipmentTypes.map((type: any, index: number) => (
+              <View key={type.id}>
+                {index > 0 && <View style={styles.divider} />}
+                <TouchableOpacity
+                  style={styles.paramItem}
+                  onPress={() => openEditEquipmentType(type)}
+                >
+                  <View style={styles.paramItemContent}>
+                    <Text style={styles.paramItemCode}>{type.code}</Text>
+                    <Text style={styles.paramItemName}>{type.name}</Text>
+                    <Text style={styles.paramItemCategory}>{type.category}</Text>
+                  </View>
+                  <View style={styles.paramItemValues}>
+                    <Text style={styles.paramItemValue}>
+                      {type.land_area_m2}m² • {(type.building_occupation_pct * 100).toFixed(0)}%
+                    </Text>
+                    <Text style={styles.paramItemValueSecondary}>
+                      {type.cost_type}
+                    </Text>
+                    <Edit2 size={16} color="#C7C7CC" style={{ marginLeft: 8 }} />
+                  </View>
+                </TouchableOpacity>
+              </View>
+            ))}
+          </View>
+          <Text style={styles.sectionHint}>
+            These default parameters will be applied to all newly created projects. 
+            You can still customize parameters for individual projects.
+          </Text>
         </View>
 
         <View style={styles.section}>
@@ -117,6 +312,133 @@ export default function SettingsScreen() {
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      <Modal
+        visible={editMode !== null}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setEditMode(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>
+              Edit {editItem?.name || 'Parameter'}
+            </Text>
+
+            {editMode === 'construction' && (
+              <>
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>Gold Grams per m²</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={editValues.gold_grams_per_m2}
+                    onChangeText={(text) => setEditValues({ ...editValues, gold_grams_per_m2: text })}
+                    keyboardType="decimal-pad"
+                    placeholder="14.91"
+                  />
+                  <Text style={styles.inputHint}>
+                    Cost per m²: ${calculateCostPerM2(parseFloat(editValues.gold_grams_per_m2) || 0, currentGoldPrice).toFixed(0)}
+                  </Text>
+                </View>
+              </>
+            )}
+
+            {editMode === 'housing' && (
+              <>
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>Default Area (m²)</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={editValues.default_area_m2}
+                    onChangeText={(text) => setEditValues({ ...editValues, default_area_m2: text })}
+                    keyboardType="decimal-pad"
+                    placeholder="100"
+                  />
+                </View>
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>Cost Type</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={editValues.default_cost_type}
+                    onChangeText={(text) => setEditValues({ ...editValues, default_cost_type: text })}
+                    placeholder="ZME"
+                  />
+                </View>
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>Monthly Rent (XOF)</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={editValues.default_rent_monthly}
+                    onChangeText={(text) => setEditValues({ ...editValues, default_rent_monthly: text })}
+                    keyboardType="numeric"
+                    placeholder="250000"
+                  />
+                </View>
+              </>
+            )}
+
+            {editMode === 'equipment' && (
+              <>
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>Land Area (m²)</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={editValues.land_area_m2}
+                    onChangeText={(text) => setEditValues({ ...editValues, land_area_m2: text })}
+                    keyboardType="decimal-pad"
+                    placeholder="1800"
+                  />
+                </View>
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>Building Occupation (%)</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={editValues.building_occupation_pct}
+                    onChangeText={(text) => setEditValues({ ...editValues, building_occupation_pct: text })}
+                    keyboardType="decimal-pad"
+                    placeholder="30"
+                  />
+                </View>
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>Cost Type</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={editValues.cost_type}
+                    onChangeText={(text) => setEditValues({ ...editValues, cost_type: text })}
+                    placeholder="ZMER"
+                  />
+                </View>
+              </>
+            )}
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={styles.modalButtonCancel}
+                onPress={() => setEditMode(null)}
+              >
+                <Text style={styles.modalButtonCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.modalButtonSave}
+                onPress={handleSave}
+                disabled={
+                  updateConstructionCostMutation.status === 'pending' ||
+                  updateHousingTypeMutation.status === 'pending' ||
+                  updateEquipmentTypeMutation.status === 'pending'
+                }
+              >
+                {(updateConstructionCostMutation.status === 'pending' ||
+                  updateHousingTypeMutation.status === 'pending' ||
+                  updateEquipmentTypeMutation.status === 'pending') ? (
+                  <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.modalButtonSaveText}>Save</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -129,9 +451,26 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: '#6C757D',
+  },
   section: {
     marginTop: 24,
     paddingHorizontal: 16,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+    paddingHorizontal: 4,
   },
   sectionTitle: {
     fontSize: 13,
@@ -139,8 +478,20 @@ const styles = StyleSheet.create({
     color: '#6C757D',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
-    marginBottom: 12,
-    paddingHorizontal: 4,
+  },
+  goldPriceBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    gap: 4,
+  },
+  goldPriceText: {
+    fontSize: 12,
+    fontWeight: '600' as const,
+    color: '#F59E0B',
   },
   sectionHint: {
     fontSize: 13,
@@ -191,60 +542,49 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#6C757D',
   },
-  menuItem: {
+  paramItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 20,
+    padding: 16,
   },
-  menuItemContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  paramItemContent: {
     flex: 1,
   },
-  menuItemIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#E3F2FD',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 16,
+  paramItemCode: {
+    fontSize: 15,
+    fontWeight: '700' as const,
+    color: '#007AFF',
+    marginBottom: 2,
   },
-  menuItemText: {
-    flex: 1,
-  },
-  menuItemTitle: {
-    fontSize: 16,
-    fontWeight: '600' as const,
+  paramItemName: {
+    fontSize: 14,
     color: '#212529',
     marginBottom: 2,
   },
-  menuItemSubtitle: {
-    fontSize: 13,
+  paramItemCategory: {
+    fontSize: 12,
     color: '#6C757D',
-    lineHeight: 18,
+    textTransform: 'capitalize',
   },
-  aboutItem: {
+  paramItemValues: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 16,
-    paddingHorizontal: 20,
+    gap: 8,
   },
-  aboutLabel: {
-    fontSize: 16,
+  paramItemValue: {
+    fontSize: 14,
+    fontWeight: '600' as const,
     color: '#212529',
   },
-  aboutValue: {
-    fontSize: 16,
-    fontWeight: '600' as const,
+  paramItemValueSecondary: {
+    fontSize: 13,
     color: '#6C757D',
   },
   divider: {
     height: 1,
     backgroundColor: '#F8F9FA',
-    marginHorizontal: 20,
+    marginHorizontal: 16,
   },
   logoutButton: {
     flexDirection: 'row',
@@ -265,5 +605,75 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '600' as const,
     color: '#FF3B30',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
+    paddingBottom: 40,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '700' as const,
+    color: '#212529',
+    marginBottom: 24,
+  },
+  inputGroup: {
+    marginBottom: 20,
+  },
+  inputLabel: {
+    fontSize: 14,
+    fontWeight: '600' as const,
+    color: '#212529',
+    marginBottom: 8,
+  },
+  input: {
+    backgroundColor: '#F8F9FA',
+    borderRadius: 12,
+    padding: 14,
+    fontSize: 16,
+    color: '#212529',
+    borderWidth: 1,
+    borderColor: '#E9ECEF',
+  },
+  inputHint: {
+    fontSize: 13,
+    color: '#6C757D',
+    marginTop: 6,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 8,
+  },
+  modalButtonCancel: {
+    flex: 1,
+    backgroundColor: '#F8F9FA',
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+  },
+  modalButtonCancelText: {
+    fontSize: 16,
+    fontWeight: '600' as const,
+    color: '#6C757D',
+  },
+  modalButtonSave: {
+    flex: 1,
+    backgroundColor: '#007AFF',
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+  },
+  modalButtonSaveText: {
+    fontSize: 16,
+    fontWeight: '600' as const,
+    color: '#FFFFFF',
   },
 });
