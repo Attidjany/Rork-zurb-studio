@@ -49,6 +49,7 @@ export default function SiteScreen() {
   const [villaTypeModalVisible, setVillaTypeModalVisible] = useState<boolean>(false);
 
   const handleRefresh = useCallback(async () => {
+    console.log('[Site] Manual refresh triggered');
     setRefreshing(true);
     await Promise.all([loadSites(), loadBlocks(), loadHalfBlocks(), loadUnits()]);
     setRefreshing(false);
@@ -165,6 +166,7 @@ export default function SiteScreen() {
   }, [updateUnit]);
 
   const handleUpdateVillaType = useCallback(async (unitId: string, villaType: BuildingType) => {
+    console.log('[Site] Updating villa type for unit:', unitId, 'to:', villaType);
     await updateUnit(unitId, { building_type: villaType });
   }, [updateUnit]);
 

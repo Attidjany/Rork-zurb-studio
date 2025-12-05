@@ -803,6 +803,10 @@ export const [ZURBContext, useZURB] = createContextHook(() => {
         utility_name?: string;
       }
     ) => {
+      setUnits(prev => 
+        prev.map(unit => unit.id === unitId ? { ...unit, ...updates } : unit)
+      );
+      
       try {
         const { error } = await supabase
           .from('units')
@@ -811,13 +815,14 @@ export const [ZURBContext, useZURB] = createContextHook(() => {
 
         if (error) throw error;
 
-        console.log('[ZURB] Unit updated');
+        console.log('[ZURB] Unit updated successfully:', unitId, updates);
       } catch (error: any) {
         console.error('[ZURB] Error updating unit:', error);
         Alert.alert('Error', error.message || 'Failed to update unit');
+        await loadUnits();
       }
     },
-    []
+    [loadUnits]
   );
 
   const createScenario = useCallback(
