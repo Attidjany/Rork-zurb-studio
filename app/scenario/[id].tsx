@@ -122,6 +122,7 @@ export default function ScenarioScreen() {
         equipmentCount: 0,
         utilityCount: 0,
         rentalPeriodYears: 20,
+        estimatedPopulation: 0,
       };
     }
 
@@ -131,6 +132,7 @@ export default function ScenarioScreen() {
     let totalRevenue = 0;
     let equipmentCount = 0;
     let utilityCount = 0;
+    let estimatedPopulation = 0;
     const unitsByType: { [key: string]: number } = {};
     const equipmentByType: { [key: string]: number } = {};
     const utilityByType: { [key: string]: number } = {};
@@ -161,6 +163,9 @@ export default function ScenarioScreen() {
               
               const rentMonthly = projectHousing ? projectHousing.default_rent_monthly : (housingConfig?.defaultRent || 500000);
 
+              const occupancyRate = unit.size_m2 > 700 ? 6 : unit.size_m2 > 400 ? 5 : 4;
+              estimatedPopulation += occupancyRate;
+
               totalBuildArea += buildArea;
               totalCosts += buildArea * costPerM2;
               totalRevenue += rentMonthly * 12 * (scenario.rental_period_years || 20);
@@ -182,6 +187,9 @@ export default function ScenarioScreen() {
               const buildArea = projectHousing ? projectHousing.default_area_m2 : (housingConfig?.defaultArea || 80);
               const costPerM2 = costParam ? costParam.gold_grams_per_m2 * 85 * 656 : 900;
               const rentMonthly = projectHousing ? projectHousing.default_rent_monthly : (housingConfig?.defaultRent || 400);
+
+              const occupancyRate = buildArea > 120 ? 5 : buildArea > 80 ? 4 : 3;
+              estimatedPopulation += occupancyRate * totalCount;
 
               totalBuildArea += buildArea * totalCount;
               totalCosts += buildArea * costPerM2 * totalCount;
@@ -245,6 +253,7 @@ export default function ScenarioScreen() {
       equipmentCount,
       utilityCount,
       rentalPeriodYears,
+      estimatedPopulation,
     };
   }, [scenario, siteBlocks, getHalfBlocksByBlockId, getUnitsByHalfBlockId, mergedConstructionCosts, mergedHousingTypes, mergedEquipmentUtilityTypes, projectHousingTypes]);
 
@@ -288,6 +297,11 @@ export default function ScenarioScreen() {
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Total Residential Units</Text>
             <Text style={styles.summaryValue}>{summary.totalResidentialUnits}</Text>
+          </View>
+
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Estimated Population</Text>
+            <Text style={styles.summaryValue}>{summary.estimatedPopulation} people</Text>
           </View>
 
           <View style={styles.summaryRow}>
