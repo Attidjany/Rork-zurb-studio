@@ -97,6 +97,31 @@ export const BUILDING_TYPES: BuildingTypeConfig[] = [
     },
   },
   {
+    id: 'BMS',
+    name: 'Villa MidEnd Small',
+    category: 'villa',
+  },
+  {
+    id: 'BML',
+    name: 'Villa MidEnd Large',
+    category: 'villa',
+  },
+  {
+    id: 'BH',
+    name: 'Villa Highend',
+    category: 'villa',
+  },
+  {
+    id: 'CH',
+    name: 'Mansion HighEnd',
+    category: 'villa',
+  },
+  {
+    id: 'CO',
+    name: 'Mansion OutStanding',
+    category: 'villa',
+  },
+  {
     id: 'EQS',
     name: 'Equipment Small',
     category: 'equipment',
@@ -219,6 +244,13 @@ export const UNIT_RENTS_MONTHLY: { [key: string]: number } = {
   ZOS: 0,
   ZMER: 0,
   ZHER: 0,
+};
+
+export const VILLA_TYPE_OPTIONS: { [plotSize: number]: BuildingTypeConfig[] } = {
+  200: BUILDING_TYPES.filter(bt => ['BMS', 'BML'].includes(bt.id)),
+  300: BUILDING_TYPES.filter(bt => ['BML', 'BH'].includes(bt.id)),
+  500: BUILDING_TYPES.filter(bt => ['BH', 'CH'].includes(bt.id)),
+  1000: BUILDING_TYPES.filter(bt => ['CH', 'CO'].includes(bt.id)),
 };
 
 export const DEFAULT_LEASE_YEARS = 20;

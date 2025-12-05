@@ -19,6 +19,7 @@ import {
   BUILDING_TYPES,
   EQUIPMENT_OPTIONS,
   UTILITY_OPTIONS,
+  VILLA_TYPE_OPTIONS,
 } from '@/constants/typologies';
 import { DbBlock, DbHalfBlock, VillaLayout, ApartmentLayout, HalfBlockType, BuildingType } from '@/types';
 
@@ -45,6 +46,7 @@ export default function SiteScreen() {
   const [bulkEditMode, setBulkEditMode] = useState<boolean>(false);
   const [selectedHalfBlocks, setSelectedHalfBlocks] = useState<Set<string>>(new Set());
   const [buildingAssignModalVisible, setBuildingAssignModalVisible] = useState<boolean>(false);
+  const [villaTypeModalVisible, setVillaTypeModalVisible] = useState<boolean>(false);
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -74,10 +76,31 @@ export default function SiteScreen() {
   const handleSelectVillaLayout = useCallback(async (layout: VillaLayout) => {
     if (!selectedHalfBlock) return;
     await updateHalfBlock(selectedHalfBlock.id, 'villas', layout);
+    
+    const villaConfig = VILLA_LAYOUTS.find(l => l.id === layout);
+    const units = getUnitsByHalfBlockId(selectedHalfBlock.id);
+    
+    if (units.length === 0 && villaConfig) {
+      let unitNumber = 1;
+      for (const plot of villaConfig.plots) {
+        for (let i = 0; i < plot.count; i++) {
+          await createUnit(
+            selectedHalfBlock.id,
+            unitNumber++,
+            'villa',
+            plot.size,
+            undefined,
+            undefined,
+            undefined
+          );
+        }
+      }
+    }
+    
     setConfigModalVisible(false);
     setSelectedHalfBlock(null);
     setSelectedBlock(null);
-  }, [selectedHalfBlock, updateHalfBlock]);
+  }, [selectedHalfBlock, updateHalfBlock, getUnitsByHalfBlockId, createUnit]);
 
   const handleSelectApartmentLayout = useCallback(async (layout: ApartmentLayout) => {
     if (!selectedHalfBlock) return;
@@ -139,6 +162,10 @@ export default function SiteScreen() {
 
   const handleUpdateBuildingType = useCallback(async (unitId: string, buildingType: BuildingType) => {
     await updateUnit(unitId, { building_type: buildingType });
+  }, [updateUnit]);
+
+  const handleUpdateVillaType = useCallback(async (unitId: string, villaType: BuildingType) => {
+    await updateUnit(unitId, { building_type: villaType });
   }, [updateUnit]);
 
   const handleUpdateEquipmentName = useCallback(async (unitId: string, equipmentName: string) => {
@@ -268,9 +295,22 @@ export default function SiteScreen() {
                                   {northHB.type === 'villas' ? 'Villas' : 'Apartments'}
                                 </Text>
                                 {northHB.villa_layout && (
-                                  <Text style={styles.halfBlockSubtype}>
-                                    {VILLA_LAYOUTS.find(l => l.id === northHB.villa_layout)?.name}
-                                  </Text>
+                                  <>
+                                    <Text style={styles.halfBlockSubtype}>
+                                      {VILLA_LAYOUTS.find(l => l.id === northHB.villa_layout)?.name}
+                                    </Text>
+                                    <TouchableOpacity
+                                      style={styles.editBuildingsButton}
+                                      onPress={(e) => {
+                                        e.stopPropagation();
+                                        setSelectedHalfBlock(northHB);
+                                        setSelectedBlock(block);
+                                        setVillaTypeModalVisible(true);
+                                      }}
+                                    >
+                                      <Text style={styles.editBuildingsButtonText}>Edit Villa Types</Text>
+                                    </TouchableOpacity>
+                                  </>
                                 )}
                                 {northHB.apartment_layout && (
                                   <>
@@ -339,9 +379,22 @@ export default function SiteScreen() {
                                   {southHB.type === 'villas' ? 'Villas' : 'Apartments'}
                                 </Text>
                                 {southHB.villa_layout && (
-                                  <Text style={styles.halfBlockSubtype}>
-                                    {VILLA_LAYOUTS.find(l => l.id === southHB.villa_layout)?.name}
-                                  </Text>
+                                  <>
+                                    <Text style={styles.halfBlockSubtype}>
+                                      {VILLA_LAYOUTS.find(l => l.id === southHB.villa_layout)?.name}
+                                    </Text>
+                                    <TouchableOpacity
+                                      style={styles.editBuildingsButton}
+                                      onPress={(e) => {
+                                        e.stopPropagation();
+                                        setSelectedHalfBlock(southHB);
+                                        setSelectedBlock(block);
+                                        setVillaTypeModalVisible(true);
+                                      }}
+                                    >
+                                      <Text style={styles.editBuildingsButtonText}>Edit Villa Types</Text>
+                                    </TouchableOpacity>
+                                  </>
                                 )}
                                 {southHB.apartment_layout && (
                                   <>
@@ -575,6 +628,101 @@ export default function SiteScreen() {
               style={styles.closeButton}
               onPress={() => {
                 setBuildingAssignModalVisible(false);
+                setSelectedHalfBlock(null);
+                setSelectedBlock(null);
+              }}
+            >
+              <Text style={styles.closeButtonText}>Done</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={villaTypeModalVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setVillaTypeModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, styles.buildingModalContent]}>
+            <Text style={styles.modalTitle}>
+              Assign Villa Types
+            </Text>
+            <Text style={styles.modalSubtitle}>
+              Block {selectedBlock?.block_number} - {selectedHalfBlock?.position === 'north' ? 'North' : 'South'}
+            </Text>
+
+            <ScrollView style={styles.buildingList} showsVerticalScrollIndicator={false}>
+              {selectedHalfBlock && (() => {
+                const villaUnits = getUnitsByHalfBlockId(selectedHalfBlock.id);
+                const villaLayout = VILLA_LAYOUTS.find(l => l.id === selectedHalfBlock.villa_layout);
+                
+                if (!villaLayout) return null;
+
+                const groupedUnits: { [key: number]: typeof villaUnits } = {};
+                villaUnits.forEach((unit) => {
+                  const plotSize = unit.size_m2 || 0;
+                  if (!groupedUnits[plotSize]) {
+                    groupedUnits[plotSize] = [];
+                  }
+                  groupedUnits[plotSize].push(unit);
+                });
+
+                return Object.entries(groupedUnits).map(([plotSize, units]) => {
+                  const size = parseInt(plotSize);
+                  const availableTypes = VILLA_TYPE_OPTIONS[size] || [];
+                  const firstUnit = units[0];
+                  const selectedType = firstUnit?.building_type;
+
+                  return (
+                    <View key={plotSize} style={styles.villaTypeGroupItem}>
+                      <Text style={styles.villaGroupTitle}>
+                        {size}m² Villas ({units.length} units)
+                      </Text>
+                      <View style={styles.villaTypeSelector}>
+                        {availableTypes.map(vt => (
+                          <TouchableOpacity
+                            key={vt.id}
+                            style={[
+                              styles.villaTypeButton,
+                              selectedType === vt.id && styles.villaTypeButtonSelected,
+                            ]}
+                            onPress={() => {
+                              units.forEach(unit => {
+                                handleUpdateVillaType(unit.id, vt.id);
+                              });
+                            }}
+                          >
+                            <Text
+                              style={[
+                                styles.villaTypeButtonText,
+                                selectedType === vt.id && styles.villaTypeButtonTextSelected,
+                              ]}
+                            >
+                              {vt.id}
+                            </Text>
+                            <Text
+                              style={[
+                                styles.villaTypeButtonSubtext,
+                                selectedType === vt.id && styles.villaTypeButtonSubtextSelected,
+                              ]}
+                            >
+                              {vt.name}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    </View>
+                  );
+                });
+              })()}
+            </ScrollView>
+
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={() => {
+                setVillaTypeModalVisible(false);
                 setSelectedHalfBlock(null);
                 setSelectedBlock(null);
               }}
@@ -946,5 +1094,53 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600' as const,
     color: '#FFFFFF',
+  },
+  villaTypeGroupItem: {
+    marginBottom: 24,
+    paddingBottom: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F8F9FA',
+  },
+  villaGroupTitle: {
+    fontSize: 16,
+    fontWeight: '600' as const,
+    color: '#212529',
+    marginBottom: 12,
+  },
+  villaTypeSelector: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  villaTypeButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    backgroundColor: '#F8F9FA',
+    borderWidth: 2,
+    borderColor: '#F8F9FA',
+    minWidth: 100,
+  },
+  villaTypeButtonSelected: {
+    backgroundColor: '#007AFF',
+    borderColor: '#007AFF',
+  },
+  villaTypeButtonText: {
+    fontSize: 16,
+    fontWeight: '700' as const,
+    color: '#212529',
+    textAlign: 'center',
+    marginBottom: 2,
+  },
+  villaTypeButtonTextSelected: {
+    color: '#FFFFFF',
+  },
+  villaTypeButtonSubtext: {
+    fontSize: 11,
+    color: '#6C757D',
+    textAlign: 'center',
+  },
+  villaTypeButtonSubtextSelected: {
+    color: 'rgba(255,255,255,0.8)',
   },
 });
