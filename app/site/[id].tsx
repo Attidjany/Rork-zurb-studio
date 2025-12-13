@@ -15,7 +15,6 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useZURB } from '@/contexts/ZURBContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { trpc } from '@/lib/trpc';
 import {
   VILLA_LAYOUTS,
   APARTMENT_LAYOUTS,
@@ -52,26 +51,7 @@ export default function SiteScreen() {
   const [selectedHalfBlocks, setSelectedHalfBlocks] = useState<Set<string>>(new Set());
   const [buildingAssignModalVisible, setBuildingAssignModalVisible] = useState<boolean>(false);
   const [villaTypeModalVisible, setVillaTypeModalVisible] = useState<boolean>(false);
-
-  const generateScenariosMutation = trpc.scenarios.generateIntelligent.useMutation({
-    onSuccess: async (data) => {
-      console.log('[Site] AI Scenarios generated:', data);
-      await loadScenarios();
-      Alert.alert(
-        'Success',
-        data.message + '\n\n' + data.scenarios.map((s: any) => `• ${s.name}`).join('\n'),
-        [{ text: 'OK' }]
-      );
-    },
-    onError: (error) => {
-      console.error('[Site] Error generating scenarios:', error);
-      Alert.alert(
-        'Error',
-        error.message || 'Failed to generate scenarios. Please try again.',
-        [{ text: 'OK' }]
-      );
-    },
-  });
+  const [generatingScenarios, setGeneratingScenarios] = useState<boolean>(false);
 
   const handleRefresh = useCallback(async () => {
     console.log('[Site] Manual refresh triggered');
@@ -211,10 +191,52 @@ export default function SiteScreen() {
     await updateUnit(unitId, { utility_name: utilityName });
   }, [updateUnit]);
 
-  const handleGenerateAutoScenarios = useCallback(() => {
+  const handleGenerateAutoScenarios = useCallback(async () => {
     if (!id || !user) return;
-    generateScenariosMutation.mutate({ siteId: id, userId: user.id });
-  }, [id, user, generateScenariosMutation]);
+    
+    setGeneratingScenarios(true);
+    try {
+      const apiUrl = process.env.EXPO_PUBLIC_RORK_API_BASE_URL;
+      if (!apiUrl) {
+        throw new Error('API URL not configured');
+      }
+
+      console.log('[Site] Calling API to generate scenarios');
+      const response = await fetch(`${apiUrl}/api/scenarios/generate-intelligent`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          siteId: id,
+          userId: user.id,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to generate scenarios');
+      }
+
+      console.log('[Site] AI Scenarios generated:', data);
+      await loadScenarios();
+      Alert.alert(
+        'Success',
+        data.message + '\n\n' + data.scenarios.map((s: any) => `• ${s.name}`).join('\n'),
+        [{ text: 'OK' }]
+      );
+    } catch (error: any) {
+      console.error('[Site] Error generating scenarios:', error);
+      Alert.alert(
+        'Error',
+        error.message || 'Failed to generate scenarios. Please try again.',
+        [{ text: 'OK' }]
+      );
+    } finally {
+      setGeneratingScenarios(false);
+    }
+  }, [id, user, loadScenarios]);
 
   const selectedHalfBlock = useMemo(() => {
     if (!selectedHalfBlockId) return null;
@@ -302,13 +324,13 @@ export default function SiteScreen() {
             <TouchableOpacity
               style={[
                 styles.generateButton,
-                generateScenariosMutation.isPending && styles.generateButtonDisabled,
+                generatingScenarios && styles.generateButtonDisabled,
               ]}
               onPress={handleGenerateAutoScenarios}
-              disabled={generateScenariosMutation.isPending}
+              disabled={generatingScenarios}
               testID="generate-auto-scenarios"
             >
-              {generateScenariosMutation.isPending ? (
+              {generatingScenarios ? (
                 <ActivityIndicator size="small" color="#FFFFFF" />
               ) : (
                 <>
