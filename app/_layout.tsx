@@ -1,7 +1,9 @@
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { trpc, trpcClient } from "@/lib/trpc";
 import { ZURBContext } from "@/contexts/ZURBContext";
 import { AuthContext } from "@/contexts/AuthContext";
 
@@ -21,17 +23,23 @@ function RootLayoutNav() {
 }
 
 export default function RootLayout() {
+  const [queryClient] = useState(() => new QueryClient());
+
   useEffect(() => {
     SplashScreen.hideAsync();
   }, []);
 
   return (
-    <AuthContext>
-      <ZURBContext>
-        <GestureHandlerRootView>
-          <RootLayoutNav />
-        </GestureHandlerRootView>
-      </ZURBContext>
-    </AuthContext>
+    <trpc.Provider client={trpcClient} queryClient={queryClient}>
+      <QueryClientProvider client={queryClient}>
+        <AuthContext>
+          <ZURBContext>
+            <GestureHandlerRootView>
+              <RootLayoutNav />
+            </GestureHandlerRootView>
+          </ZURBContext>
+        </AuthContext>
+      </QueryClientProvider>
+    </trpc.Provider>
   );
 }

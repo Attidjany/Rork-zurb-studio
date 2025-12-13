@@ -10,9 +10,12 @@ import {
   Modal,
   RefreshControl,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useZURB } from '@/contexts/ZURBContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { trpc } from '@/lib/trpc';
 import {
   VILLA_LAYOUTS,
   APARTMENT_LAYOUTS,
@@ -25,6 +28,7 @@ import { DbBlock, DbHalfBlock, VillaLayout, ApartmentLayout, HalfBlockType, Buil
 
 export default function SiteScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const { user } = useAuth();
   const {
     sites,
     getBlocksBySiteId,
@@ -34,10 +38,10 @@ export default function SiteScreen() {
     loadBlocks,
     loadHalfBlocks,
     loadUnits,
+    loadScenarios,
     updateHalfBlock,
     createUnit,
     updateUnit,
-    generateAutoScenarios,
   } = useZURB();
 
   const [refreshing, setRefreshing] = useState<boolean>(false);
@@ -48,7 +52,26 @@ export default function SiteScreen() {
   const [selectedHalfBlocks, setSelectedHalfBlocks] = useState<Set<string>>(new Set());
   const [buildingAssignModalVisible, setBuildingAssignModalVisible] = useState<boolean>(false);
   const [villaTypeModalVisible, setVillaTypeModalVisible] = useState<boolean>(false);
-  const [isGeneratingScenarios, setIsGeneratingScenarios] = useState<boolean>(false);
+
+  const generateScenariosMutation = trpc.scenarios.generateIntelligent.useMutation({
+    onSuccess: async (data) => {
+      console.log('[Site] AI Scenarios generated:', data);
+      await loadScenarios();
+      Alert.alert(
+        'Success',
+        data.message + '\n\n' + data.scenarios.map((s: any) => `• ${s.name}`).join('\n'),
+        [{ text: 'OK' }]
+      );
+    },
+    onError: (error) => {
+      console.error('[Site] Error generating scenarios:', error);
+      Alert.alert(
+        'Error',
+        error.message || 'Failed to generate scenarios. Please try again.',
+        [{ text: 'OK' }]
+      );
+    },
+  });
 
   const handleRefresh = useCallback(async () => {
     console.log('[Site] Manual refresh triggered');
@@ -188,12 +211,10 @@ export default function SiteScreen() {
     await updateUnit(unitId, { utility_name: utilityName });
   }, [updateUnit]);
 
-  const handleGenerateAutoScenarios = useCallback(async () => {
-    if (!id) return;
-    setIsGeneratingScenarios(true);
-    await generateAutoScenarios(id);
-    setIsGeneratingScenarios(false);
-  }, [id, generateAutoScenarios]);
+  const handleGenerateAutoScenarios = useCallback(() => {
+    if (!id || !user) return;
+    generateScenariosMutation.mutate({ siteId: id, userId: user.id });
+  }, [id, user, generateScenariosMutation]);
 
   const selectedHalfBlock = useMemo(() => {
     if (!selectedHalfBlockId) return null;
@@ -281,13 +302,13 @@ export default function SiteScreen() {
             <TouchableOpacity
               style={[
                 styles.generateButton,
-                isGeneratingScenarios && styles.generateButtonDisabled,
+                generateScenariosMutation.isPending && styles.generateButtonDisabled,
               ]}
               onPress={handleGenerateAutoScenarios}
-              disabled={isGeneratingScenarios}
+              disabled={generateScenariosMutation.isPending}
               testID="generate-auto-scenarios"
             >
-              {isGeneratingScenarios ? (
+              {generateScenariosMutation.isPending ? (
                 <ActivityIndicator size="small" color="#FFFFFF" />
               ) : (
                 <>
