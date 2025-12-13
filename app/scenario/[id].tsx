@@ -8,9 +8,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 
 import {
-  UNIT_BUILD_AREAS,
   BUILDING_TYPES,
-  VILLA_LAYOUTS,
   HOUSING_TYPES,
 } from '@/constants/typologies';
 import { DbBlock, DbHalfBlock } from '@/types';

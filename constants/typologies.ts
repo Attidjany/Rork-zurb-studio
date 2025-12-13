@@ -18,22 +18,22 @@ export const VILLA_LAYOUTS: VillaLayoutConfig[] = [
     totalUnits: 50,
   },
   {
-    id: '500',
-    name: '500 sqm Layout',
-    description: '30 plots of 500sqm each',
+    id: '480',
+    name: '480 sqm Layout',
+    description: '30 plots of 480sqm each',
     plots: [
-      { size: 500, count: 30 },
+      { size: 480, count: 30 },
     ],
     totalUnits: 30,
   },
   {
-    id: '1000',
-    name: '1000 sqm Layout',
-    description: '20 plots of 1000sqm each',
+    id: '1200',
+    name: '1200 sqm Layout',
+    description: '14 plots of 1200sqm each',
     plots: [
-      { size: 1000, count: 20 },
+      { size: 1200, count: 14 },
     ],
-    totalUnits: 20,
+    totalUnits: 14,
   },
 ];
 
@@ -249,8 +249,8 @@ export const UNIT_RENTS_MONTHLY: { [key: string]: number } = {
 export const VILLA_TYPE_OPTIONS: { [plotSize: number]: BuildingTypeConfig[] } = {
   200: BUILDING_TYPES.filter(bt => ['BMS', 'BML'].includes(bt.id)),
   300: BUILDING_TYPES.filter(bt => ['BML', 'BH'].includes(bt.id)),
-  500: BUILDING_TYPES.filter(bt => ['BH', 'CH'].includes(bt.id)),
-  1000: BUILDING_TYPES.filter(bt => ['CH', 'CO'].includes(bt.id)),
+  480: BUILDING_TYPES.filter(bt => ['BH', 'CH'].includes(bt.id)),
+  1200: BUILDING_TYPES.filter(bt => ['CH', 'CO'].includes(bt.id)),
 };
 
 export const DEFAULT_LEASE_YEARS = 20;
