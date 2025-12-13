@@ -397,6 +397,14 @@ export default function ScenarioScreen() {
               const name = projectHousing ? projectHousing.name : (housingConfig?.name || type);
               const area = projectHousing ? projectHousing.default_area_m2 : (housingConfig?.defaultArea || 0);
               const rentMonthly = projectHousing ? projectHousing.default_rent_monthly : (housingConfig?.defaultRent || 0);
+              
+              const costTypeCode = projectHousing?.default_cost_type || housingConfig?.defaultCostType || 'ZME';
+              const costParam = mergedConstructionCosts.find((c) => c.code === costTypeCode);
+              const costPerM2 = costParam ? costParam.gold_grams_per_m2 * 85 * 656 : 1000;
+              const constructionCost = area * costPerM2;
+              
+              const totalBuyingPrice = rentMonthly * 12 * summary.rentalPeriodYears;
+              
               return (
                 <View key={type} style={styles.breakdownRow}>
                   <View style={styles.breakdownLabelContainer}>
@@ -410,9 +418,19 @@ export default function ScenarioScreen() {
                         {area.toFixed(0)} m² each
                       </Text>
                     )}
+                    {constructionCost > 0 && (
+                      <Text style={styles.breakdownSubValue}>
+                        {constructionCost.toLocaleString(undefined, {maximumFractionDigits: 0})} XOF construction cost
+                      </Text>
+                    )}
                     {rentMonthly > 0 && (
                       <Text style={styles.breakdownSubValue}>
                         {rentMonthly.toLocaleString(undefined, {maximumFractionDigits: 0})} XOF/month
+                      </Text>
+                    )}
+                    {totalBuyingPrice > 0 && (
+                      <Text style={styles.breakdownSubValue}>
+                        {totalBuyingPrice.toLocaleString(undefined, {maximumFractionDigits: 0})} XOF total rent
                       </Text>
                     )}
                   </View>
