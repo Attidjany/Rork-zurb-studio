@@ -420,5 +420,4 @@ $$ LANGUAGE plpgsql;
 
 -- Add helpful comment
 COMMENT ON FUNCTION generate_auto_scenarios(uuid) IS 
-  'Generates up to 3 auto-scenarios for a site, only creating scenarios where expected revenue exceeds costs. ' ||
-  'Calculates profitability based on existing units, rental periods, and cost/rent adjustments.';
+  'Generates up to 3 auto-scenarios for a site, only creating scenarios where expected revenue exceeds costs. Calculates profitability based on existing units, rental periods, and cost/rent adjustments.';
