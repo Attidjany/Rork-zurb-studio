@@ -52,6 +52,9 @@ export default function SiteScreen() {
   const [buildingAssignModalVisible, setBuildingAssignModalVisible] = useState<boolean>(false);
   const [villaTypeModalVisible, setVillaTypeModalVisible] = useState<boolean>(false);
   const [generatingScenarios, setGeneratingScenarios] = useState<boolean>(false);
+  const [aiThinking, setAiThinking] = useState<string[]>([]);
+  const [showAiOverlay, setShowAiOverlay] = useState<boolean>(false);
+  const [generationComplete, setGenerationComplete] = useState<boolean>(false);
 
   const handleRefresh = useCallback(async () => {
     console.log('[Site] Manual refresh triggered');
@@ -195,12 +198,31 @@ export default function SiteScreen() {
     if (!id || !user) return;
     
     setGeneratingScenarios(true);
+    setShowAiOverlay(true);
+    setGenerationComplete(false);
+    setAiThinking([]);
+    
+    const addThought = (thought: string) => {
+      setAiThinking(prev => [...prev, thought]);
+    };
+    
     try {
+      addThought('🔍 Analyzing site configuration...');
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
       const apiUrl = process.env.EXPO_PUBLIC_RORK_API_BASE_URL || (typeof window !== 'undefined' && window.location ? `${window.location.protocol}//${window.location.host}` : '');
       if (!apiUrl) {
         console.error('[Site] EXPO_PUBLIC_RORK_API_BASE_URL is not set');
         throw new Error('API URL not configured. Please check your environment settings.');
       }
+
+      addThought('📊 Loading project data and market parameters...');
+      await new Promise(resolve => setTimeout(resolve, 400));
+      
+      addThought('💰 Calculating construction costs and revenue potential...');
+      await new Promise(resolve => setTimeout(resolve, 400));
+      
+      addThought('🤖 Consulting AI financial advisor...');
 
       console.log('[Site] Calling API to generate scenarios at:', `${apiUrl}/api/scenarios/generate-intelligent`);
       const response = await fetch(`${apiUrl}/api/scenarios/generate-intelligent`, {
@@ -215,6 +237,12 @@ export default function SiteScreen() {
       });
 
       console.log('[Site] Response status:', response.status, response.statusText);
+      
+      addThought('🧠 AI is analyzing market dynamics and profitability...');
+      await new Promise(resolve => setTimeout(resolve, 600));
+      
+      addThought('📈 Optimizing rental periods and pricing strategies...');
+      await new Promise(resolve => setTimeout(resolve, 500));
 
       let data;
       const contentType = response.headers.get('content-type');
@@ -232,19 +260,26 @@ export default function SiteScreen() {
       }
 
       console.log('[Site] AI Scenarios generated:', data);
+      
+      addThought('✨ Creating scenario configurations...');
+      await new Promise(resolve => setTimeout(resolve, 400));
+      
+      addThought(`✅ Generated ${data.scenarios.length} profitable scenarios!`);
+      
       await loadScenarios();
-      Alert.alert(
-        'Success',
-        data.message + '\n\n' + data.scenarios.map((s: any) => `• ${s.name}`).join('\n'),
-        [{ text: 'OK' }]
-      );
+      setGenerationComplete(true);
     } catch (error: any) {
       console.error('[Site] Error generating scenarios:', error);
-      Alert.alert(
-        'Error',
-        error.message || 'Failed to generate scenarios. Please try again.',
-        [{ text: 'OK' }]
-      );
+      addThought(`❌ Error: ${error.message || 'Failed to generate scenarios'}`);
+      setGenerationComplete(true);
+      
+      setTimeout(() => {
+        Alert.alert(
+          'Error',
+          error.message || 'Failed to generate scenarios. Please try again.',
+          [{ text: 'OK' }]
+        );
+      }, 100);
     } finally {
       setGeneratingScenarios(false);
     }
@@ -836,6 +871,59 @@ export default function SiteScreen() {
           </View>
         </View>
       </Modal>
+
+      <Modal
+        visible={showAiOverlay}
+        animationType="fade"
+        transparent
+        onRequestClose={() => {
+          if (generationComplete) {
+            setShowAiOverlay(false);
+          }
+        }}
+      >
+        <View style={styles.aiOverlay}>
+          <View style={styles.aiOverlayContent}>
+            <View style={styles.aiHeader}>
+              <View style={styles.aiHeaderIcon}>
+                <Sparkles size={24} color="#007AFF" />
+              </View>
+              <Text style={styles.aiTitle}>AI Financial Advisor</Text>
+            </View>
+            
+            <ScrollView 
+              style={styles.aiThinkingContainer}
+              showsVerticalScrollIndicator={false}
+            >
+              {aiThinking.map((thought, index) => (
+                <View key={index} style={styles.aiThoughtItem}>
+                  <View style={styles.aiThoughtDot} />
+                  <Text style={styles.aiThoughtText}>{thought}</Text>
+                </View>
+              ))}
+              
+              {!generationComplete && (
+                <View style={styles.aiThinkingIndicator}>
+                  <ActivityIndicator size="small" color="#007AFF" />
+                  <Text style={styles.aiThinkingText}>Thinking...</Text>
+                </View>
+              )}
+            </ScrollView>
+            
+            {generationComplete && (
+              <TouchableOpacity
+                style={styles.aiDismissButton}
+                onPress={() => {
+                  setShowAiOverlay(false);
+                  setAiThinking([]);
+                }}
+              >
+                <Text style={styles.aiDismissButtonText}>View Scenarios</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -1273,5 +1361,102 @@ const styles = StyleSheet.create({
   },
   villaTypeButtonSubtextSelected: {
     color: 'rgba(255,255,255,0.8)',
+  },
+  aiOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+  },
+  aiOverlayContent: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    width: '100%',
+    maxWidth: 500,
+    maxHeight: '80%',
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 24,
+    elevation: 10,
+  },
+  aiHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingTop: 24,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  aiHeaderIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#E3F2FD',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  aiTitle: {
+    fontSize: 20,
+    fontWeight: '700' as const,
+    color: '#212529',
+  },
+  aiThinkingContainer: {
+    paddingHorizontal: 24,
+    paddingVertical: 20,
+    maxHeight: 400,
+  },
+  aiThoughtItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 16,
+  },
+  aiThoughtDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#007AFF',
+    marginTop: 6,
+    marginRight: 12,
+  },
+  aiThoughtText: {
+    flex: 1,
+    fontSize: 15,
+    lineHeight: 22,
+    color: '#212529',
+  },
+  aiThinkingIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    gap: 12,
+  },
+  aiThinkingText: {
+    fontSize: 14,
+    color: '#6C757D',
+    fontStyle: 'italic' as const,
+  },
+  aiDismissButton: {
+    marginHorizontal: 24,
+    marginVertical: 20,
+    backgroundColor: '#007AFF',
+    borderRadius: 16,
+    paddingVertical: 16,
+    alignItems: 'center',
+    shadowColor: '#007AFF',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  aiDismissButtonText: {
+    fontSize: 16,
+    fontWeight: '700' as const,
+    color: '#FFFFFF',
   },
 });

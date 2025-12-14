@@ -7,15 +7,23 @@ const app = new Hono();
 
 app.use("*", cors());
 
-if (!process.env.EXPO_PUBLIC_SUPABASE_URL || !process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY) {
-  console.error('[Hono] Missing Supabase environment variables');
-  console.error('[Hono] EXPO_PUBLIC_SUPABASE_URL:', !!process.env.EXPO_PUBLIC_SUPABASE_URL);
-  console.error('[Hono] EXPO_PUBLIC_SUPABASE_ANON_KEY:', !!process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY);
+console.log('[Hono] Starting server...');
+console.log('[Hono] Environment check:', {
+  hasSupabaseUrl: !!process.env.EXPO_PUBLIC_SUPABASE_URL,
+  hasSupabaseKey: !!process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
+  nodeEnv: process.env.NODE_ENV,
+});
+
+const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+const supabaseKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+
+if (!supabaseUrl || !supabaseKey) {
+  console.error('[Hono] ERROR: Missing required Supabase environment variables');
 }
 
 const supabase = createClient(
-  process.env.EXPO_PUBLIC_SUPABASE_URL || '',
-  process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || ''
+  supabaseUrl || '',
+  supabaseKey || ''
 );
 
 app.get("/", (c) => {
@@ -28,6 +36,13 @@ app.get("/api", (c) => {
 
 app.post("/api/scenarios/generate-intelligent", async (c) => {
   try {
+    console.log('[AI Scenarios] Request received');
+
+    if (!supabaseUrl || !supabaseKey) {
+      console.error('[AI Scenarios] Missing Supabase credentials');
+      return c.json({ error: 'Server configuration error: Missing database credentials' }, 500);
+    }
+
     const body = await c.req.json();
     const { siteId, userId } = body;
 
@@ -177,11 +192,11 @@ Think step-by-step and be bold in your recommendations. The goal is to find trul
       messages: [{ role: "user", content: aiPrompt }],
     });
 
-    console.log('[AI Scenarios] AI Response:', aiResponse);
+    console.log('[AI Scenarios] AI Response received, length:', aiResponse.length);
 
     let parsedResponse;
     try {
-      let jsonText = aiResponse;
+      let jsonText = aiResponse.trim();
       
       const jsonMatch = aiResponse.match(/\{[\s\S]*"scenarios"[\s\S]*\}/s);
       if (jsonMatch) {
@@ -190,6 +205,7 @@ Think step-by-step and be bold in your recommendations. The goal is to find trul
       
       jsonText = jsonText.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
       
+      console.log('[AI Scenarios] Attempting to parse JSON, length:', jsonText.length);
       parsedResponse = JSON.parse(jsonText);
       
       if (!parsedResponse.scenarios || !Array.isArray(parsedResponse.scenarios)) {
