@@ -3,9 +3,15 @@ import { cors } from "hono/cors";
 import { generateText } from "@rork-ai/toolkit-sdk";
 import { createClient } from "@supabase/supabase-js";
 
-const app = new Hono().basePath('/api');
+const app = new Hono();
 
 app.use("*", cors());
+
+app.use("*", async (c, next) => {
+  console.log(`[Hono] Incoming request: ${c.req.method} ${c.req.url}`);
+  console.log(`[Hono] Path: ${c.req.path}`);
+  await next();
+});
 
 console.log('[Hono] Starting server...');
 console.log('[Hono] Environment check:', {
@@ -32,18 +38,34 @@ const getSupabase = () => {
   return createClient(supabaseUrl, supabaseKey);
 };
 
-app.get("/", (c) => {
-  return c.json({ status: "ok", message: "ZURB API is running" });
+// Health check endpoint
+app.get("/api/health", (c) => {
+  return c.json({
+    status: "ok",
+    message: "ZURB API is healthy",
+    timestamp: new Date().toISOString(),
+    env: {
+      hasSupabaseUrl: !!supabaseUrl,
+      hasSupabaseKey: !!supabaseKey,
+    },
+  });
 });
 
-
+app.get("/api", (c) => {
+  return c.json({ status: "ok", message: "ZURB API is running" });
+});
 
 app.onError((err, c) => {
   console.error('[Hono] Unhandled error:', err);
   return c.json({ error: 'Internal server error', message: err.message }, 500);
 });
 
-app.post("/scenarios/generate-intelligent", async (c) => {
+app.notFound((c) => {
+  console.log(`[Hono] 404 Not Found: ${c.req.method} ${c.req.path}`);
+  return c.json({ error: 'Not Found', path: c.req.path, methods: c.req.method }, 404);
+});
+
+app.post("/api/scenarios/generate-intelligent", async (c) => {
   try {
     console.log('[AI Scenarios] Request received');
 
@@ -165,7 +187,7 @@ For EACH scenario, you must:
 3. Adjust construction costs (you can go +/- 30% from default by changing quality)
 4. **CRITICAL**: Calculate total revenue (all rents × 12 months × rental period) and total costs
 5. **CRITICAL**: Ensure revenue > costs for profitability
-6. Explain your strategic thinking - WHY these numbers create the desired outcome
+6. Explain your strategic thinking - WHY these numbers create the desired outcome. explicitly calling it "thought process".
 
 BE CREATIVE AND ANALYTICAL:
 - Consider market dynamics: longer periods need lower rents to attract buyers
@@ -180,7 +202,7 @@ Return a JSON object with this EXACT structure:
     {
       "name": "Most Profitable",
       "rentalPeriodYears": <number between 5 and ${maxRentalPeriod}>,
-      "strategy": "<2-3 sentence explanation of your strategy>",
+      "strategy": "<2-3 sentence explanation of your strategy and thought process>",
       "rentAdjustments": {
         "<unit_type>": <multiplier like 1.2 for +20% or 0.85 for -15%>,
         ...
@@ -364,18 +386,6 @@ Think step-by-step and be bold in your recommendations. The goal is to find trul
     console.error('[AI Scenarios] Error:', error);
     return c.json({ error: error.message || 'Failed to generate scenarios' }, 500);
   }
-});
-
-app.get("/health", (c) => {
-  return c.json({
-    status: "ok",
-    message: "ZURB API is healthy",
-    timestamp: new Date().toISOString(),
-    env: {
-      hasSupabaseUrl: !!supabaseUrl,
-      hasSupabaseKey: !!supabaseKey,
-    },
-  });
 });
 
 export default app;

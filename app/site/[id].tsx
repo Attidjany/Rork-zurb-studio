@@ -212,8 +212,10 @@ export default function SiteScreen() {
       await new Promise(resolve => setTimeout(resolve, 500));
       
       const normalizeApiBaseUrl = (raw: string) => {
+        if (!raw) return '';
         const trimmed = raw.trim();
         const noTrailing = trimmed.replace(/\/+$/, '');
+        // If it ends with /api, remove it because we append /api later
         return noTrailing.endsWith('/api') ? noTrailing.slice(0, -4) : noTrailing;
       };
 
@@ -338,7 +340,7 @@ export default function SiteScreen() {
       const isErrorGenerateResponse = (
         v: GenerateScenariosApiResponse | null
       ): v is { error: string; details?: string; success?: false } => {
-        return !!v && typeof (v as { error?: unknown }).error === 'string';
+        return !!v && typeof (v as any).error === 'string';
       };
 
       let data: GenerateScenariosApiResponse | null = null;

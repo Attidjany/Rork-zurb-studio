@@ -2,6 +2,7 @@ import * as z from "zod";
 import { createTRPCRouter, publicProcedure } from "../create-context";
 import { generateText } from "@rork-ai/toolkit-sdk";
 import { createClient } from "@supabase/supabase-js";
+import { TRPCError } from "@trpc/server";
 
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!;
@@ -26,7 +27,10 @@ export const scenariosRouter = createTRPCRouter({
         .single();
 
       if (!site) {
-        throw new Error('Site not found');
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Site not found',
+        });
       }
 
       const project = site.projects;
@@ -42,8 +46,6 @@ export const scenariosRouter = createTRPCRouter({
         .select('*, account_housing_types(*), account_construction_costs(*), account_equipment_utility_types(*), account_occupancy_rates(*)')
         .eq('user_id', userId)
         .single();
-
-
 
       const goldPrice = accountSettings?.gold_price_per_oz || 3000;
       const usdPerGram = goldPrice / 31.1034768;
@@ -124,7 +126,7 @@ For EACH scenario, you must:
 3. Adjust construction costs (you can go +/- 30% from default by changing quality)
 4. **CRITICAL**: Calculate total revenue (all rents × 12 months × rental period) and total costs
 5. **CRITICAL**: Ensure revenue > costs for profitability
-6. Explain your strategic thinking - WHY these numbers create the desired outcome
+6. Explain your strategic thinking - WHY these numbers create the desired outcome. explicitly calling it "thought process".
 
 BE CREATIVE AND ANALYTICAL:
 - Consider market dynamics: longer periods need lower rents to attract buyers
@@ -139,7 +141,7 @@ Return a JSON object with this EXACT structure:
     {
       "name": "Most Profitable",
       "rentalPeriodYears": <number between 5 and ${maxRentalPeriod}>,
-      "strategy": "<2-3 sentence explanation of your strategy>",
+      "strategy": "<2-3 sentence explanation of your strategy and thought process>",
       "rentAdjustments": {
         "<unit_type>": <multiplier like 1.2 for +20% or 0.85 for -15%>,
         ...
@@ -171,9 +173,12 @@ Think step-by-step and be bold in your recommendations. The goal is to find trul
         } else {
           throw new Error('No JSON found in AI response');
         }
-      } catch (e) {
+      } catch (e: any) {
         console.error('[AI Scenarios] Failed to parse AI response:', e);
-        throw new Error('AI returned invalid response format');
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'AI returned invalid response format: ' + e.message,
+        });
       }
 
       const { data: existingAutoScenarios } = await supabase
