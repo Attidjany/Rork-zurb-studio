@@ -196,7 +196,7 @@ export default function SiteScreen() {
     
     setGeneratingScenarios(true);
     try {
-      const apiUrl = process.env.EXPO_PUBLIC_RORK_API_BASE_URL;
+      const apiUrl = process.env.EXPO_PUBLIC_RORK_API_BASE_URL || (typeof window !== 'undefined' && window.location ? `${window.location.protocol}//${window.location.host}` : '');
       if (!apiUrl) {
         console.error('[Site] EXPO_PUBLIC_RORK_API_BASE_URL is not set');
         throw new Error('API URL not configured. Please check your environment settings.');
