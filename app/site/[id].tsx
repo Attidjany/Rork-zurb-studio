@@ -198,10 +198,11 @@ export default function SiteScreen() {
     try {
       const apiUrl = process.env.EXPO_PUBLIC_RORK_API_BASE_URL;
       if (!apiUrl) {
-        throw new Error('API URL not configured');
+        console.error('[Site] EXPO_PUBLIC_RORK_API_BASE_URL is not set');
+        throw new Error('API URL not configured. Please check your environment settings.');
       }
 
-      console.log('[Site] Calling API to generate scenarios');
+      console.log('[Site] Calling API to generate scenarios at:', `${apiUrl}/api/scenarios/generate-intelligent`);
       const response = await fetch(`${apiUrl}/api/scenarios/generate-intelligent`, {
         method: 'POST',
         headers: {
@@ -213,7 +214,18 @@ export default function SiteScreen() {
         }),
       });
 
-      const data = await response.json();
+      console.log('[Site] Response status:', response.status, response.statusText);
+
+      let data;
+      const contentType = response.headers.get('content-type');
+      
+      if (contentType && contentType.includes('application/json')) {
+        data = await response.json();
+      } else {
+        const textResponse = await response.text();
+        console.error('[Site] Non-JSON response:', textResponse);
+        throw new Error('Server returned an invalid response. Please try again.');
+      }
 
       if (!response.ok) {
         throw new Error(data.error || 'Failed to generate scenarios');
