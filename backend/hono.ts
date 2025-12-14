@@ -36,16 +36,14 @@ app.get("/", (c) => {
   return c.json({ status: "ok", message: "ZURB API is running" });
 });
 
-app.get("/api", (c) => {
-  return c.json({ status: "ok", message: "ZURB API is running" });
-});
+
 
 app.onError((err, c) => {
   console.error('[Hono] Unhandled error:', err);
   return c.json({ error: 'Internal server error', message: err.message }, 500);
 });
 
-app.post("/api/scenarios/generate-intelligent", async (c) => {
+app.post("/scenarios/generate-intelligent", async (c) => {
   try {
     console.log('[AI Scenarios] Request received');
 
@@ -365,7 +363,7 @@ Think step-by-step and be bold in your recommendations. The goal is to find trul
   }
 });
 
-app.get("/api/health", (c) => {
+app.get("/health", (c) => {
   return c.json({
     status: "ok",
     message: "ZURB API is healthy",
