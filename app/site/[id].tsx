@@ -243,8 +243,8 @@ export default function SiteScreen() {
         const apiBaseUrl = normalizeApiBaseUrl(baseUrl);
         return {
           apiBaseUrl,
-          scenarioEndpoint: `${apiBaseUrl}/scenarios/generate-intelligent`,
-          healthEndpoint: `${apiBaseUrl}/health`,
+          scenarioEndpoint: `${apiBaseUrl}/api/scenarios/generate-intelligent`,
+          healthEndpoint: `${apiBaseUrl}/api/health`,
         };
       };
 
@@ -260,40 +260,12 @@ export default function SiteScreen() {
       let lastTriedScenarioEndpoint = '';
 
       for (const baseUrl of candidates) {
-        const { apiBaseUrl, scenarioEndpoint, healthEndpoint } = buildEndpoints(baseUrl);
+        const { apiBaseUrl, scenarioEndpoint } = buildEndpoints(baseUrl);
         lastTriedScenarioEndpoint = scenarioEndpoint;
 
         console.log('[Site] API base URL candidate:', apiBaseUrl);
-        console.log('[Site] Health endpoint:', healthEndpoint);
-        console.log('[Site] Scenario endpoint:', scenarioEndpoint);
-
-        const healthController = new AbortController();
-        const healthTimeout = setTimeout(() => healthController.abort(), 4500);
-        try {
-          const healthRes = await fetch(healthEndpoint, {
-            method: 'GET',
-            headers: { Accept: 'application/json' },
-            signal: healthController.signal,
-          });
-          const healthCt = healthRes.headers.get('content-type') ?? '';
-          const healthText = await healthRes.text();
-          console.log('[Site] Health response:', {
-            ok: healthRes.ok,
-            status: healthRes.status,
-            contentType: healthCt,
-            preview: healthText.slice(0, 120),
-          });
-        } catch (e: any) {
-          const name = typeof e?.name === 'string' ? e.name : '';
-          if (name === 'AbortError') {
-            console.log('[Site] Health check timed out (continuing).');
-          } else {
-            console.log('[Site] Health check failed (continuing):', e);
-          }
-        } finally {
-          clearTimeout(healthTimeout);
-        }
-
+        // Skip health check for speed, trust the scenario call or timeout
+        
         console.log('[Site] Calling API to generate scenarios at:', scenarioEndpoint);
         try {
           response = await fetch(scenarioEndpoint, {
@@ -312,12 +284,18 @@ export default function SiteScreen() {
           response = null;
         }
 
-        if (response && response.status !== 404) {
-          break;
-        }
-
-        if (response?.status === 404) {
-          console.log('[Site] Scenario endpoint 404 for base URL candidate, trying next...');
+        if (response) {
+          const contentType = response.headers.get('content-type') || '';
+          // If we get a 200 OK but it's HTML, it's likely the Single Page App fallback, not the API
+          if (response.status === 200 && !contentType.includes('application/json')) {
+            console.log(`[Site] Candidate ${baseUrl} returned non-JSON 200 (likely HTML fallback). Skipping...`);
+            response = null;
+            continue;
+          }
+          
+          if (response.status !== 404) {
+             break;
+          }
         }
       }
 

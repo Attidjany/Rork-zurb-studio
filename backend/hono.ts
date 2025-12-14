@@ -3,7 +3,7 @@ import { cors } from "hono/cors";
 import { generateText } from "@rork-ai/toolkit-sdk";
 import { createClient } from "@supabase/supabase-js";
 
-const app = new Hono();
+const app = new Hono().basePath('/api');
 
 app.use("*", cors());
 
@@ -198,8 +198,11 @@ Think step-by-step and be bold in your recommendations. The goal is to find trul
 
     console.log('[AI Scenarios] Sending prompt to AI...');
     
+    // Simulate AI delay for better UX
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
     const aiResponse = await generateText({
-      messages: [{ role: "user", content: aiPrompt }],
+      messages: [{ role: "user", content: aiPrompt }]
     });
 
     console.log('[AI Scenarios] AI Response received, length:', aiResponse.length);
