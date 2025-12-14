@@ -243,8 +243,8 @@ export default function SiteScreen() {
         const apiBaseUrl = normalizeApiBaseUrl(baseUrl);
         return {
           apiBaseUrl,
-          scenarioEndpoint: `${apiBaseUrl}/api/scenarios/generate-intelligent`,
-          healthEndpoint: `${apiBaseUrl}/api/health`,
+          scenarioEndpoint: `${apiBaseUrl}/scenarios/generate-intelligent`,
+          healthEndpoint: `${apiBaseUrl}/health`,
         };
       };
 
@@ -377,12 +377,7 @@ export default function SiteScreen() {
         const textResponse = await response.text();
         const preview = textResponse?.slice(0, 220) ?? '';
 
-        console.error('[Site] Non-JSON response:', {
-          status: response.status,
-          statusText: response.statusText,
-          contentType,
-          preview,
-        });
+        console.error('[Site] Non-JSON response:', `Status: ${response.status}, ContentType: ${contentType}, Preview: ${preview}`);
 
         if (response.status === 404) {
           throw new Error(
