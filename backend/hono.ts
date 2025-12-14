@@ -7,9 +7,15 @@ const app = new Hono();
 
 app.use("*", cors());
 
+if (!process.env.EXPO_PUBLIC_SUPABASE_URL || !process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY) {
+  console.error('[Hono] Missing Supabase environment variables');
+  console.error('[Hono] EXPO_PUBLIC_SUPABASE_URL:', !!process.env.EXPO_PUBLIC_SUPABASE_URL);
+  console.error('[Hono] EXPO_PUBLIC_SUPABASE_ANON_KEY:', !!process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY);
+}
+
 const supabase = createClient(
-  process.env.EXPO_PUBLIC_SUPABASE_URL!,
-  process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!
+  process.env.EXPO_PUBLIC_SUPABASE_URL || '',
+  process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || ''
 );
 
 app.get("/", (c) => {
