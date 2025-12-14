@@ -11,11 +11,11 @@ import {
   RefreshControl,
   ActivityIndicator,
   Alert,
-  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useZURB } from '@/contexts/ZURBContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { trpc } from '@/lib/trpc';
 import {
   VILLA_LAYOUTS,
   APARTMENT_LAYOUTS,
@@ -195,204 +195,24 @@ export default function SiteScreen() {
     await updateUnit(unitId, { utility_name: utilityName });
   }, [updateUnit]);
 
-  const handleGenerateAutoScenarios = useCallback(async () => {
-    if (!id || !user) return;
-    
-    setGeneratingScenarios(true);
-    setShowAiOverlay(true);
-    setGenerationComplete(false);
-    setAiThinking([]);
-    
-    const addThought = (thought: string) => {
-      setAiThinking(prev => [...prev, thought]);
-    };
-    
-    try {
-      addThought('🔍 Analyzing site configuration...');
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      const normalizeApiBaseUrl = (raw: string) => {
-        if (!raw) return '';
-        const trimmed = raw.trim();
-        const noTrailing = trimmed.replace(/\/+$/, '');
-        // If it ends with /api, remove it because we append /api later
-        return noTrailing.endsWith('/api') ? noTrailing.slice(0, -4) : noTrailing;
-      };
-
-      const rawApiBaseUrl = process.env.EXPO_PUBLIC_RORK_API_BASE_URL;
-
-      const getWebOrigin = () => {
-        if (Platform.OS !== 'web') return null;
-        try {
-          const origin = globalThis?.location?.origin;
-          return typeof origin === 'string' && origin.length > 0 ? origin : null;
-        } catch {
-          return null;
-        }
-      };
-
-      const candidates = [
-        rawApiBaseUrl ? normalizeApiBaseUrl(rawApiBaseUrl) : null,
-        getWebOrigin(),
-      ].filter((v): v is string => typeof v === 'string' && v.length > 0);
-
-      if (candidates.length === 0) {
-        console.error('[Site] EXPO_PUBLIC_RORK_API_BASE_URL is not set and no web origin available');
-        throw new Error('API URL not configured. Please check your environment settings.');
-      }
-
-      const buildEndpoints = (baseUrl: string) => {
-        const apiBaseUrl = normalizeApiBaseUrl(baseUrl);
-        return {
-          apiBaseUrl,
-          scenarioEndpoint: `${apiBaseUrl}/api/scenarios/generate-intelligent`,
-          healthEndpoint: `${apiBaseUrl}/api/health`,
-        };
-      };
-
-      addThought('📊 Loading project data and market parameters...');
-      await new Promise(resolve => setTimeout(resolve, 400));
-      
-      addThought('💰 Calculating construction costs and revenue potential...');
-      await new Promise(resolve => setTimeout(resolve, 400));
-      
-      addThought('🤖 Consulting AI financial advisor...');
-
-      let response: Response | null = null;
-      let lastTriedScenarioEndpoint = '';
-
-      for (const baseUrl of candidates) {
-        const { apiBaseUrl, scenarioEndpoint } = buildEndpoints(baseUrl);
-        lastTriedScenarioEndpoint = scenarioEndpoint;
-
-        console.log('[Site] API base URL candidate:', apiBaseUrl);
-        // Skip health check for speed, trust the scenario call or timeout
-        
-        console.log('[Site] Calling API to generate scenarios at:', scenarioEndpoint);
-        try {
-          response = await fetch(scenarioEndpoint, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Accept: 'application/json',
-            },
-            body: JSON.stringify({
-              siteId: id,
-              userId: user.id,
-            }),
-          });
-        } catch (e) {
-          console.log('[Site] Network error calling scenario endpoint:', e);
-          response = null;
-        }
-
-        if (response) {
-          const contentType = response.headers.get('content-type') || '';
-          // If we get a 200 OK but it's HTML, it's likely the Single Page App fallback, not the API
-          if (response.status === 200 && !contentType.includes('application/json')) {
-            console.log(`[Site] Candidate ${baseUrl} returned non-JSON 200 (likely HTML fallback). Skipping...`);
-            response = null;
-            continue;
-          }
-          
-          if (response.status !== 404) {
-             break;
-          }
-        }
-      }
-
-      if (!response) {
-        throw new Error('Could not reach scenario API. Please check your network and API deployment.');
-      }
-
-      console.log('[Site] Response status:', response.status, response.statusText);
-      
-      addThought('🧠 AI is analyzing market dynamics and profitability...');
-      await new Promise(resolve => setTimeout(resolve, 600));
-      
-      addThought('📈 Optimizing rental periods and pricing strategies...');
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      type GeneratedScenarioSummary = {
-        id: string;
-        name: string;
-        strategy?: string;
-      };
-
-      type GenerateScenariosApiResponse =
-        | {
-            success: true;
-            message?: string;
-            scenarios: GeneratedScenarioSummary[];
-          }
-        | {
-            success?: false;
-            error: string;
-            details?: string;
-          };
-
-      const isOkGenerateResponse = (
-        v: GenerateScenariosApiResponse | null
-      ): v is { success: true; scenarios: GeneratedScenarioSummary[]; message?: string } => {
-        return !!v && (v as { success?: unknown }).success === true;
-      };
-
-      const isErrorGenerateResponse = (
-        v: GenerateScenariosApiResponse | null
-      ): v is { error: string; details?: string; success?: false } => {
-        return !!v && typeof (v as any).error === 'string';
-      };
-
-      let data: GenerateScenariosApiResponse | null = null;
-      const contentType = response.headers.get('content-type') ?? '';
-
-      if (contentType.includes('application/json')) {
-        try {
-          data = (await response.json()) as GenerateScenariosApiResponse;
-        } catch (e) {
-          console.error('[Site] Failed to parse JSON response:', e);
-          throw new Error('Server returned invalid JSON. Please try again.');
-        }
-      } else {
-        const textResponse = await response.text();
-        const preview = textResponse?.slice(0, 220) ?? '';
-
-        console.error('[Site] Non-JSON response:', `Status: ${response.status}, ContentType: ${contentType}, Preview: ${preview}`);
-
-        if (response.status === 404) {
-          throw new Error(
-            `API endpoint not found (404). Please verify EXPO_PUBLIC_RORK_API_BASE_URL points to your deployed API host.\nTried: ${lastTriedScenarioEndpoint}`
-          );
-        }
-
-        throw new Error(
-          preview.includes('Server did not start')
-            ? 'Server did not start. Please ensure the API is deployed and environment variables are set.'
-            : `Server returned a non-JSON response (HTTP ${response.status}). Please try again.`
-        );
-      }
-
-      if (!response.ok) {
-        if (isErrorGenerateResponse(data)) {
-          throw new Error(data.details ? `${data.error} (${data.details})` : data.error);
-        }
-        throw new Error(`Failed to generate scenarios (HTTP ${response.status})`);
-      }
-
+  const generateScenariosMutation = trpc.scenarios.generateIntelligent.useMutation({
+    onSuccess: async (data) => {
       console.log('[Site] AI Scenarios generated:', data);
-      
-      addThought('✨ Creating scenario configurations...');
+      setAiThinking(prev => [...prev, '✨ Creating scenario configurations...']);
       await new Promise(resolve => setTimeout(resolve, 400));
       
-      const scenariosCount = isOkGenerateResponse(data) ? data.scenarios.length : 0;
-      addThought(`✅ Generated ${scenariosCount} profitable scenarios!`);
+      const scenariosCount = data.scenarios?.length || 0;
+      setAiThinking(prev => [...prev, `✅ Generated ${scenariosCount} profitable scenarios!`]);
       
       await loadScenarios();
       setGenerationComplete(true);
-    } catch (error: any) {
+      setGeneratingScenarios(false);
+    },
+    onError: (error) => {
       console.error('[Site] Error generating scenarios:', error);
-      addThought(`❌ Error: ${error.message || 'Failed to generate scenarios'}`);
+      setAiThinking(prev => [...prev, `❌ Error: ${error.message || 'Failed to generate scenarios'}`]);
       setGenerationComplete(true);
+      setGeneratingScenarios(false);
       
       setTimeout(() => {
         Alert.alert(
@@ -401,10 +221,37 @@ export default function SiteScreen() {
           [{ text: 'OK' }]
         );
       }, 100);
-    } finally {
-      setGeneratingScenarios(false);
-    }
-  }, [id, user, loadScenarios]);
+    },
+  });
+
+  const handleGenerateAutoScenarios = useCallback(async () => {
+    if (!id || !user) return;
+    
+    setGeneratingScenarios(true);
+    setShowAiOverlay(true);
+    setGenerationComplete(false);
+    setAiThinking([]);
+    
+    setAiThinking(prev => [...prev, '🔍 Analyzing site configuration...']);
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    setAiThinking(prev => [...prev, '📊 Loading project data and market parameters...']);
+    await new Promise(resolve => setTimeout(resolve, 400));
+    
+    setAiThinking(prev => [...prev, '💰 Calculating construction costs and revenue potential...']);
+    await new Promise(resolve => setTimeout(resolve, 400));
+    
+    setAiThinking(prev => [...prev, '🤖 Consulting AI financial advisor...']);
+    
+    setAiThinking(prev => [...prev, '🧠 AI is analyzing market dynamics and profitability...']);
+    
+    setAiThinking(prev => [...prev, '📈 Optimizing rental periods and pricing strategies...']);
+    
+    generateScenariosMutation.mutate({
+      siteId: id,
+      userId: user.id,
+    });
+  }, [id, user, generateScenariosMutation]);
 
   const selectedHalfBlock = useMemo(() => {
     if (!selectedHalfBlockId) return null;
