@@ -175,15 +175,28 @@ Think step-by-step and be bold in your recommendations. The goal is to find trul
 
     let parsedResponse;
     try {
-      const jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
+      let jsonText = aiResponse;
+      
+      const jsonMatch = aiResponse.match(/\{[\s\S]*"scenarios"[\s\S]*\}/s);
       if (jsonMatch) {
-        parsedResponse = JSON.parse(jsonMatch[0]);
-      } else {
-        throw new Error('No JSON found in AI response');
+        jsonText = jsonMatch[0];
       }
-    } catch (e) {
+      
+      jsonText = jsonText.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+      
+      parsedResponse = JSON.parse(jsonText);
+      
+      if (!parsedResponse.scenarios || !Array.isArray(parsedResponse.scenarios)) {
+        throw new Error('Invalid response structure: missing scenarios array');
+      }
+    } catch (e: any) {
       console.error('[AI Scenarios] Failed to parse AI response:', e);
-      return c.json({ error: 'AI returned invalid response format' }, 500);
+      console.error('[AI Scenarios] Raw response:', aiResponse);
+      return c.json({ 
+        error: 'AI returned invalid response format. Please try again.',
+        details: e.message,
+        rawResponse: aiResponse.substring(0, 500)
+      }, 500);
     }
 
     const { data: existingAutoScenarios } = await supabase
