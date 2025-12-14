@@ -11,6 +11,7 @@ import {
   RefreshControl,
   ActivityIndicator,
   Alert,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useZURB } from '@/contexts/ZURBContext';
@@ -217,14 +218,35 @@ export default function SiteScreen() {
       };
 
       const rawApiBaseUrl = process.env.EXPO_PUBLIC_RORK_API_BASE_URL;
-      if (!rawApiBaseUrl) {
-        console.error('[Site] EXPO_PUBLIC_RORK_API_BASE_URL is not set');
+
+      const getWebOrigin = () => {
+        if (Platform.OS !== 'web') return null;
+        try {
+          const origin = globalThis?.location?.origin;
+          return typeof origin === 'string' && origin.length > 0 ? origin : null;
+        } catch {
+          return null;
+        }
+      };
+
+      const candidates = [
+        rawApiBaseUrl ? normalizeApiBaseUrl(rawApiBaseUrl) : null,
+        getWebOrigin(),
+      ].filter((v): v is string => typeof v === 'string' && v.length > 0);
+
+      if (candidates.length === 0) {
+        console.error('[Site] EXPO_PUBLIC_RORK_API_BASE_URL is not set and no web origin available');
         throw new Error('API URL not configured. Please check your environment settings.');
       }
 
-      const apiBaseUrl = normalizeApiBaseUrl(rawApiBaseUrl);
-      const scenarioEndpoint = `${apiBaseUrl}/api/scenarios/generate-intelligent`;
-      const healthEndpoint = `${apiBaseUrl}/api/health`;
+      const buildEndpoints = (baseUrl: string) => {
+        const apiBaseUrl = normalizeApiBaseUrl(baseUrl);
+        return {
+          apiBaseUrl,
+          scenarioEndpoint: `${apiBaseUrl}/api/scenarios/generate-intelligent`,
+          healthEndpoint: `${apiBaseUrl}/api/health`,
+        };
+      };
 
       addThought('📊 Loading project data and market parameters...');
       await new Promise(resolve => setTimeout(resolve, 400));
@@ -234,43 +256,74 @@ export default function SiteScreen() {
       
       addThought('🤖 Consulting AI financial advisor...');
 
-      console.log('[Site] API base URL:', apiBaseUrl);
-      console.log('[Site] Health endpoint:', healthEndpoint);
-      console.log('[Site] Scenario endpoint:', scenarioEndpoint);
+      let response: Response | null = null;
+      let lastTriedScenarioEndpoint = '';
 
-      const healthController = new AbortController();
-      const healthTimeout = setTimeout(() => healthController.abort(), 6500);
-      try {
-        const healthRes = await fetch(healthEndpoint, {
-          method: 'GET',
-          headers: { Accept: 'application/json' },
-          signal: healthController.signal,
-        });
-        const healthCt = healthRes.headers.get('content-type') ?? '';
-        const healthText = await healthRes.text();
-        console.log('[Site] Health response:', {
-          ok: healthRes.ok,
-          status: healthRes.status,
-          contentType: healthCt,
-          preview: healthText.slice(0, 120),
-        });
-      } catch (e) {
-        console.error('[Site] Health check failed:', e);
-      } finally {
-        clearTimeout(healthTimeout);
+      for (const baseUrl of candidates) {
+        const { apiBaseUrl, scenarioEndpoint, healthEndpoint } = buildEndpoints(baseUrl);
+        lastTriedScenarioEndpoint = scenarioEndpoint;
+
+        console.log('[Site] API base URL candidate:', apiBaseUrl);
+        console.log('[Site] Health endpoint:', healthEndpoint);
+        console.log('[Site] Scenario endpoint:', scenarioEndpoint);
+
+        const healthController = new AbortController();
+        const healthTimeout = setTimeout(() => healthController.abort(), 4500);
+        try {
+          const healthRes = await fetch(healthEndpoint, {
+            method: 'GET',
+            headers: { Accept: 'application/json' },
+            signal: healthController.signal,
+          });
+          const healthCt = healthRes.headers.get('content-type') ?? '';
+          const healthText = await healthRes.text();
+          console.log('[Site] Health response:', {
+            ok: healthRes.ok,
+            status: healthRes.status,
+            contentType: healthCt,
+            preview: healthText.slice(0, 120),
+          });
+        } catch (e: any) {
+          const name = typeof e?.name === 'string' ? e.name : '';
+          if (name === 'AbortError') {
+            console.log('[Site] Health check timed out (continuing).');
+          } else {
+            console.log('[Site] Health check failed (continuing):', e);
+          }
+        } finally {
+          clearTimeout(healthTimeout);
+        }
+
+        console.log('[Site] Calling API to generate scenarios at:', scenarioEndpoint);
+        try {
+          response = await fetch(scenarioEndpoint, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Accept: 'application/json',
+            },
+            body: JSON.stringify({
+              siteId: id,
+              userId: user.id,
+            }),
+          });
+        } catch (e) {
+          console.log('[Site] Network error calling scenario endpoint:', e);
+          response = null;
+        }
+
+        if (response && response.status !== 404) {
+          break;
+        }
+
+        if (response?.status === 404) {
+          console.log('[Site] Scenario endpoint 404 for base URL candidate, trying next...');
+        }
       }
 
-      console.log('[Site] Calling API to generate scenarios at:', scenarioEndpoint);
-      const response = await fetch(scenarioEndpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          siteId: id,
-          userId: user.id,
-        }),
-      });
+      if (!response) {
+        throw new Error('Could not reach scenario API. Please check your network and API deployment.');
+      }
 
       console.log('[Site] Response status:', response.status, response.statusText);
       
@@ -322,24 +375,25 @@ export default function SiteScreen() {
         }
       } else {
         const textResponse = await response.text();
+        const preview = textResponse?.slice(0, 220) ?? '';
+
         console.error('[Site] Non-JSON response:', {
           status: response.status,
           statusText: response.statusText,
           contentType,
-          preview: textResponse?.slice(0, 300) ?? '',
+          preview,
         });
 
-        const preview = textResponse?.slice(0, 200) ?? '';
         if (response.status === 404) {
           throw new Error(
-            `API endpoint not found (404). Please verify EXPO_PUBLIC_RORK_API_BASE_URL points to your deployed API host.\nTried: ${scenarioEndpoint}`
+            `API endpoint not found (404). Please verify EXPO_PUBLIC_RORK_API_BASE_URL points to your deployed API host.\nTried: ${lastTriedScenarioEndpoint}`
           );
         }
 
         throw new Error(
           preview.includes('Server did not start')
             ? 'Server did not start. Please ensure the API is deployed and environment variables are set.'
-            : 'Server returned an invalid response. Please try again.'
+            : `Server returned a non-JSON response (HTTP ${response.status}). Please try again.`
         );
       }
 
