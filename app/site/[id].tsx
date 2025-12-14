@@ -210,11 +210,21 @@ export default function SiteScreen() {
       addThought('🔍 Analyzing site configuration...');
       await new Promise(resolve => setTimeout(resolve, 500));
       
-      const apiUrl = process.env.EXPO_PUBLIC_RORK_API_BASE_URL || (typeof window !== 'undefined' && window.location ? `${window.location.protocol}//${window.location.host}` : '');
-      if (!apiUrl) {
+      const normalizeApiBaseUrl = (raw: string) => {
+        const trimmed = raw.trim();
+        const noTrailing = trimmed.replace(/\/+$/, '');
+        return noTrailing.endsWith('/api') ? noTrailing.slice(0, -4) : noTrailing;
+      };
+
+      const rawApiBaseUrl = process.env.EXPO_PUBLIC_RORK_API_BASE_URL;
+      if (!rawApiBaseUrl) {
         console.error('[Site] EXPO_PUBLIC_RORK_API_BASE_URL is not set');
         throw new Error('API URL not configured. Please check your environment settings.');
       }
+
+      const apiBaseUrl = normalizeApiBaseUrl(rawApiBaseUrl);
+      const scenarioEndpoint = `${apiBaseUrl}/api/scenarios/generate-intelligent`;
+      const healthEndpoint = `${apiBaseUrl}/api/health`;
 
       addThought('📊 Loading project data and market parameters...');
       await new Promise(resolve => setTimeout(resolve, 400));
@@ -224,8 +234,34 @@ export default function SiteScreen() {
       
       addThought('🤖 Consulting AI financial advisor...');
 
-      console.log('[Site] Calling API to generate scenarios at:', `${apiUrl}/api/scenarios/generate-intelligent`);
-      const response = await fetch(`${apiUrl}/api/scenarios/generate-intelligent`, {
+      console.log('[Site] API base URL:', apiBaseUrl);
+      console.log('[Site] Health endpoint:', healthEndpoint);
+      console.log('[Site] Scenario endpoint:', scenarioEndpoint);
+
+      const healthController = new AbortController();
+      const healthTimeout = setTimeout(() => healthController.abort(), 6500);
+      try {
+        const healthRes = await fetch(healthEndpoint, {
+          method: 'GET',
+          headers: { Accept: 'application/json' },
+          signal: healthController.signal,
+        });
+        const healthCt = healthRes.headers.get('content-type') ?? '';
+        const healthText = await healthRes.text();
+        console.log('[Site] Health response:', {
+          ok: healthRes.ok,
+          status: healthRes.status,
+          contentType: healthCt,
+          preview: healthText.slice(0, 120),
+        });
+      } catch (e) {
+        console.error('[Site] Health check failed:', e);
+      } finally {
+        clearTimeout(healthTimeout);
+      }
+
+      console.log('[Site] Calling API to generate scenarios at:', scenarioEndpoint);
+      const response = await fetch(scenarioEndpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -244,34 +280,40 @@ export default function SiteScreen() {
       addThought('📈 Optimizing rental periods and pricing strategies...');
       await new Promise(resolve => setTimeout(resolve, 500));
 
+      type GeneratedScenarioSummary = {
+        id: string;
+        name: string;
+        strategy?: string;
+      };
+
       type GenerateScenariosApiResponse =
         | {
-            status?: string;
-            scenarios: unknown[];
-            progress_steps?: { id: number; label: string }[];
-            error?: never;
+            success: true;
+            message?: string;
+            scenarios: GeneratedScenarioSummary[];
           }
         | {
-            status?: string;
+            success?: false;
             error: string;
-            scenarios?: never;
-            progress_steps?: { id: number; label: string }[];
+            details?: string;
           };
 
       const isOkGenerateResponse = (
         v: GenerateScenariosApiResponse | null
-      ): v is {
-        status?: string;
-        scenarios: unknown[];
-        progress_steps?: { id: number; label: string }[];
-      } => {
-        return !!v && Array.isArray((v as { scenarios?: unknown[] }).scenarios);
+      ): v is { success: true; scenarios: GeneratedScenarioSummary[]; message?: string } => {
+        return !!v && (v as { success?: unknown }).success === true;
+      };
+
+      const isErrorGenerateResponse = (
+        v: GenerateScenariosApiResponse | null
+      ): v is { error: string; details?: string; success?: false } => {
+        return !!v && typeof (v as { error?: unknown }).error === 'string';
       };
 
       let data: GenerateScenariosApiResponse | null = null;
-      const contentType = response.headers.get('content-type');
+      const contentType = response.headers.get('content-type') ?? '';
 
-      if (contentType && contentType.includes('application/json')) {
+      if (contentType.includes('application/json')) {
         try {
           data = (await response.json()) as GenerateScenariosApiResponse;
         } catch (e) {
@@ -280,8 +322,20 @@ export default function SiteScreen() {
         }
       } else {
         const textResponse = await response.text();
-        console.error('[Site] Non-JSON response:', textResponse);
+        console.error('[Site] Non-JSON response:', {
+          status: response.status,
+          statusText: response.statusText,
+          contentType,
+          preview: textResponse?.slice(0, 300) ?? '',
+        });
+
         const preview = textResponse?.slice(0, 200) ?? '';
+        if (response.status === 404) {
+          throw new Error(
+            `API endpoint not found (404). Please verify EXPO_PUBLIC_RORK_API_BASE_URL points to your deployed API host.\nTried: ${scenarioEndpoint}`
+          );
+        }
+
         throw new Error(
           preview.includes('Server did not start')
             ? 'Server did not start. Please ensure the API is deployed and environment variables are set.'
@@ -290,10 +344,10 @@ export default function SiteScreen() {
       }
 
       if (!response.ok) {
-        if (data && 'error' in data) {
-          throw new Error(data.error);
+        if (isErrorGenerateResponse(data)) {
+          throw new Error(data.details ? `${data.error} (${data.details})` : data.error);
         }
-        throw new Error('Failed to generate scenarios');
+        throw new Error(`Failed to generate scenarios (HTTP ${response.status})`);
       }
 
       console.log('[Site] AI Scenarios generated:', data);
