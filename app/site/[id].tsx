@@ -244,19 +244,56 @@ export default function SiteScreen() {
       addThought('📈 Optimizing rental periods and pricing strategies...');
       await new Promise(resolve => setTimeout(resolve, 500));
 
-      let data;
+      type GenerateScenariosApiResponse =
+        | {
+            status?: string;
+            scenarios: unknown[];
+            progress_steps?: { id: number; label: string }[];
+            error?: never;
+          }
+        | {
+            status?: string;
+            error: string;
+            scenarios?: never;
+            progress_steps?: { id: number; label: string }[];
+          };
+
+      const isOkGenerateResponse = (
+        v: GenerateScenariosApiResponse | null
+      ): v is {
+        status?: string;
+        scenarios: unknown[];
+        progress_steps?: { id: number; label: string }[];
+      } => {
+        return !!v && Array.isArray((v as { scenarios?: unknown[] }).scenarios);
+      };
+
+      let data: GenerateScenariosApiResponse | null = null;
       const contentType = response.headers.get('content-type');
-      
+
       if (contentType && contentType.includes('application/json')) {
-        data = await response.json();
+        try {
+          data = (await response.json()) as GenerateScenariosApiResponse;
+        } catch (e) {
+          console.error('[Site] Failed to parse JSON response:', e);
+          throw new Error('Server returned invalid JSON. Please try again.');
+        }
       } else {
         const textResponse = await response.text();
         console.error('[Site] Non-JSON response:', textResponse);
-        throw new Error('Server returned an invalid response. Please try again.');
+        const preview = textResponse?.slice(0, 200) ?? '';
+        throw new Error(
+          preview.includes('Server did not start')
+            ? 'Server did not start. Please ensure the API is deployed and environment variables are set.'
+            : 'Server returned an invalid response. Please try again.'
+        );
       }
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to generate scenarios');
+        if (data && 'error' in data) {
+          throw new Error(data.error);
+        }
+        throw new Error('Failed to generate scenarios');
       }
 
       console.log('[Site] AI Scenarios generated:', data);
@@ -264,7 +301,8 @@ export default function SiteScreen() {
       addThought('✨ Creating scenario configurations...');
       await new Promise(resolve => setTimeout(resolve, 400));
       
-      addThought(`✅ Generated ${data.scenarios.length} profitable scenarios!`);
+      const scenariosCount = isOkGenerateResponse(data) ? data.scenarios.length : 0;
+      addThought(`✅ Generated ${scenariosCount} profitable scenarios!`);
       
       await loadScenarios();
       setGenerationComplete(true);

@@ -14,17 +14,23 @@ console.log('[Hono] Environment check:', {
   nodeEnv: process.env.NODE_ENV,
 });
 
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
-const supabaseKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+const supabaseUrl =
+  process.env.SUPABASE_URL ||
+  process.env.EXPO_PUBLIC_SUPABASE_URL ||
+  '';
+const supabaseKey =
+  process.env.SUPABASE_ANON_KEY ||
+  process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ||
+  '';
 
 if (!supabaseUrl || !supabaseKey) {
   console.error('[Hono] ERROR: Missing required Supabase environment variables');
 }
 
-const supabase = createClient(
-  supabaseUrl || '',
-  supabaseKey || ''
-);
+const getSupabase = () => {
+  if (!supabaseUrl || !supabaseKey) return null;
+  return createClient(supabaseUrl, supabaseKey);
+};
 
 app.get("/", (c) => {
   return c.json({ status: "ok", message: "ZURB API is running" });
@@ -34,11 +40,17 @@ app.get("/api", (c) => {
   return c.json({ status: "ok", message: "ZURB API is running" });
 });
 
+app.onError((err, c) => {
+  console.error('[Hono] Unhandled error:', err);
+  return c.json({ error: 'Internal server error', message: err.message }, 500);
+});
+
 app.post("/api/scenarios/generate-intelligent", async (c) => {
   try {
     console.log('[AI Scenarios] Request received');
 
-    if (!supabaseUrl || !supabaseKey) {
+    const supabase = getSupabase();
+    if (!supabase) {
       console.error('[AI Scenarios] Missing Supabase credentials');
       return c.json({ error: 'Server configuration error: Missing database credentials' }, 500);
     }
@@ -354,20 +366,15 @@ Think step-by-step and be bold in your recommendations. The goal is to find trul
 });
 
 app.get("/api/health", (c) => {
-  return c.json({ 
-    status: "ok", 
+  return c.json({
+    status: "ok",
     message: "ZURB API is healthy",
     timestamp: new Date().toISOString(),
     env: {
-      hasSupabaseUrl: !!process.env.EXPO_PUBLIC_SUPABASE_URL,
-      hasSupabaseKey: !!process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
-    }
+      hasSupabaseUrl: !!supabaseUrl,
+      hasSupabaseKey: !!supabaseKey,
+    },
   });
-});
-
-app.onError((err, c) => {
-  console.error('[Hono Error]', err);
-  return c.json({ error: err.message }, 500);
 });
 
 export default app;
