@@ -221,6 +221,11 @@ export default function SiteScreen() {
     const blocks = getBlocksBySiteId(id);
     const project = projects.find(p => p.id === site.project_id);
     
+    const { data: projectHousingTypes } = await supabase
+      .from('project_housing_types')
+      .select('*')
+      .eq('project_id', project?.id || '');
+    
     const unitTypeCounts: { [key: string]: { count: number; totalArea: number; monthlyRent: number; costType: string } } = {};
     let totalConstructionCost = 0;
     let totalMonthlyRent = 0;
@@ -390,8 +395,30 @@ For each scenario, calculate expected surplus % = ((totalRent - totalCost) / tot
           .single();
         
         if (!error && newScenario) {
+          if (projectHousingTypes && projectHousingTypes.length > 0) {
+            const scenarioHousingTypesToInsert = projectHousingTypes.map(pht => ({
+              scenario_id: newScenario.id,
+              code: pht.code,
+              name: pht.name,
+              category: pht.category,
+              default_area_m2: pht.default_area_m2,
+              default_cost_type: pht.default_cost_type,
+              default_rent_monthly: Math.round(pht.default_rent_monthly * (1 + scenario.rentalAdjustmentPercent / 100)),
+            }));
+            
+            const { error: housingError } = await supabase
+              .from('scenario_housing_types')
+              .insert(scenarioHousingTypesToInsert);
+            
+            if (housingError) {
+              console.error('[Site] Error creating scenario housing types:', housingError);
+            } else {
+              console.log('[Site] Created scenario housing types with', scenario.rentalAdjustmentPercent, '% rental adjustment');
+            }
+          }
+          
           createdScenarios.push(scenario.name);
-          addThought(`   ✓ ${scenario.name}: ${scenario.rentalPeriodYears} yrs, +${actualSurplus.toFixed(0)}% surplus`);
+          addThought(`   ✓ ${scenario.name}: ${scenario.rentalPeriodYears} yrs, ${scenario.rentalAdjustmentPercent >= 0 ? '+' : ''}${scenario.rentalAdjustmentPercent}% rent, +${actualSurplus.toFixed(0)}% surplus`);
           console.log('[Site] Created smart scenario:', scenario.name);
         }
       }
@@ -408,14 +435,77 @@ For each scenario, calculate expected surplus % = ((totalRent - totalCost) / tot
       setGeneratingScenarios(false);
     } catch (error: any) {
       console.error('[Site] Error generating scenarios:', error);
-      addThought(`❌ Error: ${error.message || 'Failed to generate scenarios'}`);
+      const errorMessage = error?.message || 'Failed to generate scenarios';
+      const isNetworkError = errorMessage.toLowerCase().includes('load failed') || 
+                             errorMessage.toLowerCase().includes('network') ||
+                             errorMessage.toLowerCase().includes('fetch');
+      
+      if (isNetworkError) {
+        addThought('⚠️ Network error - falling back to default scenarios...');
+        await new Promise(resolve => setTimeout(resolve, 300));
+        
+        const { data: projectHousingTypesFallback } = await supabase
+          .from('project_housing_types')
+          .select('*')
+          .eq('project_id', project?.id || '');
+        
+        const fallbackScenarios = [
+          { name: 'Conservative', years: Math.min(breakEvenYears + 10, project?.max_rental_period_years || 30), adjustment: -10 },
+          { name: 'Balanced', years: Math.min(breakEvenYears + 5, project?.max_rental_period_years || 30), adjustment: 0 },
+          { name: 'Accelerated', years: Math.min(breakEvenYears + 3, project?.max_rental_period_years || 30), adjustment: 10 },
+        ];
+        
+        for (const fb of fallbackScenarios) {
+          const adjRent = annualRent * (1 + fb.adjustment / 100);
+          const totalRent = adjRent * fb.years;
+          const surplus = ((totalRent - totalConstructionCost) / totalConstructionCost) * 100;
+          
+          if (surplus < 10) continue;
+          
+          const { data: newScenario, error: scError } = await supabase
+            .from('scenarios')
+            .insert({
+              site_id: id,
+              name: `${fb.name} Scenario`,
+              notes: `Auto-generated ${fb.name.toLowerCase()} scenario.\n\nExpected Surplus: ${surplus.toFixed(1)}%\nRental Adjustment: ${fb.adjustment >= 0 ? '+' : ''}${fb.adjustment}%`,
+              rental_period_years: fb.years,
+              is_auto_scenario: true,
+              created_by: user.id,
+            })
+            .select()
+            .single();
+          
+          if (!scError && newScenario && projectHousingTypesFallback) {
+            const housingTypesToInsert = projectHousingTypesFallback.map(pht => ({
+              scenario_id: newScenario.id,
+              code: pht.code,
+              name: pht.name,
+              category: pht.category,
+              default_area_m2: pht.default_area_m2,
+              default_cost_type: pht.default_cost_type,
+              default_rent_monthly: Math.round(pht.default_rent_monthly * (1 + fb.adjustment / 100)),
+            }));
+            
+            await supabase.from('scenario_housing_types').insert(housingTypesToInsert);
+            addThought(`   ✓ ${fb.name}: ${fb.years} yrs, ${fb.adjustment >= 0 ? '+' : ''}${fb.adjustment}% rent`);
+          }
+        }
+        
+        addThought('✅ Created fallback scenarios');
+        await loadScenarios();
+        setGenerationComplete(true);
+        setGeneratingScenarios(false);
+        return;
+      }
+      
+      addThought(`❌ Error: ${errorMessage}`);
       setGenerationComplete(true);
       setGeneratingScenarios(false);
       
       setTimeout(() => {
         Alert.alert(
           'Error',
-          error.message || 'Failed to generate scenarios. Please try again.',
+          errorMessage || 'Failed to generate scenarios. Please try again.',
           [{ text: 'OK' }]
         );
       }, 100);
