@@ -1,4 +1,5 @@
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabase';
 import { Link } from 'expo-router';
 import { LogIn } from 'lucide-react-native';
 import React, { useState } from 'react';
@@ -11,6 +12,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -18,12 +20,55 @@ export default function LoginScreen() {
   const { signIn, isLoading } = useAuth();
   const [email, setEmail] = useState<string>('');
   const [password, setPassword] = useState<string>('');
+  const [isResetting, setIsResetting] = useState<boolean>(false);
 
   const handleSignIn = async () => {
     if (!email.trim() || !password.trim()) {
       return;
     }
-    await signIn(email.trim(), password);
+    const result = await signIn(email.trim(), password);
+    if (result?.error) {
+      const errorMessage = result.error.message;
+      if (errorMessage.includes('Invalid login credentials')) {
+        Alert.alert(
+          'Sign In Failed',
+          'The email or password you entered is incorrect. Please check your credentials and try again.',
+          [
+            { text: 'Try Again', style: 'cancel' },
+            { text: 'Reset Password', onPress: handleForgotPassword }
+          ]
+        );
+      }
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    if (!email.trim()) {
+      Alert.alert('Email Required', 'Please enter your email address first, then tap "Forgot Password".');
+      return;
+    }
+    
+    setIsResetting(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: 'zurb://reset-password',
+      });
+      
+      if (error) {
+        console.error('[Login] Password reset error:', error);
+        Alert.alert('Error', error.message);
+      } else {
+        Alert.alert(
+          'Check Your Email',
+          'If an account exists with this email, you will receive a password reset link.'
+        );
+      }
+    } catch (err) {
+      console.error('[Login] Password reset exception:', err);
+      Alert.alert('Error', 'Failed to send reset email. Please try again.');
+    } finally {
+      setIsResetting(false);
+    }
   };
 
   return (
@@ -73,6 +118,18 @@ export default function LoginScreen() {
               <ActivityIndicator color="#FFFFFF" />
             ) : (
               <Text style={styles.buttonText}>Sign In</Text>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={handleForgotPassword}
+            disabled={isLoading || isResetting}
+            style={styles.forgotPassword}
+          >
+            {isResetting ? (
+              <ActivityIndicator size="small" color="#007AFF" />
+            ) : (
+              <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
             )}
           </TouchableOpacity>
 
@@ -156,5 +213,15 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#007AFF',
     fontWeight: '600' as const,
+  },
+  forgotPassword: {
+    alignItems: 'center',
+    paddingVertical: 8,
+    minHeight: 32,
+  },
+  forgotPasswordText: {
+    fontSize: 14,
+    color: '#007AFF',
+    fontWeight: '500' as const,
   },
 });
