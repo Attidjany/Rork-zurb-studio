@@ -736,6 +736,7 @@ const styles = StyleSheet.create({
   scenarioItemNameAuto: {
     color: '#FF9500',
     fontWeight: '600' as const,
+    fontStyle: 'italic' as const,
   },
   scenarioItemActions: {
     flexDirection: 'row',

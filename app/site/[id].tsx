@@ -28,6 +28,7 @@ import {
   HOUSING_TYPES,
   CONSTRUCTION_COSTS,
 } from '@/constants/typologies';
+import { supabase } from '@/lib/supabase';
 import { DbBlock, DbHalfBlock, VillaLayout, ApartmentLayout, HalfBlockType, BuildingType } from '@/types';
 
 export default function SiteScreen() {
@@ -47,8 +48,6 @@ export default function SiteScreen() {
     updateHalfBlock,
     createUnit,
     updateUnit,
-    createScenario,
-    updateScenario,
   } = useZURB();
 
   const [refreshing, setRefreshing] = useState<boolean>(false);
@@ -212,80 +211,151 @@ export default function SiteScreen() {
     setGenerationComplete(false);
     setAiThinking([]);
     
-    setAiThinking(prev => [...prev, '🔍 Analyzing site configuration...']);
-    await new Promise(resolve => setTimeout(resolve, 500));
+    const addThought = (thought: string) => {
+      setAiThinking(prev => [...prev, thought]);
+    };
+    
+    addThought('🔍 Scanning block configuration...');
+    await new Promise(resolve => setTimeout(resolve, 300));
     
     const blocks = getBlocksBySiteId(id);
-    const halfBlocksData = blocks.flatMap(block => {
-      const hbs = getHalfBlocksByBlockId(block.id);
-      return hbs.map(hb => ({
-        blockNumber: block.block_number,
-        position: hb.position,
-        type: hb.type,
-        villaLayout: hb.villa_layout,
-        apartmentLayout: hb.apartment_layout,
-        units: getUnitsByHalfBlockId(hb.id).map(u => ({
-          unitType: u.unit_type,
-          buildingType: u.building_type,
-          sizeM2: u.size_m2,
-        })),
-      }));
-    });
-    
     const project = projects.find(p => p.id === site.project_id);
     
-    setAiThinking(prev => [...prev, '📊 Loading project data and market parameters...']);
+    const unitTypeCounts: { [key: string]: { count: number; totalArea: number; monthlyRent: number; costType: string } } = {};
+    let totalConstructionCost = 0;
+    let totalMonthlyRent = 0;
+    
+    blocks.forEach(block => {
+      const hbs = getHalfBlocksByBlockId(block.id);
+      hbs.forEach(hb => {
+        if (hb.type === 'villas' && hb.villa_layout) {
+          const units = getUnitsByHalfBlockId(hb.id);
+          units.forEach(unit => {
+            if (unit.unit_type === 'villa' && unit.building_type) {
+              const villaType = unit.building_type;
+              const housing = HOUSING_TYPES[villaType];
+              if (housing) {
+                if (!unitTypeCounts[villaType]) {
+                  unitTypeCounts[villaType] = { count: 0, totalArea: 0, monthlyRent: housing.defaultRent, costType: housing.defaultCostType };
+                }
+                unitTypeCounts[villaType].count++;
+                unitTypeCounts[villaType].totalArea += housing.defaultArea;
+                
+                const costConfig = CONSTRUCTION_COSTS[housing.defaultCostType];
+                const costPerM2 = costConfig ? costConfig.goldGramsPerM2 * 85 * 656 : 1000;
+                totalConstructionCost += housing.defaultArea * costPerM2;
+                totalMonthlyRent += housing.defaultRent;
+              }
+            }
+          });
+        } else if (hb.type === 'apartments' && hb.apartment_layout) {
+          const buildingConfig = BUILDING_TYPES.find(bt => bt.id === hb.apartment_layout);
+          const units = getUnitsByHalfBlockId(hb.id);
+          const numApartmentBuildings = units.filter(u => u.unit_type === 'apartment').length;
+          
+          if (buildingConfig?.units) {
+            Object.entries(buildingConfig.units).forEach(([unitType, countPerBuilding]) => {
+              const housing = HOUSING_TYPES[unitType];
+              if (housing) {
+                const totalCount = countPerBuilding * numApartmentBuildings;
+                if (!unitTypeCounts[unitType]) {
+                  unitTypeCounts[unitType] = { count: 0, totalArea: 0, monthlyRent: housing.defaultRent, costType: housing.defaultCostType };
+                }
+                unitTypeCounts[unitType].count += totalCount;
+                unitTypeCounts[unitType].totalArea += housing.defaultArea * totalCount;
+                
+                const costConfig = CONSTRUCTION_COSTS[housing.defaultCostType];
+                const costPerM2 = costConfig ? costConfig.goldGramsPerM2 * 85 * 656 : 1000;
+                totalConstructionCost += housing.defaultArea * costPerM2 * totalCount;
+                totalMonthlyRent += housing.defaultRent * totalCount;
+              }
+            });
+          }
+        }
+      });
+    });
+    
+    const unitTypes = Object.keys(unitTypeCounts);
+    const totalUnits = Object.values(unitTypeCounts).reduce((sum, v) => sum + v.count, 0);
+    
+    if (totalUnits === 0) {
+      addThought('⚠️ No units configured yet. Please configure blocks first.');
+      setGenerationComplete(true);
+      setGeneratingScenarios(false);
+      return;
+    }
+    
+    addThought(`📊 Found ${totalUnits} units across ${unitTypes.length} housing types`);
+    await new Promise(resolve => setTimeout(resolve, 300));
+    
+    unitTypes.forEach(type => {
+      const info = unitTypeCounts[type];
+      const housing = HOUSING_TYPES[type];
+      addThought(`   • ${info.count}x ${housing?.name || type} @ ${info.monthlyRent.toLocaleString()} XOF/month`);
+    });
     await new Promise(resolve => setTimeout(resolve, 400));
     
-    const villaCount = halfBlocksData.filter(hb => hb.type === 'villas').length;
-    const apartmentCount = halfBlocksData.filter(hb => hb.type === 'apartments').length;
-    const totalUnits = halfBlocksData.reduce((sum, hb) => sum + hb.units.length, 0);
+    addThought(`💰 Total construction investment: ${totalConstructionCost.toLocaleString()} XOF`);
+    addThought(`📈 Total monthly rental income: ${totalMonthlyRent.toLocaleString()} XOF`);
+    await new Promise(resolve => setTimeout(resolve, 300));
     
-    setAiThinking(prev => [...prev, '💰 Calculating construction costs and revenue potential...']);
+    const annualRent = totalMonthlyRent * 12;
+    const breakEvenYears = Math.ceil(totalConstructionCost / annualRent);
+    
+    addThought(`⏱️ Break-even point: ~${breakEvenYears} years`);
+    await new Promise(resolve => setTimeout(resolve, 300));
+    
+    addThought('🤖 Calculating optimal scenarios with Islamic finance principles...');
+    addThought('   • Ensuring rental levels are affordable');
+    addThought('   • Guaranteeing investment recoup + reasonable surplus');
     await new Promise(resolve => setTimeout(resolve, 400));
-    
-    setAiThinking(prev => [...prev, '🤖 Consulting AI financial advisor...']);
     
     try {
       const scenarioSchema = z.object({
         scenarios: z.array(z.object({
           name: z.string().describe('Short descriptive name for the scenario'),
-          notes: z.string().describe('Brief explanation of the investment strategy'),
-          rentalPeriodYears: z.number().min(5).max(50).describe('Optimal rental period in years'),
-          reasoning: z.string().describe('Why this rental period is optimal'),
+          notes: z.string().describe('Brief explanation including affordability and surplus'),
+          rentalPeriodYears: z.number().min(5).max(50).describe('Rental period in years'),
+          rentalAdjustmentPercent: z.number().min(-30).max(30).describe('Rental adjustment from default (-30% to +30%)'),
+          reasoning: z.string().describe('Specific reasoning for this scenario'),
+          expectedSurplusPercent: z.number().describe('Expected surplus percentage over investment'),
         })).min(2).max(4),
       });
       
-      const prompt = `You are a real estate investment advisor. Analyze this site and suggest 2-4 optimal investment scenarios.
+      const unitTypeDetails = unitTypes.map(type => {
+        const info = unitTypeCounts[type];
+        const housing = HOUSING_TYPES[type];
+        return `${type} (${housing?.name}): ${info.count} units, ${info.monthlyRent.toLocaleString()} XOF/month each`;
+      }).join('\n');
+      
+      const prompt = `You are an Islamic finance-compliant real estate investment advisor. Generate 2-4 viable investment scenarios.
 
-Site Information:
-- Name: ${site.name}
-- Total Area: ${site.area_ha} hectares
-- Number of 6ha Blocks: ${blocks.length}
-- Villa Half-Blocks: ${villaCount}
-- Apartment Half-Blocks: ${apartmentCount}
-- Total Units Configured: ${totalUnits}
-- Max Rental Period Allowed: ${project?.max_rental_period_years || 30} years
+IMPORTANT PRINCIPLES:
+1. All scenarios MUST be profitable - investment must be fully recouped plus surplus
+2. Rental levels must be affordable for target market
+3. No interest/riba - pure rental income model
+4. Surplus should be reasonable (15-50% over investment)
 
-Housing Types Available:
-${Object.entries(HOUSING_TYPES).map(([code, info]) => `- ${code}: ${info.name} (${info.defaultArea}m², rent: ${info.defaultRent} CFA/month)`).join('\n')}
+Site: ${site.name} (${site.area_ha} ha)
+Total Construction Cost: ${totalConstructionCost.toLocaleString()} XOF
+Break-even Period: ${breakEvenYears} years
+Max Allowed Period: ${project?.max_rental_period_years || 30} years
 
-Construction Cost Types:
-${Object.entries(CONSTRUCTION_COSTS).map(([code, info]) => `- ${code}: ${info.name} (${info.goldGramsPerM2}g gold/m²)`).join('\n')}
+Configured Unit Types:
+${unitTypeDetails}
 
-Generate diverse scenarios with different investment strategies:
-1. A conservative scenario with longer rental period for stable returns
-2. An aggressive scenario with shorter period for faster ROI
-3. A balanced scenario optimizing risk vs return
-4. (Optional) A premium scenario if high-end units are present
+Total Monthly Rent at Default Rates: ${totalMonthlyRent.toLocaleString()} XOF
+Annual Rent: ${annualRent.toLocaleString()} XOF
 
-Consider:
-- Construction costs vs rental income
-- Break-even analysis
-- Market demand for different unit types
-- Risk mitigation through diversification`;
+Generate scenarios that:
+1. CONSERVATIVE: Longer period (${Math.min(breakEvenYears + 10, project?.max_rental_period_years || 30)} years), slightly lower rents for affordability, ~20-30% surplus
+2. BALANCED: Medium period (${Math.min(breakEvenYears + 5, project?.max_rental_period_years || 30)} years), default rents, ~30-40% surplus  
+3. ACCELERATED: Shorter period (${Math.min(breakEvenYears + 3, project?.max_rental_period_years || 30)} years), maintain affordability, ~15-25% surplus
+4. (Optional) PREMIUM: If high-end units exist, target premium market segment
 
-      setAiThinking(prev => [...prev, '🧠 AI is analyzing market dynamics and profitability...']);
+For each scenario, calculate expected surplus % = ((totalRent - totalCost) / totalCost) * 100`;
+
+      addThought('🧠 AI analyzing optimal rental periods and affordability...');
       
       console.log('[Site] Calling AI generateObject...');
       const result = await generateObject({
@@ -295,27 +365,42 @@ Consider:
       
       console.log('[Site] AI generated scenarios:', result);
       
-      setAiThinking(prev => [...prev, '📈 Optimizing rental periods and pricing strategies...']);
-      await new Promise(resolve => setTimeout(resolve, 400));
-      
-      setAiThinking(prev => [...prev, '✨ Creating scenario configurations...']);
+      addThought('✨ Creating viable scenarios...');
+      await new Promise(resolve => setTimeout(resolve, 300));
       
       const createdScenarios: string[] = [];
       for (const scenario of result.scenarios) {
-        const newScenario = await createScenario(id, scenario.name, scenario.notes);
-        if (newScenario) {
-          await updateScenario(newScenario.id, { rental_period_years: scenario.rentalPeriodYears });
+        const adjustedAnnualRent = annualRent * (1 + scenario.rentalAdjustmentPercent / 100);
+        const totalRentOverPeriod = adjustedAnnualRent * scenario.rentalPeriodYears;
+        const actualSurplus = ((totalRentOverPeriod - totalConstructionCost) / totalConstructionCost) * 100;
+        
+        const enrichedNotes = `${scenario.notes}\n\nExpected Surplus: ${actualSurplus.toFixed(1)}% over investment\nRental Adjustment: ${scenario.rentalAdjustmentPercent >= 0 ? '+' : ''}${scenario.rentalAdjustmentPercent}%`;
+        
+        const { data: newScenario, error } = await supabase
+          .from('scenarios')
+          .insert({
+            site_id: id,
+            name: scenario.name,
+            notes: enrichedNotes,
+            rental_period_years: scenario.rentalPeriodYears,
+            is_auto_scenario: true,
+            created_by: user.id,
+          })
+          .select()
+          .single();
+        
+        if (!error && newScenario) {
           createdScenarios.push(scenario.name);
-          console.log('[Site] Created scenario:', scenario.name, 'with', scenario.rentalPeriodYears, 'years');
+          addThought(`   ✓ ${scenario.name}: ${scenario.rentalPeriodYears} yrs, +${actualSurplus.toFixed(0)}% surplus`);
+          console.log('[Site] Created smart scenario:', scenario.name);
         }
       }
       
       await new Promise(resolve => setTimeout(resolve, 400));
       
-      setAiThinking(prev => [...prev, `✅ Generated ${createdScenarios.length} profitable scenarios!`]);
-      
       if (createdScenarios.length > 0) {
-        setAiThinking(prev => [...prev, `📋 Created: ${createdScenarios.join(', ')}`]);
+        addThought(`✅ Generated ${createdScenarios.length} viable scenarios!`);
+        addThought('💡 All scenarios ensure investment recovery + halal surplus');
       }
       
       await loadScenarios();
@@ -323,7 +408,7 @@ Consider:
       setGeneratingScenarios(false);
     } catch (error: any) {
       console.error('[Site] Error generating scenarios:', error);
-      setAiThinking(prev => [...prev, `❌ Error: ${error.message || 'Failed to generate scenarios'}`]);
+      addThought(`❌ Error: ${error.message || 'Failed to generate scenarios'}`);
       setGenerationComplete(true);
       setGeneratingScenarios(false);
       
@@ -335,7 +420,7 @@ Consider:
         );
       }, 100);
     }
-  }, [id, user, site, projects, getBlocksBySiteId, getHalfBlocksByBlockId, getUnitsByHalfBlockId, createScenario, updateScenario, loadScenarios]);
+  }, [id, user, site, projects, getBlocksBySiteId, getHalfBlocksByBlockId, getUnitsByHalfBlockId, loadScenarios]);
 
   const selectedHalfBlock = useMemo(() => {
     if (!selectedHalfBlockId) return null;
