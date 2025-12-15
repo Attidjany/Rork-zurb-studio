@@ -1,5 +1,5 @@
 import { Stack, useRouter, useLocalSearchParams } from 'expo-router';
-import { Plus, MapPin, Copy, Trash2, Settings, FileText, Edit3 } from 'lucide-react-native';
+import { Plus, MapPin, Copy, Trash2, Settings, FileText, Edit3, Download, FileSpreadsheet } from 'lucide-react-native';
 import React, { useState } from 'react';
 import {
   View,
@@ -16,6 +16,9 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useZURB } from '@/contexts/ZURBContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabase';
+import { exportToPDF, exportToExcel } from '@/lib/exports';
 
 type Site = {
   id: string;
@@ -29,7 +32,34 @@ type Site = {
 export default function ProjectScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { projects, getSitesByProjectId, getScenariosBySiteId, createSite, createScenario, deleteScenario, duplicateScenario, isLoading, loadSites, loadProjects, loadScenarios, deleteSite, duplicateSite, updateSite, updateScenario } = useZURB();
+  const { user } = useAuth();
+  const { 
+    projects, 
+    sites,
+    blocks,
+    halfBlocks,
+    units,
+    scenarios,
+    projectConstructionCosts,
+    projectHousingTypes,
+    projectEquipmentUtilityTypes,
+    scenarioHousingTypes,
+    scenarioConstructionCosts,
+    getSitesByProjectId, 
+    getScenariosBySiteId, 
+    createSite, 
+    createScenario, 
+    deleteScenario, 
+    duplicateScenario, 
+    isLoading, 
+    loadSites, 
+    loadProjects, 
+    loadScenarios, 
+    deleteSite, 
+    duplicateSite, 
+    updateSite, 
+    updateScenario 
+  } = useZURB();
   const [modalVisible, setModalVisible] = useState<boolean>(false);
   const [siteName, setSiteName] = useState<string>('');
   const [siteArea, setSiteArea] = useState<string>('');
@@ -41,11 +71,104 @@ export default function ProjectScreen() {
   const [isCreatingScenario, setIsCreatingScenario] = useState<boolean>(false);
   const [renameModalVisible, setRenameModalVisible] = useState<{ type: 'site' | 'scenario'; id: string; currentName: string } | null>(null);
   const [renameName, setRenameName] = useState<string>('');
+  const [isExporting, setIsExporting] = useState<boolean>(false);
+  const [goldPrice, setGoldPrice] = useState<number>(55720);
 
   const handleRefresh = async () => {
     setRefreshing(true);
     await Promise.all([loadProjects(), loadSites(), loadScenarios()]);
     setRefreshing(false);
+  };
+
+  React.useEffect(() => {
+    const loadGoldPrice = async () => {
+      if (!user) return;
+      try {
+        const { data } = await supabase
+          .from('account_settings')
+          .select('gold_price_per_gram')
+          .eq('user_id', user.id)
+          .single();
+        if (data?.gold_price_per_gram) {
+          setGoldPrice(data.gold_price_per_gram);
+        }
+      } catch (error) {
+        console.log('[Project] Error loading gold price:', error);
+      }
+    };
+    loadGoldPrice();
+  }, [user]);
+
+  const getExportData = () => {
+    if (!project) return null;
+    const projectSitesList = sites.filter(s => s.project_id === project.id);
+    const projectScenarios = scenarios.filter(s => 
+      projectSitesList.some(site => site.id === s.site_id)
+    );
+    const projectBlocks = blocks.filter(b => 
+      projectSitesList.some(site => site.id === b.site_id)
+    );
+    const projectHalfBlocks = halfBlocks.filter(hb => 
+      projectBlocks.some(block => block.id === hb.block_id)
+    );
+    const projectUnits = units.filter(u => 
+      projectHalfBlocks.some(hb => hb.id === u.half_block_id)
+    );
+    
+    return {
+      project,
+      sites: projectSitesList,
+      blocks: projectBlocks,
+      halfBlocks: projectHalfBlocks,
+      units: projectUnits,
+      scenarios: projectScenarios,
+      projectConstructionCosts: projectConstructionCosts.filter(c => c.project_id === project.id),
+      projectHousingTypes: projectHousingTypes.filter(h => h.project_id === project.id),
+      projectEquipmentUtilityTypes: projectEquipmentUtilityTypes.filter(e => e.project_id === project.id),
+      scenarioHousingTypes: scenarioHousingTypes.filter(h => 
+        projectScenarios.some(s => s.id === h.scenario_id)
+      ),
+      scenarioConstructionCosts: scenarioConstructionCosts.filter(c => 
+        projectScenarios.some(s => s.id === c.scenario_id)
+      ),
+      goldPrice,
+    };
+  };
+
+  const handleExportPDF = async () => {
+    const data = getExportData();
+    if (!data) {
+      Alert.alert('Error', 'Project data not available');
+      return;
+    }
+    setIsExporting(true);
+    try {
+      await exportToPDF(data);
+      console.log('[Project] PDF export completed');
+    } catch (error: any) {
+      console.error('[Project] PDF export error:', error);
+      Alert.alert('Export Error', error?.message || 'Failed to export PDF');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleExportExcel = async () => {
+    const data = getExportData();
+    if (!data) {
+      Alert.alert('Error', 'Project data not available');
+      return;
+    }
+    setIsExporting(true);
+    try {
+      await exportToExcel(data);
+      console.log('[Project] Excel export completed');
+    } catch (error: any) {
+      console.error('[Project] Excel export error:', error);
+      Alert.alert('Export Error', error?.message || 'Failed to export Excel');
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   const handleDeleteSite = async (siteId: string) => {
@@ -298,6 +421,42 @@ export default function ProjectScreen() {
             <Text style={styles.descriptionText}>{project.description}</Text>
           </View>
         ) : null}
+
+        <View style={styles.exportSection}>
+          <Text style={styles.exportTitle}>Export Reports</Text>
+          <View style={styles.exportButtons}>
+            <TouchableOpacity
+              style={[styles.exportButton, styles.pdfButton]}
+              onPress={handleExportPDF}
+              disabled={isExporting}
+              testID="export-pdf-button"
+            >
+              {isExporting ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <>
+                  <Download size={18} color="#FFFFFF" />
+                  <Text style={styles.exportButtonText}>PDF Report</Text>
+                </>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.exportButton, styles.excelButton]}
+              onPress={handleExportExcel}
+              disabled={isExporting}
+              testID="export-excel-button"
+            >
+              {isExporting ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <>
+                  <FileSpreadsheet size={18} color="#FFFFFF" />
+                  <Text style={styles.exportButtonText}>Excel Report</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Sites</Text>
@@ -599,6 +758,49 @@ const styles = StyleSheet.create({
   siteBlocks: {
     fontSize: 14,
     color: '#999999',
+  },
+  exportSection: {
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 16,
+    marginTop: 16,
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  exportTitle: {
+    fontSize: 14,
+    fontWeight: '600' as const,
+    color: '#666666',
+    marginBottom: 12,
+  },
+  exportButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  exportButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    gap: 8,
+  },
+  pdfButton: {
+    backgroundColor: '#DC3545',
+  },
+  excelButton: {
+    backgroundColor: '#28A745',
+  },
+  exportButtonText: {
+    fontSize: 14,
+    fontWeight: '600' as const,
+    color: '#FFFFFF',
   },
   emptyContainer: {
     padding: 32,
