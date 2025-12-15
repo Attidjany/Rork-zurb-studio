@@ -218,7 +218,7 @@ export default function SiteScreen() {
       setAiThinking(prev => [...prev, thought]);
     };
     
-    addThought('🔍 Scanning block configuration...');
+    addThought('🔍 Analyzing block configuration...');
     await new Promise(resolve => setTimeout(resolve, 300));
     
     const blocks = getBlocksBySiteId(id);
@@ -229,7 +229,7 @@ export default function SiteScreen() {
       .select('*')
       .eq('project_id', project?.id || '');
     
-    const unitTypeCounts: { [key: string]: { count: number; totalArea: number; monthlyRent: number; costType: string } } = {};
+    const unitTypeCounts: { [key: string]: { count: number; totalArea: number; monthlyRent: number; costType: string; unitCost: number } } = {};
     let totalConstructionCost = 0;
     let totalMonthlyRent = 0;
     
@@ -241,18 +241,25 @@ export default function SiteScreen() {
           units.forEach(unit => {
             if (unit.unit_type === 'villa' && unit.building_type) {
               const villaType = unit.building_type;
+              const projectHousing = projectHousingTypes?.find(h => h.code === villaType);
               const housing = HOUSING_TYPES[villaType];
-              if (housing) {
+              
+              if (housing || projectHousing) {
+                const area = projectHousing?.default_area_m2 || housing?.defaultArea || 100;
+                const rent = projectHousing?.default_rent_monthly || housing?.defaultRent || 500000;
+                const costTypeCode = projectHousing?.default_cost_type || housing?.defaultCostType || 'ZME';
+                const costConfig = CONSTRUCTION_COSTS[costTypeCode];
+                const costPerM2 = costConfig ? costConfig.goldGramsPerM2 * 85 * 656 : 1000;
+                const unitCost = area * costPerM2;
+                
                 if (!unitTypeCounts[villaType]) {
-                  unitTypeCounts[villaType] = { count: 0, totalArea: 0, monthlyRent: housing.defaultRent, costType: housing.defaultCostType };
+                  unitTypeCounts[villaType] = { count: 0, totalArea: 0, monthlyRent: rent, costType: costTypeCode, unitCost };
                 }
                 unitTypeCounts[villaType].count++;
-                unitTypeCounts[villaType].totalArea += housing.defaultArea;
+                unitTypeCounts[villaType].totalArea += area;
                 
-                const costConfig = CONSTRUCTION_COSTS[housing.defaultCostType];
-                const costPerM2 = costConfig ? costConfig.goldGramsPerM2 * 85 * 656 : 1000;
-                totalConstructionCost += housing.defaultArea * costPerM2;
-                totalMonthlyRent += housing.defaultRent;
+                totalConstructionCost += unitCost;
+                totalMonthlyRent += rent;
               }
             }
           });
@@ -263,19 +270,26 @@ export default function SiteScreen() {
           
           if (buildingConfig?.units) {
             Object.entries(buildingConfig.units).forEach(([unitType, countPerBuilding]) => {
+              const projectHousing = projectHousingTypes?.find(h => h.code === unitType);
               const housing = HOUSING_TYPES[unitType];
-              if (housing) {
+              
+              if (housing || projectHousing) {
                 const totalCount = countPerBuilding * numApartmentBuildings;
+                const area = projectHousing?.default_area_m2 || housing?.defaultArea || 80;
+                const rent = projectHousing?.default_rent_monthly || housing?.defaultRent || 300000;
+                const costTypeCode = projectHousing?.default_cost_type || housing?.defaultCostType || 'ZME';
+                const costConfig = CONSTRUCTION_COSTS[costTypeCode];
+                const costPerM2 = costConfig ? costConfig.goldGramsPerM2 * 85 * 656 : 1000;
+                const unitCost = area * costPerM2;
+                
                 if (!unitTypeCounts[unitType]) {
-                  unitTypeCounts[unitType] = { count: 0, totalArea: 0, monthlyRent: housing.defaultRent, costType: housing.defaultCostType };
+                  unitTypeCounts[unitType] = { count: 0, totalArea: 0, monthlyRent: rent, costType: costTypeCode, unitCost };
                 }
                 unitTypeCounts[unitType].count += totalCount;
-                unitTypeCounts[unitType].totalArea += housing.defaultArea * totalCount;
+                unitTypeCounts[unitType].totalArea += area * totalCount;
                 
-                const costConfig = CONSTRUCTION_COSTS[housing.defaultCostType];
-                const costPerM2 = costConfig ? costConfig.goldGramsPerM2 * 85 * 656 : 1000;
-                totalConstructionCost += housing.defaultArea * costPerM2 * totalCount;
-                totalMonthlyRent += housing.defaultRent * totalCount;
+                totalConstructionCost += unitCost * totalCount;
+                totalMonthlyRent += rent * totalCount;
               }
             });
           }
@@ -293,79 +307,89 @@ export default function SiteScreen() {
       return;
     }
     
-    addThought(`📊 Found ${totalUnits} units across ${unitTypes.length} housing types`);
-    await new Promise(resolve => setTimeout(resolve, 300));
+    addThought(`📊 Identified ${totalUnits} units across ${unitTypes.length} housing types:`);
+    await new Promise(resolve => setTimeout(resolve, 200));
     
     unitTypes.forEach(type => {
       const info = unitTypeCounts[type];
       const housing = HOUSING_TYPES[type];
-      addThought(`   • ${info.count}x ${housing?.name || type} @ ${info.monthlyRent.toLocaleString()} XOF/month`);
+      const projectHousing = projectHousingTypes?.find(h => h.code === type);
+      const name = projectHousing?.name || housing?.name || type;
+      addThought(`   • ${info.count}x ${name} @ ${info.monthlyRent.toLocaleString()} XOF/month`);
     });
-    await new Promise(resolve => setTimeout(resolve, 400));
+    await new Promise(resolve => setTimeout(resolve, 300));
     
-    addThought(`💰 Total construction investment: ${totalConstructionCost.toLocaleString()} XOF`);
-    addThought(`📈 Total monthly rental income: ${totalMonthlyRent.toLocaleString()} XOF`);
+    addThought(`💰 Total investment required: ${totalConstructionCost.toLocaleString()} XOF`);
+    addThought(`📈 Current monthly income potential: ${totalMonthlyRent.toLocaleString()} XOF`);
     await new Promise(resolve => setTimeout(resolve, 300));
     
     const annualRent = totalMonthlyRent * 12;
-    const breakEvenYears = Math.ceil(totalConstructionCost / annualRent);
+    const breakEvenYears = totalConstructionCost / annualRent;
+    const maxPeriod = project?.max_rental_period_years || 30;
     
-    addThought(`⏱️ Break-even point: ~${breakEvenYears} years`);
-    await new Promise(resolve => setTimeout(resolve, 300));
-    
-    addThought('🤖 Calculating optimal scenarios with Islamic finance principles...');
-    addThought('   • Ensuring rental levels are affordable');
-    addThought('   • Guaranteeing investment recoup + reasonable surplus');
+    addThought(`⏱️ Minimum break-even: ${breakEvenYears.toFixed(1)} years at current rates`);
+    addThought(`📋 Maximum allowed rental period: ${maxPeriod} years`);
     await new Promise(resolve => setTimeout(resolve, 400));
     
+    addThought('🧠 Thinking about optimal combinations...');
+    await new Promise(resolve => setTimeout(resolve, 300));
+    
     try {
+      const housingTypeRentalSchema = z.object({
+        code: z.string().describe('Housing type code'),
+        proposedRent: z.number().describe('Proposed monthly rent in XOF'),
+        reasoning: z.string().describe('Why this rental level for this type'),
+      });
+      
       const scenarioSchema = z.object({
         scenarios: z.array(z.object({
-          name: z.string().describe('Short descriptive name for the scenario'),
-          notes: z.string().describe('Brief explanation including affordability and surplus'),
+          name: z.string().describe('Descriptive scenario name'),
+          strategyDescription: z.string().describe('Detailed strategy explanation'),
           rentalPeriodYears: z.number().min(5).max(50).describe('Rental period in years'),
-          rentalAdjustmentPercent: z.number().min(-30).max(30).describe('Rental adjustment from default (-30% to +30%)'),
-          reasoning: z.string().describe('Specific reasoning for this scenario'),
-          expectedSurplusPercent: z.number().describe('Expected surplus percentage over investment'),
-        })).min(2).max(4),
+          housingTypeRentals: z.array(housingTypeRentalSchema).describe('Specific rental for each housing type'),
+          thinkingProcess: z.array(z.string()).describe('Step by step reasoning for this scenario'),
+        })).min(2).max(3),
       });
       
       const unitTypeDetails = unitTypes.map(type => {
         const info = unitTypeCounts[type];
         const housing = HOUSING_TYPES[type];
-        return `${type} (${housing?.name}): ${info.count} units, ${info.monthlyRent.toLocaleString()} XOF/month each`;
+        const projectHousing = projectHousingTypes?.find(h => h.code === type);
+        const name = projectHousing?.name || housing?.name || type;
+        return `- ${type} (${name}): ${info.count} units, current rent ${info.monthlyRent.toLocaleString()} XOF/month, unit construction cost ${info.unitCost.toLocaleString()} XOF`;
       }).join('\n');
       
-      const prompt = `You are an Islamic finance-compliant real estate investment advisor. Generate 2-4 viable investment scenarios.
+      const prompt = `You are an Islamic finance real estate advisor. Analyze this project and generate 2-3 VIABLE scenarios.
 
-IMPORTANT PRINCIPLES:
-1. All scenarios MUST be profitable - investment must be fully recouped plus surplus
-2. Rental levels must be affordable for target market
-3. No interest/riba - pure rental income model
-4. Surplus should be reasonable (15-50% over investment)
+KEY CONSTRAINTS:
+- Total investment: ${totalConstructionCost.toLocaleString()} XOF (MUST be fully recouped)
+- Maximum rental period: ${maxPeriod} years
+- Break-even at current rates: ${breakEvenYears.toFixed(1)} years
+- ALL scenarios must generate POSITIVE surplus (profit over investment)
 
-Site: ${site.name} (${site.area_ha} ha)
-Total Construction Cost: ${totalConstructionCost.toLocaleString()} XOF
-Break-even Period: ${breakEvenYears} years
-Max Allowed Period: ${project?.max_rental_period_years || 30} years
-
-Configured Unit Types:
+HOUSING TYPES IN THIS PROJECT:
 ${unitTypeDetails}
 
-Total Monthly Rent at Default Rates: ${totalMonthlyRent.toLocaleString()} XOF
-Annual Rent: ${annualRent.toLocaleString()} XOF
+YOUR TASK:
+For each scenario, think deeply about:
+1. What rental period makes sense given the constraints?
+2. For EACH housing type, what monthly rent balances affordability vs profitability?
+3. Calculate: Total rent over period must exceed ${totalConstructionCost.toLocaleString()} XOF
 
-Generate scenarios that:
-1. CONSERVATIVE: Longer period (${Math.min(breakEvenYears + 10, project?.max_rental_period_years || 30)} years), slightly lower rents for affordability, ~20-30% surplus
-2. BALANCED: Medium period (${Math.min(breakEvenYears + 5, project?.max_rental_period_years || 30)} years), default rents, ~30-40% surplus  
-3. ACCELERATED: Shorter period (${Math.min(breakEvenYears + 3, project?.max_rental_period_years || 30)} years), maintain affordability, ~15-25% surplus
-4. (Optional) PREMIUM: If high-end units exist, target premium market segment
+GENERATE SCENARIOS:
+1. AFFORDABLE: Focus on lower rents for accessibility, longer period to compensate (ensure surplus 15-25%)
+2. BALANCED: Moderate rents, medium period, good surplus (25-35%)
+3. (Optional) ACCELERATED: If feasible within ${maxPeriod} years, shorter period with competitive rents (15-25% surplus)
 
-For each scenario, calculate expected surplus % = ((totalRent - totalCost) / totalCost) * 100`;
+IMPORTANT:
+- Propose SPECIFIC rental amounts for EACH housing type (not percentages)
+- Each scenario's thinkingProcess should show your actual calculations
+- Surplus % = ((totalRentOverPeriod - totalInvestment) / totalInvestment) * 100
+- Surplus MUST be positive (profit, not loss)`;
 
-      addThought('🧠 AI analyzing optimal rental periods and affordability...');
+      addThought('🤖 AI analyzing optimal rental levels per housing type...');
       
-      console.log('[Site] Calling AI generateObject...');
+      console.log('[Site] Calling AI generateObject with per-type schema...');
       const result = await generateObject({
         messages: [{ role: 'user', content: prompt }],
         schema: scenarioSchema,
@@ -373,24 +397,58 @@ For each scenario, calculate expected surplus % = ((totalRent - totalCost) / tot
       
       console.log('[Site] AI generated scenarios:', result);
       
-      addThought('✨ Creating viable scenarios...');
+      addThought('✨ Processing AI recommendations...');
       await new Promise(resolve => setTimeout(resolve, 300));
       
       const createdScenarios: string[] = [];
-      for (const scenario of result.scenarios) {
-        const adjustedAnnualRent = annualRent * (1 + scenario.rentalAdjustmentPercent / 100);
-        const totalRentOverPeriod = adjustedAnnualRent * scenario.rentalPeriodYears;
-        const actualSurplus = ((totalRentOverPeriod - totalConstructionCost) / totalConstructionCost) * 100;
+      for (const scenarioData of result.scenarios) {
+        addThought(`\n📝 Creating "${scenarioData.name}"...`);
         
-        const enrichedNotes = `${scenario.notes}\n\nExpected Surplus: ${actualSurplus.toFixed(1)}% over investment\nRental Adjustment: ${scenario.rentalAdjustmentPercent >= 0 ? '+' : ''}${scenario.rentalAdjustmentPercent}%`;
+        for (const thought of scenarioData.thinkingProcess.slice(0, 3)) {
+          addThought(`   💭 ${thought}`);
+          await new Promise(resolve => setTimeout(resolve, 150));
+        }
+        
+        let scenarioTotalRent = 0;
+        for (const rental of scenarioData.housingTypeRentals) {
+          const typeInfo = unitTypeCounts[rental.code];
+          if (typeInfo) {
+            scenarioTotalRent += rental.proposedRent * typeInfo.count * 12 * scenarioData.rentalPeriodYears;
+          }
+        }
+        
+        const actualSurplus = totalConstructionCost > 0 
+          ? ((scenarioTotalRent - totalConstructionCost) / totalConstructionCost) * 100 
+          : 0;
+        
+        const surplusDisplay = Math.abs(actualSurplus).toFixed(1);
+        const surplusSign = actualSurplus >= 0 ? '+' : '-';
+        
+        const rentalSummary = scenarioData.housingTypeRentals.map(r => {
+          const typeInfo = unitTypeCounts[r.code];
+          const housing = HOUSING_TYPES[r.code];
+          const projectHousing = projectHousingTypes?.find(h => h.code === r.code);
+          const name = projectHousing?.name || housing?.name || r.code;
+          const originalRent = typeInfo?.monthlyRent || 0;
+          const diff = originalRent > 0 ? ((r.proposedRent - originalRent) / originalRent * 100).toFixed(0) : '0';
+          return `${name}: ${r.proposedRent.toLocaleString()} XOF/month (${parseInt(diff) >= 0 ? '+' : ''}${diff}%)`;
+        }).join('\n');
+        
+        const enrichedNotes = `${scenarioData.strategyDescription}\n\n` +
+          `📊 Financial Summary:\n` +
+          `• Duration: ${scenarioData.rentalPeriodYears} years\n` +
+          `• Total Investment: ${totalConstructionCost.toLocaleString()} XOF\n` +
+          `• Total Revenue: ${scenarioTotalRent.toLocaleString()} XOF\n` +
+          `• Surplus: ${surplusSign}${surplusDisplay}% (${(scenarioTotalRent - totalConstructionCost).toLocaleString()} XOF)\n\n` +
+          `🏠 Rental Levels:\n${rentalSummary}`;
         
         const { data: newScenario, error } = await supabase
           .from('scenarios')
           .insert({
             site_id: id,
-            name: scenario.name,
+            name: scenarioData.name,
             notes: enrichedNotes,
-            rental_period_years: scenario.rentalPeriodYears,
+            rental_period_years: scenarioData.rentalPeriodYears,
             is_auto_scenario: true,
             created_by: user.id,
           })
@@ -398,40 +456,38 @@ For each scenario, calculate expected surplus % = ((totalRent - totalCost) / tot
           .single();
         
         if (!error && newScenario) {
-          if (projectHousingTypes && projectHousingTypes.length > 0 && scenario.rentalAdjustmentPercent !== 0) {
-            let updateSuccess = true;
-            for (const pht of projectHousingTypes) {
-              const adjustedRent = Math.round(pht.default_rent_monthly * (1 + scenario.rentalAdjustmentPercent / 100));
-              const { error: updateError } = await supabase
-                .from('scenario_housing_types')
-                .update({ default_rent_monthly: adjustedRent })
-                .eq('scenario_id', newScenario.id)
-                .eq('code', pht.code);
-              
-              if (updateError) {
-                console.error('[Site] Error updating scenario housing type:', pht.code, updateError);
-                updateSuccess = false;
-              }
-            }
+          await new Promise(resolve => setTimeout(resolve, 500));
+          
+          let updateCount = 0;
+          for (const rental of scenarioData.housingTypeRentals) {
+            const { error: updateError } = await supabase
+              .from('scenario_housing_types')
+              .update({ default_rent_monthly: Math.round(rental.proposedRent) })
+              .eq('scenario_id', newScenario.id)
+              .eq('code', rental.code);
             
-            if (!updateSuccess) {
-              console.warn('[Site] Some housing types could not be updated for scenario:', newScenario.id);
+            if (!updateError) {
+              updateCount++;
+              console.log(`[Site] Updated ${rental.code} rent to ${rental.proposedRent} for scenario ${newScenario.id}`);
             } else {
-              console.log('[Site] Updated scenario housing types with', scenario.rentalAdjustmentPercent, '% rental adjustment');
+              console.error(`[Site] Failed to update ${rental.code}:`, updateError);
             }
           }
           
-          createdScenarios.push(scenario.name);
-          addThought(`   ✓ ${scenario.name}: ${scenario.rentalPeriodYears} yrs, ${scenario.rentalAdjustmentPercent >= 0 ? '+' : ''}${scenario.rentalAdjustmentPercent}% rent, +${actualSurplus.toFixed(0)}% surplus`);
-          console.log('[Site] Created smart scenario:', scenario.name);
+          createdScenarios.push(scenarioData.name);
+          addThought(`   ✅ ${scenarioData.name}: ${scenarioData.rentalPeriodYears} yrs, ${surplusSign}${surplusDisplay}% surplus`);
+          console.log('[Site] Created smart scenario:', scenarioData.name, 'updated', updateCount, 'housing types');
+        } else {
+          console.error('[Site] Failed to create scenario:', error);
+          addThought(`   ❌ Failed to create ${scenarioData.name}`);
         }
       }
       
       await new Promise(resolve => setTimeout(resolve, 400));
       
       if (createdScenarios.length > 0) {
-        addThought(`✅ Generated ${createdScenarios.length} viable scenarios!`);
-        addThought('💡 All scenarios ensure investment recovery + halal surplus');
+        addThought(`\n🎉 Successfully generated ${createdScenarios.length} optimized scenarios!`);
+        addThought('💡 Each scenario has custom rental levels per housing type');
       }
       
       await Promise.all([
@@ -450,54 +506,69 @@ For each scenario, calculate expected surplus % = ((totalRent - totalCost) / tot
                              errorMessage.toLowerCase().includes('fetch');
       
       if (isNetworkError) {
-        addThought('⚠️ Network error - falling back to default scenarios...');
+        addThought('⚠️ Network error - creating optimized fallback scenarios...');
         await new Promise(resolve => setTimeout(resolve, 300));
         
-        const { data: projectHousingTypesFallback } = await supabase
-          .from('project_housing_types')
-          .select('*')
-          .eq('project_id', project?.id || '');
-        
-        const fallbackScenarios = [
-          { name: 'Conservative', years: Math.min(breakEvenYears + 10, project?.max_rental_period_years || 30), adjustment: -10 },
-          { name: 'Balanced', years: Math.min(breakEvenYears + 5, project?.max_rental_period_years || 30), adjustment: 0 },
-          { name: 'Accelerated', years: Math.min(breakEvenYears + 3, project?.max_rental_period_years || 30), adjustment: 10 },
+        const periodOptions = [
+          { name: 'Affordable Access', years: Math.min(Math.ceil(breakEvenYears * 1.3), maxPeriod), rentMultiplier: 0.9 },
+          { name: 'Balanced Growth', years: Math.min(Math.ceil(breakEvenYears * 1.2), maxPeriod), rentMultiplier: 1.0 },
+          { name: 'Accelerated Return', years: Math.min(Math.ceil(breakEvenYears * 1.15), maxPeriod), rentMultiplier: 1.1 },
         ];
         
-        for (const fb of fallbackScenarios) {
-          const adjRent = annualRent * (1 + fb.adjustment / 100);
-          const totalRent = adjRent * fb.years;
+        for (const option of periodOptions) {
+          let totalRent = 0;
+          const rentalDetails: string[] = [];
+          
+          for (const [code, info] of Object.entries(unitTypeCounts)) {
+            const adjustedRent = Math.round(info.monthlyRent * option.rentMultiplier);
+            totalRent += adjustedRent * info.count * 12 * option.years;
+            const housing = HOUSING_TYPES[code];
+            const projectHousing = projectHousingTypes?.find(h => h.code === code);
+            const name = projectHousing?.name || housing?.name || code;
+            rentalDetails.push(`${name}: ${adjustedRent.toLocaleString()} XOF/month`);
+          }
+          
           const surplus = ((totalRent - totalConstructionCost) / totalConstructionCost) * 100;
           
           if (surplus < 10) continue;
+          
+          const notes = `Auto-generated ${option.name.toLowerCase()} scenario.\n\n` +
+            `📊 Financial Summary:\n` +
+            `• Duration: ${option.years} years\n` +
+            `• Total Investment: ${totalConstructionCost.toLocaleString()} XOF\n` +
+            `• Total Revenue: ${totalRent.toLocaleString()} XOF\n` +
+            `• Surplus: +${surplus.toFixed(1)}% (${(totalRent - totalConstructionCost).toLocaleString()} XOF)\n\n` +
+            `🏠 Rental Levels:\n${rentalDetails.join('\n')}`;
           
           const { data: newScenario, error: scError } = await supabase
             .from('scenarios')
             .insert({
               site_id: id,
-              name: `${fb.name} Scenario`,
-              notes: `Auto-generated ${fb.name.toLowerCase()} scenario.\n\nExpected Surplus: ${surplus.toFixed(1)}%\nRental Adjustment: ${fb.adjustment >= 0 ? '+' : ''}${fb.adjustment}%`,
-              rental_period_years: fb.years,
+              name: `${option.name} Scenario`,
+              notes,
+              rental_period_years: option.years,
               is_auto_scenario: true,
               created_by: user.id,
             })
             .select()
             .single();
           
-          if (!scError && newScenario && projectHousingTypesFallback && fb.adjustment !== 0) {
-            for (const pht of projectHousingTypesFallback) {
-              const adjustedRent = Math.round(pht.default_rent_monthly * (1 + fb.adjustment / 100));
+          if (!scError && newScenario) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            for (const [code, info] of Object.entries(unitTypeCounts)) {
+              const adjustedRent = Math.round(info.monthlyRent * option.rentMultiplier);
               await supabase
                 .from('scenario_housing_types')
                 .update({ default_rent_monthly: adjustedRent })
                 .eq('scenario_id', newScenario.id)
-                .eq('code', pht.code);
+                .eq('code', code);
             }
-            addThought(`   ✓ ${fb.name}: ${fb.years} yrs, ${fb.adjustment >= 0 ? '+' : ''}${fb.adjustment}% rent`);
+            addThought(`   ✅ ${option.name}: ${option.years} yrs, +${surplus.toFixed(0)}% surplus`);
           }
         }
         
-        addThought('✅ Created fallback scenarios');
+        addThought('\n✅ Created fallback scenarios with optimized rentals');
         await Promise.all([
           loadScenarios(),
           loadScenarioHousingTypes(),
