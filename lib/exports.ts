@@ -542,7 +542,7 @@ export function generatePDFHTML(data: ExportData): string {
     .hb-image {
       width: 100%;
       height: 100%;
-      object-fit: cover;
+      object-fit: contain;
     }
     .hb-image.rotated {
       transform: rotate(180deg);

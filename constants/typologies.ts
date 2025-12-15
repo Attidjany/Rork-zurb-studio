@@ -16,7 +16,7 @@ export const VILLA_LAYOUTS: VillaLayoutConfig[] = [
       { size: 300, count: 24 },
     ],
     totalUnits: 50,
-    imageUrl: 'https://pub-e001eb4506b145aa938b5d3badbff6a5.r2.dev/attachments/avb0us848hxe680th6c8c',
+    imageUrl: 'https://pub-e001eb4506b145aa938b5d3badbff6a5.r2.dev/attachments/fqhyroefq5r6z7jo1mjig',
   },
   {
     id: '480',
@@ -26,7 +26,7 @@ export const VILLA_LAYOUTS: VillaLayoutConfig[] = [
       { size: 480, count: 30 },
     ],
     totalUnits: 30,
-    imageUrl: 'https://pub-e001eb4506b145aa938b5d3badbff6a5.r2.dev/attachments/pgf1s0m4yy8ggb42mexox',
+    imageUrl: 'https://pub-e001eb4506b145aa938b5d3badbff6a5.r2.dev/attachments/fz3jxoxbawqkyccpujq5n',
   },
   {
     id: '1200',
@@ -36,7 +36,7 @@ export const VILLA_LAYOUTS: VillaLayoutConfig[] = [
       { size: 1200, count: 14 },
     ],
     totalUnits: 14,
-    imageUrl: 'https://pub-e001eb4506b145aa938b5d3badbff6a5.r2.dev/attachments/fqhyroefq5r6z7jo1mjig',
+    imageUrl: 'https://pub-e001eb4506b145aa938b5d3badbff6a5.r2.dev/attachments/pgf1s0m4yy8ggb42mexox',
   },
 ];
 
@@ -49,7 +49,7 @@ export const APARTMENT_LAYOUTS: ApartmentLayoutConfig[] = [
     apartmentBuildings: 10,
     equipmentSpots: 2,
     utilitySpots: 1,
-    imageUrl: 'https://pub-e001eb4506b145aa938b5d3badbff6a5.r2.dev/attachments/fz3jxoxbawqkyccpujq5n',
+    imageUrl: 'https://pub-e001eb4506b145aa938b5d3badbff6a5.r2.dev/attachments/avb0us848hxe680th6c8c',
   },
   {
     id: 'AB2',
@@ -59,7 +59,7 @@ export const APARTMENT_LAYOUTS: ApartmentLayoutConfig[] = [
     apartmentBuildings: 10,
     equipmentSpots: 2,
     utilitySpots: 1,
-    imageUrl: 'https://pub-e001eb4506b145aa938b5d3badbff6a5.r2.dev/attachments/fz3jxoxbawqkyccpujq5n',
+    imageUrl: 'https://pub-e001eb4506b145aa938b5d3badbff6a5.r2.dev/attachments/avb0us848hxe680th6c8c',
   },
   {
     id: 'ABH',
@@ -69,7 +69,7 @@ export const APARTMENT_LAYOUTS: ApartmentLayoutConfig[] = [
     apartmentBuildings: 10,
     equipmentSpots: 2,
     utilitySpots: 1,
-    imageUrl: 'https://pub-e001eb4506b145aa938b5d3badbff6a5.r2.dev/attachments/fz3jxoxbawqkyccpujq5n',
+    imageUrl: 'https://pub-e001eb4506b145aa938b5d3badbff6a5.r2.dev/attachments/avb0us848hxe680th6c8c',
   },
 ];
 
