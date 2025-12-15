@@ -703,6 +703,14 @@ export function generatePDFHTML(data: ExportData): string {
         <div class="value">${sites.length}</div>
       </div>
       <div class="summary-item">
+        <div class="label">Total Blocks</div>
+        <div class="value">${blocks.length}</div>
+      </div>
+      <div class="summary-item">
+        <div class="label">Total Area</div>
+        <div class="value">${sites.reduce((sum, s) => sum + (s.area_ha || 0), 0).toFixed(2)} ha</div>
+      </div>
+      <div class="summary-item">
         <div class="label">Total Scenarios</div>
         <div class="value">${scenarios.length}</div>
       </div>

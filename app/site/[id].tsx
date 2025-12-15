@@ -1210,6 +1210,13 @@ RULES:
                     onPress={() => handleSelectApartmentLayout(layout.id)}
                     testID={`apartment-layout-${layout.id}`}
                   >
+                    {layout.imageUrl && (
+                      <Image
+                        source={{ uri: layout.imageUrl }}
+                        style={styles.layoutOptionImage}
+                        contentFit="contain"
+                      />
+                    )}
                     <Text style={styles.layoutOptionTitle}>{layout.name}</Text>
                     <Text style={styles.layoutOptionDesc}>{layout.description}</Text>
                     <Text style={styles.layoutOptionUnits}>{layout.totalBuildings} buildings</Text>
@@ -1793,6 +1800,13 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600' as const,
     color: '#007AFF',
+  },
+  layoutOptionImage: {
+    width: '100%',
+    height: 120,
+    marginBottom: 12,
+    borderRadius: 8,
+    backgroundColor: '#F8F9FA',
   },
   closeButton: {
     backgroundColor: '#007AFF',
