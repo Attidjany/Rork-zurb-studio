@@ -587,10 +587,18 @@ RULES:
       addThought('🤖 AI analyzing optimal rental levels per housing type...');
       
       console.log('[Site] Calling AI generateObject with per-type schema...');
-      const result = await generateObject({
-        messages: [{ role: 'user', content: prompt }],
-        schema: scenarioSchema,
-      });
+      console.log('[Site] EXPO_PUBLIC_TOOLKIT_URL:', process.env.EXPO_PUBLIC_TOOLKIT_URL);
+      
+      let result;
+      try {
+        result = await generateObject({
+          messages: [{ role: 'user', content: prompt }],
+          schema: scenarioSchema,
+        });
+      } catch (aiError: any) {
+        console.error('[Site] AI generateObject error:', aiError?.message || JSON.stringify(aiError));
+        throw aiError;
+      }
       
       console.log('[Site] AI generated scenarios:', result);
       

@@ -77,8 +77,8 @@ export default function ScenarioScreen() {
         if (ratesError) throw ratesError;
 
         setOccupancyRates(rates || []);
-      } catch (error) {
-        console.error('[Scenario] Error loading account data:', error);
+      } catch (error: any) {
+        console.error('[Scenario] Error loading account data:', error?.message || JSON.stringify(error));
       }
     };
 
