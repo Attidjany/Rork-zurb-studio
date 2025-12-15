@@ -38,16 +38,6 @@ export const VILLA_LAYOUTS: VillaLayoutConfig[] = [
     totalUnits: 14,
     imageUrl: 'https://pub-e001eb4506b145aa938b5d3badbff6a5.r2.dev/attachments/fqhyroefq5r6z7jo1mjig',
   },
-  {
-    id: '1000',
-    name: 'Estate Layout (1000m²)',
-    description: 'Premium density: 18 plots of 1000sqm each',
-    plots: [
-      { size: 1000, count: 18 },
-    ],
-    totalUnits: 18,
-    imageUrl: 'https://pub-e001eb4506b145aa938b5d3badbff6a5.r2.dev/attachments/fz3jxoxbawqkyccpujq5n',
-  },
 ];
 
 export const APARTMENT_LAYOUTS: ApartmentLayoutConfig[] = [
@@ -59,6 +49,7 @@ export const APARTMENT_LAYOUTS: ApartmentLayoutConfig[] = [
     apartmentBuildings: 10,
     equipmentSpots: 2,
     utilitySpots: 1,
+    imageUrl: 'https://pub-e001eb4506b145aa938b5d3badbff6a5.r2.dev/attachments/fz3jxoxbawqkyccpujq5n',
   },
   {
     id: 'AB2',
@@ -68,6 +59,7 @@ export const APARTMENT_LAYOUTS: ApartmentLayoutConfig[] = [
     apartmentBuildings: 10,
     equipmentSpots: 2,
     utilitySpots: 1,
+    imageUrl: 'https://pub-e001eb4506b145aa938b5d3badbff6a5.r2.dev/attachments/fz3jxoxbawqkyccpujq5n',
   },
   {
     id: 'ABH',
@@ -77,6 +69,7 @@ export const APARTMENT_LAYOUTS: ApartmentLayoutConfig[] = [
     apartmentBuildings: 10,
     equipmentSpots: 2,
     utilitySpots: 1,
+    imageUrl: 'https://pub-e001eb4506b145aa938b5d3badbff6a5.r2.dev/attachments/fz3jxoxbawqkyccpujq5n',
   },
 ];
 

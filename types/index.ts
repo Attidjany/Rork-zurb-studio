@@ -26,7 +26,7 @@ export interface DbBlock {
 
 export type HalfBlockPosition = 'north' | 'south';
 export type HalfBlockType = 'villas' | 'apartments';
-export type VillaLayout = '200_300_mix' | '480' | '1200' | '1000';
+export type VillaLayout = '200_300_mix' | '480' | '1200';
 export type ApartmentLayout = 'AB1' | 'AB2' | 'ABH';
 export type BuildingType = 'AB1' | 'AB2' | 'ABH' | 'BMS' | 'BML' | 'BH' | 'CH' | 'CO' | 'EQS' | 'EQL' | 'UTL';
 

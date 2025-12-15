@@ -215,17 +215,28 @@ export function generatePDFHTML(data: ExportData): string {
       const northHb = blockHalfBlocks.find(hb => hb.position === 'north');
       const southHb = blockHalfBlocks.find(hb => hb.position === 'south');
       
+      const northImage = northHb ? getLayoutImage(northHb) : undefined;
+      const southImage = southHb ? getLayoutImage(southHb) : undefined;
+      const northName = northHb ? getLayoutName(northHb) : 'Not configured';
+      const southName = southHb ? getLayoutName(southHb) : 'Not configured';
+
       blocksHTML += `
         <div class="block-item">
           <div class="block-header">Block ${block.block_number}</div>
-          <div class="half-blocks">
-            <div class="half-block">
-              <span class="position">North:</span>
-              <span class="layout">${northHb ? getLayoutName(northHb) : 'Not configured'}</span>
+          <div class="half-blocks-visual">
+            <div class="half-block-visual-item north">
+              <div class="hb-label north">N: ${northName}</div>
+              ${northImage 
+                ? `<img src="${northImage}" class="hb-image" />` 
+                : `<div class="hb-placeholder">No Layout</div>`
+              }
             </div>
-            <div class="half-block">
-              <span class="position">South:</span>
-              <span class="layout">${southHb ? getLayoutName(southHb) : 'Not configured'}</span>
+            <div class="half-block-visual-item south">
+              <div class="hb-label south">S: ${southName}</div>
+              ${southImage 
+                ? `<img src="${southImage}" class="hb-image rotated" />` 
+                : `<div class="hb-placeholder">No Layout</div>`
+              }
             </div>
           </div>
         </div>
@@ -326,44 +337,12 @@ export function generatePDFHTML(data: ExportData): string {
           ${site.area_ha ? `<span class="site-area">${site.area_ha.toFixed(2)} ha</span>` : ''}
         </div>
         
-        <div class="blocks-section">
-          <h3>Block Configuration</h3>
-          <div class="blocks-grid">
-            ${blocksHTML || '<p class="empty">No blocks configured</p>'}
+          <div class="blocks-section">
+            <h3>Block Configurations</h3>
+            <div class="blocks-grid">
+              ${blocksHTML || '<p class="empty">No blocks configured</p>'}
+            </div>
           </div>
-          
-          <div class="layouts-visuals">
-             <h3>Layout Visuals</h3>
-             <div class="visuals-grid">
-               ${(() => {
-                 const siteBlocks = blocks.filter(b => b.site_id === site.id);
-                 let visualsHTML = '';
-                 const processedLayouts = new Set<string>();
-                 
-                 siteBlocks.forEach(block => {
-                   const blockHalfBlocks = halfBlocks.filter(hb => hb.block_id === block.id);
-                   blockHalfBlocks.forEach(hb => {
-                     const layoutName = getLayoutName(hb);
-                     const imageUrl = getLayoutImage(hb);
-                     const key = `${hb.type}-${hb.villa_layout || hb.apartment_layout}`;
-                     
-                     if (imageUrl && !processedLayouts.has(key)) {
-                       processedLayouts.add(key);
-                       visualsHTML += `
-                         <div class="visual-item">
-                           <div class="visual-title">${layoutName}</div>
-                           <img src="${imageUrl}" class="visual-image" alt="${layoutName}" />
-                           <div class="visual-desc">Used in Block ${block.block_number} (${hb.position === 'north' ? 'North' : 'South'})</div>
-                         </div>
-                       `;
-                     }
-                   });
-                 });
-                 return visualsHTML || '<p class="empty">No layout visuals available</p>';
-               })()}
-             </div>
-          </div>
-        </div>
         
         <div class="scenarios-section">
           <h3>Scenarios (${siteScenarios.length})</h3>
@@ -522,23 +501,73 @@ export function generatePDFHTML(data: ExportData): string {
       background: #f8f9fa;
       border-radius: 6px;
       padding: 10px;
-      min-width: 150px;
+      min-width: 200px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
     }
     .block-header {
       font-weight: 600;
       color: #007AFF;
-      margin-bottom: 6px;
+      margin-bottom: 8px;
+      width: 100%;
+      text-align: center;
     }
-    .half-block {
-      font-size: 10px;
-      margin-bottom: 3px;
+    .half-blocks-visual {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      width: 100%;
+      align-items: center;
     }
-    .position {
-      font-weight: 500;
-      color: #666;
+    .half-block-visual-item {
+      position: relative;
+      width: 100%;
+      height: 100px;
+      overflow: hidden;
+      border: 1px solid #ddd;
+      background: white;
+      display: flex;
+      justify-content: center;
+      align-items: center;
     }
-    .layout {
-      color: #333;
+    .half-block-visual-item.north {
+      border-radius: 4px 4px 0 0;
+      border-bottom: none;
+    }
+    .half-block-visual-item.south {
+      border-radius: 0 0 4px 4px;
+      border-top: 1px dashed #ccc;
+    }
+    .hb-image {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .hb-image.rotated {
+      transform: rotate(180deg);
+    }
+    .hb-placeholder {
+      font-size: 9px;
+      color: #999;
+      text-align: center;
+      padding: 5px;
+    }
+    .hb-label {
+      position: absolute;
+      background: rgba(255, 255, 255, 0.8);
+      padding: 2px 4px;
+      font-size: 8px;
+      border-radius: 2px;
+      z-index: 10;
+    }
+    .hb-label.north {
+      top: 2px;
+      left: 2px;
+    }
+    .hb-label.south {
+      bottom: 2px;
+      right: 2px;
     }
     .scenario {
       background: #fff;
