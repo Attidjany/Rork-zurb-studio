@@ -192,53 +192,58 @@ export default function ProjectScreen() {
         </View>
         {siteScenarios.length > 0 && (
           <View style={styles.scenariosList}>
-            {siteScenarios.map(scenario => (
-              <TouchableOpacity
-                key={scenario.id}
-                style={[
-                  styles.scenarioItem,
-                  scenario.is_auto_scenario && styles.scenarioItemAuto,
-                ]}
-                onPress={() => router.push({ pathname: '/scenario/[id]', params: { id: scenario.id } } as any)}
-                testID={`scenario-${scenario.id}`}
-              >
-                <FileText size={14} color={scenario.is_auto_scenario ? "#FF9500" : "#6C757D"} />
-                <Text style={[
-                  styles.scenarioItemName,
-                  scenario.is_auto_scenario && styles.scenarioItemNameAuto,
-                ]} numberOfLines={1}>{scenario.name}</Text>
-                <View style={styles.scenarioItemActions}>
-                  <TouchableOpacity
-                    onPress={(e) => {
-                      e.stopPropagation();
-                      setRenameModalVisible({ type: 'scenario', id: scenario.id, currentName: scenario.name });
-                      setRenameName(scenario.name);
-                    }}
-                    style={styles.scenarioItemAction}
-                  >
-                    <Edit3 size={12} color="#007AFF" />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={(e) => {
-                      e.stopPropagation();
-                      handleDuplicateScenario(scenario.id);
-                    }}
-                    style={styles.scenarioItemAction}
-                  >
-                    <Copy size={12} color="#007AFF" />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={(e) => {
-                      e.stopPropagation();
-                      handleDeleteScenario(scenario.id);
-                    }}
-                    style={styles.scenarioItemAction}
-                  >
-                    <Trash2 size={12} color="#FF3B30" />
-                  </TouchableOpacity>
-                </View>
-              </TouchableOpacity>
-            ))}
+            {siteScenarios.map(scenario => {
+              const isExtreme = scenario.name.includes('Extreme') || scenario.name.includes('🔴');
+              return (
+                <TouchableOpacity
+                  key={scenario.id}
+                  style={[
+                    styles.scenarioItem,
+                    scenario.is_auto_scenario && !isExtreme && styles.scenarioItemAuto,
+                    isExtreme && styles.scenarioItemExtreme,
+                  ]}
+                  onPress={() => router.push({ pathname: '/scenario/[id]', params: { id: scenario.id } } as any)}
+                  testID={`scenario-${scenario.id}`}
+                >
+                  <FileText size={14} color={isExtreme ? "#DC3545" : (scenario.is_auto_scenario ? "#FF9500" : "#6C757D")} />
+                  <Text style={[
+                    styles.scenarioItemName,
+                    scenario.is_auto_scenario && !isExtreme && styles.scenarioItemNameAuto,
+                    isExtreme && styles.scenarioItemNameExtreme,
+                  ]} numberOfLines={1}>{scenario.name}</Text>
+                  <View style={styles.scenarioItemActions}>
+                    <TouchableOpacity
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        setRenameModalVisible({ type: 'scenario', id: scenario.id, currentName: scenario.name });
+                        setRenameName(scenario.name);
+                      }}
+                      style={styles.scenarioItemAction}
+                    >
+                      <Edit3 size={12} color="#007AFF" />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        handleDuplicateScenario(scenario.id);
+                      }}
+                      style={styles.scenarioItemAction}
+                    >
+                      <Copy size={12} color="#007AFF" />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        handleDeleteScenario(scenario.id);
+                      }}
+                      style={styles.scenarioItemAction}
+                    >
+                      <Trash2 size={12} color="#FF3B30" />
+                    </TouchableOpacity>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
           </View>
         )}
       </View>
@@ -735,6 +740,15 @@ const styles = StyleSheet.create({
   },
   scenarioItemNameAuto: {
     color: '#FF9500',
+    fontWeight: '600' as const,
+    fontStyle: 'italic' as const,
+  },
+  scenarioItemExtreme: {
+    backgroundColor: '#FFF0F0',
+    borderColor: '#FFCDD2',
+  },
+  scenarioItemNameExtreme: {
+    color: '#DC3545',
     fontWeight: '600' as const,
     fontStyle: 'italic' as const,
   },

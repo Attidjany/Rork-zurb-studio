@@ -31,6 +31,174 @@ import {
 import { supabase } from '@/lib/supabase';
 import { DbBlock, DbHalfBlock, VillaLayout, ApartmentLayout, HalfBlockType, BuildingType } from '@/types';
 
+type UnitTypeInfo = {
+  count: number;
+  totalArea: number;
+  monthlyRent: number;
+  costType: string;
+  unitCost: number;
+  totalTypeCost: number;
+};
+
+type ProjectHousingType = {
+  code: string;
+  name?: string;
+  default_rent_monthly?: number;
+};
+
+async function generateExtremeScenarios(
+  siteId: string,
+  userId: string,
+  totalConstructionCost: number,
+  unitTypeCounts: { [key: string]: UnitTypeInfo },
+  maxPeriod: number,
+  projectHousingTypes: ProjectHousingType[] | null,
+  addThought: (thought: string) => void
+) {
+  // EXTREME 1: Longest period + lowest rent for 100% surplus
+  addThought('\n🔴 EXTREME 1: Finding lowest rent for 100% surplus...');
+  
+  // Target: 100% surplus means total revenue = 2 * totalConstructionCost
+  const targetRevenue100 = totalConstructionCost * 2;
+  
+  // Use maximum period allowed
+  const extreme1Period = maxPeriod;
+  
+  // Calculate required monthly rent to achieve target
+  const totalMonthsExtreme1 = extreme1Period * 12;
+  
+  // Calculate proportional rent reduction needed
+  const currentTotalMonthlyRent = Object.values(unitTypeCounts).reduce((sum, v) => sum + (v.monthlyRent * v.count), 0);
+  const currentTotalRevenue = currentTotalMonthlyRent * totalMonthsExtreme1;
+  const rentMultiplier100 = targetRevenue100 / currentTotalRevenue;
+  
+  const extreme1Rentals: { code: string; rent: number }[] = [];
+  let extreme1TotalRevenue = 0;
+  const extreme1RentalDetails: string[] = [];
+  
+  for (const [code, info] of Object.entries(unitTypeCounts)) {
+    const adjustedRent = Math.round(info.monthlyRent * rentMultiplier100);
+    extreme1Rentals.push({ code, rent: adjustedRent });
+    extreme1TotalRevenue += adjustedRent * info.count * totalMonthsExtreme1;
+    const housing = HOUSING_TYPES[code];
+    const projectHousing = projectHousingTypes?.find(h => h.code === code);
+    const name = projectHousing?.name || housing?.name || code;
+    const pctChange = ((adjustedRent - info.monthlyRent) / info.monthlyRent * 100).toFixed(0);
+    extreme1RentalDetails.push(`${name}: ${adjustedRent.toLocaleString()} XOF/month (${parseInt(pctChange) >= 0 ? '+' : ''}${pctChange}%)`);
+  }
+  
+  const extreme1Surplus = ((extreme1TotalRevenue - totalConstructionCost) / totalConstructionCost) * 100;
+  const extreme1BreakEvenMonths = totalConstructionCost / (extreme1TotalRevenue / totalMonthsExtreme1);
+  const extreme1BreakEvenYears = Math.floor(extreme1BreakEvenMonths / 12);
+  const extreme1BreakEvenMonthsRem = Math.round(extreme1BreakEvenMonths % 12);
+  const extreme1BreakEvenDisplay = extreme1BreakEvenMonthsRem > 0
+    ? `${extreme1BreakEvenYears} years ${extreme1BreakEvenMonthsRem} months`
+    : `${extreme1BreakEvenYears} years`;
+  
+  const extreme1Notes = `🔴 EXTREME TEST: Maximum period with lowest possible rent for 100% surplus.\n\n` +
+    `📊 Financial Summary:\n` +
+    `• Duration: ${extreme1Period} years (maximum allowed)\n` +
+    `• Total Investment: ${totalConstructionCost.toLocaleString()} XOF\n` +
+    `• Total Revenue: ${extreme1TotalRevenue.toLocaleString()} XOF\n` +
+    `• Surplus: +${extreme1Surplus.toFixed(1)}% (${(extreme1TotalRevenue - totalConstructionCost).toLocaleString()} XOF)\n` +
+    `• ⏱️ Break-even: ${extreme1BreakEvenDisplay}\n\n` +
+    `🏠 Rental Levels (lowest for 100% surplus):\n${extreme1RentalDetails.join('\n')}`;
+  
+  const { data: extreme1Scenario, error: err1 } = await supabase
+    .from('scenarios')
+    .insert({
+      site_id: siteId,
+      name: '🔴 Extreme: 100% Surplus (Lowest Rent)',
+      notes: extreme1Notes,
+      rental_period_years: extreme1Period,
+      is_auto_scenario: true,
+      created_by: userId,
+    })
+    .select()
+    .single();
+  
+  if (!err1 && extreme1Scenario) {
+    await new Promise(resolve => setTimeout(resolve, 500));
+    for (const rental of extreme1Rentals) {
+      await supabase
+        .from('scenario_housing_types')
+        .update({ default_rent_monthly: rental.rent })
+        .eq('scenario_id', extreme1Scenario.id)
+        .eq('code', rental.code);
+    }
+    addThought(`   ✅ Created: ${extreme1Period} yrs, +${extreme1Surplus.toFixed(0)}% surplus, break-even ${extreme1BreakEvenDisplay}`);
+  }
+  
+  // EXTREME 2: Lowest rent for 30% surplus in 7 years
+  addThought('\n🔴 EXTREME 2: Finding lowest rent for 30% surplus in 7 years...');
+  
+  const extreme2Period = 7;
+  const targetRevenue30 = totalConstructionCost * 1.30; // 30% surplus
+  const totalMonthsExtreme2 = extreme2Period * 12;
+  
+  const currentTotalRevenue7yr = currentTotalMonthlyRent * totalMonthsExtreme2;
+  const rentMultiplier30 = targetRevenue30 / currentTotalRevenue7yr;
+  
+  const extreme2Rentals: { code: string; rent: number }[] = [];
+  let extreme2TotalRevenue = 0;
+  const extreme2RentalDetails: string[] = [];
+  
+  for (const [code, info] of Object.entries(unitTypeCounts)) {
+    const adjustedRent = Math.round(info.monthlyRent * rentMultiplier30);
+    extreme2Rentals.push({ code, rent: adjustedRent });
+    extreme2TotalRevenue += adjustedRent * info.count * totalMonthsExtreme2;
+    const housing = HOUSING_TYPES[code];
+    const projectHousing = projectHousingTypes?.find(h => h.code === code);
+    const name = projectHousing?.name || housing?.name || code;
+    const pctChange = ((adjustedRent - info.monthlyRent) / info.monthlyRent * 100).toFixed(0);
+    extreme2RentalDetails.push(`${name}: ${adjustedRent.toLocaleString()} XOF/month (${parseInt(pctChange) >= 0 ? '+' : ''}${pctChange}%)`);
+  }
+  
+  const extreme2Surplus = ((extreme2TotalRevenue - totalConstructionCost) / totalConstructionCost) * 100;
+  const extreme2BreakEvenMonths = totalConstructionCost / (extreme2TotalRevenue / totalMonthsExtreme2);
+  const extreme2BreakEvenYears = Math.floor(extreme2BreakEvenMonths / 12);
+  const extreme2BreakEvenMonthsRem = Math.round(extreme2BreakEvenMonths % 12);
+  const extreme2BreakEvenDisplay = extreme2BreakEvenMonthsRem > 0
+    ? `${extreme2BreakEvenYears} years ${extreme2BreakEvenMonthsRem} months`
+    : `${extreme2BreakEvenYears} years`;
+  
+  const extreme2Notes = `🔴 EXTREME TEST: Minimum surplus (30%) in shortest viable period (7 years).\n\n` +
+    `📊 Financial Summary:\n` +
+    `• Duration: ${extreme2Period} years\n` +
+    `• Total Investment: ${totalConstructionCost.toLocaleString()} XOF\n` +
+    `• Total Revenue: ${extreme2TotalRevenue.toLocaleString()} XOF\n` +
+    `• Surplus: +${extreme2Surplus.toFixed(1)}% (${(extreme2TotalRevenue - totalConstructionCost).toLocaleString()} XOF)\n` +
+    `• ⏱️ Break-even: ${extreme2BreakEvenDisplay}\n\n` +
+    `🏠 Rental Levels (minimum for 30% in 7 years):\n${extreme2RentalDetails.join('\n')}`;
+  
+  const { data: extreme2Scenario, error: err2 } = await supabase
+    .from('scenarios')
+    .insert({
+      site_id: siteId,
+      name: '🔴 Extreme: 30% Surplus in 7 Years',
+      notes: extreme2Notes,
+      rental_period_years: extreme2Period,
+      is_auto_scenario: true,
+      created_by: userId,
+    })
+    .select()
+    .single();
+  
+  if (!err2 && extreme2Scenario) {
+    await new Promise(resolve => setTimeout(resolve, 500));
+    for (const rental of extreme2Rentals) {
+      await supabase
+        .from('scenario_housing_types')
+        .update({ default_rent_monthly: rental.rent })
+        .eq('scenario_id', extreme2Scenario.id)
+        .eq('code', rental.code);
+    }
+    addThought(`   ✅ Created: ${extreme2Period} yrs, +${extreme2Surplus.toFixed(0)}% surplus, break-even ${extreme2BreakEvenDisplay}`);
+  }
+  
+  addThought('\n🔴 Extreme scenarios generated!');
+}
+
 export default function SiteScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { user } = useAuth();
@@ -463,12 +631,20 @@ RULES:
           return `${name}: ${r.proposedRent.toLocaleString()} XOF/month (${parseInt(diff) >= 0 ? '+' : ''}${diff}%)`;
         }).join('\n');
         
+        const breakEvenMonths = totalConstructionCost / (scenarioTotalRent / (scenarioData.rentalPeriodYears * 12));
+        const breakEvenYearsCalc = Math.floor(breakEvenMonths / 12);
+        const breakEvenMonthsRemainder = Math.round(breakEvenMonths % 12);
+        const breakEvenDisplay = breakEvenMonthsRemainder > 0 
+          ? `${breakEvenYearsCalc} years ${breakEvenMonthsRemainder} months`
+          : `${breakEvenYearsCalc} years`;
+        
         const enrichedNotes = `${scenarioData.strategyDescription}\n\n` +
           `📊 Financial Summary:\n` +
           `• Duration: ${scenarioData.rentalPeriodYears} years\n` +
           `• Total Investment: ${totalConstructionCost.toLocaleString()} XOF\n` +
           `• Total Revenue: ${scenarioTotalRent.toLocaleString()} XOF\n` +
-          `• Surplus: ${surplusSign}${surplusDisplay}% (${(scenarioTotalRent - totalConstructionCost).toLocaleString()} XOF)\n\n` +
+          `• Surplus: ${surplusSign}${surplusDisplay}% (${(scenarioTotalRent - totalConstructionCost).toLocaleString()} XOF)\n` +
+          `• ⏱️ Break-even: ${breakEvenDisplay}\n\n` +
           `🏠 Rental Levels:\n${rentalSummary}`;
         
         const { data: newScenario, error } = await supabase
@@ -519,6 +695,19 @@ RULES:
         addThought('💡 Each scenario has custom rental levels per housing type');
       }
       
+      addThought('\n🔴 Generating extreme test scenarios...');
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      await generateExtremeScenarios(
+        id,
+        user.id,
+        totalConstructionCost,
+        unitTypeCounts,
+        maxPeriod,
+        projectHousingTypes,
+        addThought
+      );
+      
       await Promise.all([
         loadScenarios(),
         loadScenarioHousingTypes(),
@@ -561,12 +750,20 @@ RULES:
           
           if (surplus < 10) continue;
           
+          const fallbackBreakEvenMonths = totalConstructionCost / (totalRent / (option.years * 12));
+          const fallbackBreakEvenYears = Math.floor(fallbackBreakEvenMonths / 12);
+          const fallbackBreakEvenMonthsRemainder = Math.round(fallbackBreakEvenMonths % 12);
+          const fallbackBreakEvenDisplay = fallbackBreakEvenMonthsRemainder > 0
+            ? `${fallbackBreakEvenYears} years ${fallbackBreakEvenMonthsRemainder} months`
+            : `${fallbackBreakEvenYears} years`;
+          
           const notes = `Auto-generated ${option.name.toLowerCase()} scenario.\n\n` +
             `📊 Financial Summary:\n` +
             `• Duration: ${option.years} years\n` +
             `• Total Investment: ${totalConstructionCost.toLocaleString()} XOF\n` +
             `• Total Revenue: ${totalRent.toLocaleString()} XOF\n` +
-            `• Surplus: +${surplus.toFixed(1)}% (${(totalRent - totalConstructionCost).toLocaleString()} XOF)\n\n` +
+            `• Surplus: +${surplus.toFixed(1)}% (${(totalRent - totalConstructionCost).toLocaleString()} XOF)\n` +
+            `• ⏱️ Break-even: ${fallbackBreakEvenDisplay}\n\n` +
             `🏠 Rental Levels:\n${rentalDetails.join('\n')}`;
           
           const { data: newScenario, error: scError } = await supabase
