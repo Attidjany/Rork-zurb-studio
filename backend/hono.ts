@@ -1,7 +1,8 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import { generateText } from "@rork-ai/toolkit-sdk";
+import { generateText, generateObject } from "@rork-ai/toolkit-sdk";
 import { createClient } from "@supabase/supabase-js";
+import { z } from "zod";
 
 const app = new Hono();
 
@@ -63,6 +64,45 @@ app.onError((err, c) => {
 app.notFound((c) => {
   console.log(`[Hono] 404 Not Found: ${c.req.method} ${c.req.path}`);
   return c.json({ error: 'Not Found', path: c.req.path, methods: c.req.method }, 404);
+});
+
+app.post("/api/ai/generate-scenarios-object", async (c) => {
+  try {
+    const body = await c.req.json();
+    const { prompt } = body;
+
+    if (!prompt) {
+      return c.json({ error: "Prompt is required" }, 400);
+    }
+
+    const housingTypeRentalSchema = z.object({
+      code: z.string().describe('Housing type code'),
+      proposedRent: z.number().describe('Proposed monthly rent in XOF'),
+      reasoning: z.string().describe('Why this rental level for this type'),
+    });
+    
+    const scenarioSchema = z.object({
+      scenarios: z.array(z.object({
+        name: z.string().describe('Descriptive scenario name'),
+        strategyDescription: z.string().describe('Detailed strategy explanation'),
+        rentalPeriodYears: z.number().min(5).max(50).describe('Rental period in years'),
+        housingTypeRentals: z.array(housingTypeRentalSchema).describe('Specific rental for each housing type'),
+        thinkingProcess: z.array(z.string()).describe('Step by step reasoning for this scenario'),
+      })).min(2).max(3),
+    });
+
+    console.log('[AI Scenarios Object] Generating object with prompt length:', prompt.length);
+
+    const result = await generateObject({
+      messages: [{ role: 'user', content: prompt }],
+      schema: scenarioSchema,
+    });
+
+    return c.json(result);
+  } catch (error: any) {
+    console.error('[AI Scenarios Object] Error:', error);
+    return c.json({ error: error.message || 'Failed to generate scenarios' }, 500);
+  }
 });
 
 app.post("/api/scenarios/generate-intelligent", async (c) => {

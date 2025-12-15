@@ -2,8 +2,6 @@ import { Stack, useLocalSearchParams } from 'expo-router';
 import { Image } from 'expo-image';
 import { Settings, Sparkles } from 'lucide-react-native';
 import React, { useMemo, useState, useCallback } from 'react';
-import { generateObject } from '@rork-ai/toolkit-sdk';
-import { z } from 'zod';
 import {
   View,
   Text,
@@ -45,6 +43,20 @@ type ProjectHousingType = {
   code: string;
   name?: string;
   default_rent_monthly?: number;
+};
+
+type ScenarioResult = {
+  scenarios: {
+    name: string;
+    strategyDescription: string;
+    rentalPeriodYears: number;
+    housingTypeRentals: {
+      code: string;
+      proposedRent: number;
+      reasoning: string;
+    }[];
+    thinkingProcess: string[];
+  }[];
 };
 
 async function generateExtremeScenarios(
@@ -524,23 +536,10 @@ export default function SiteScreen() {
     addThought('🧠 Thinking about optimal combinations...');
     await new Promise(resolve => setTimeout(resolve, 300));
     
+    addThought('🧠 Thinking about optimal combinations...');
+    await new Promise(resolve => setTimeout(resolve, 300));
+    
     try {
-      const housingTypeRentalSchema = z.object({
-        code: z.string().describe('Housing type code'),
-        proposedRent: z.number().describe('Proposed monthly rent in XOF'),
-        reasoning: z.string().describe('Why this rental level for this type'),
-      });
-      
-      const scenarioSchema = z.object({
-        scenarios: z.array(z.object({
-          name: z.string().describe('Descriptive scenario name'),
-          strategyDescription: z.string().describe('Detailed strategy explanation'),
-          rentalPeriodYears: z.number().min(5).max(50).describe('Rental period in years'),
-          housingTypeRentals: z.array(housingTypeRentalSchema).describe('Specific rental for each housing type'),
-          thinkingProcess: z.array(z.string()).describe('Step by step reasoning for this scenario'),
-        })).min(2).max(3),
-      });
-      
       const unitTypeDetails = unitTypes.map(type => {
         const info = unitTypeCounts[type];
         const housing = HOUSING_TYPES[type];
@@ -587,15 +586,46 @@ RULES:
 
       addThought('🤖 AI analyzing optimal rental levels per housing type...');
       
-      console.log('[Site] Calling AI generateObject with per-type schema...');
-      console.log('[Site] EXPO_PUBLIC_TOOLKIT_URL:', process.env.EXPO_PUBLIC_TOOLKIT_URL);
+      console.log('[Site] Calling AI generateObject via backend proxy...');
       
-      let result;
+      let result: ScenarioResult;
       try {
-        result = await generateObject({
-          messages: [{ role: 'user', content: prompt }],
-          schema: scenarioSchema,
+        const baseUrl = process.env.EXPO_PUBLIC_RORK_API_BASE_URL || '';
+        const response = await fetch(`${baseUrl}/api/ai/generate-scenarios-object`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ prompt }),
         });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`API error: ${response.status} ${errorText}`);
+        }
+
+        const data = await response.json();
+        
+        // The generateObject from SDK returns the object directly matching the schema (or .object property depending on version, but usually direct)
+        // Let's assume the backend returns result.object or just result
+        // Based on backend implementation: return c.json(result); 
+        // generateObject returns { object: T, ... } or just T? 
+        // It returns { object: T, usage: ... } in newer SDK, but let's check my backend code.
+        // Backend calls generateObject. 
+        // Docs say: "generateObject... Returns a promise that resolves to a result object that contains the generated object."
+        // It usually returns { object: ... }.
+        // BUT wait, in backend/hono.ts I wrote: return c.json(result);
+        // If generateObject returns { object: ... }, then result.object is what we want.
+        
+        if (data.object) {
+          result = data.object;
+        } else if (data.scenarios) {
+           result = data;
+        } else {
+           // Maybe it is wrapped in object
+           result = data.object || data;
+        }
+
       } catch (aiError: any) {
         console.error('[Site] AI generateObject error:', aiError?.message || JSON.stringify(aiError));
         throw aiError;
