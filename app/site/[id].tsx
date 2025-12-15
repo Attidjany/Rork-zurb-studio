@@ -1,6 +1,8 @@
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { Settings, Sparkles } from 'lucide-react-native';
 import React, { useMemo, useState, useCallback } from 'react';
+import { generateObject } from '@rork-ai/toolkit-sdk';
+import { z } from 'zod';
 import {
   View,
   Text,
@@ -23,6 +25,8 @@ import {
   EQUIPMENT_OPTIONS,
   UTILITY_OPTIONS,
   VILLA_TYPE_OPTIONS,
+  HOUSING_TYPES,
+  CONSTRUCTION_COSTS,
 } from '@/constants/typologies';
 import { DbBlock, DbHalfBlock, VillaLayout, ApartmentLayout, HalfBlockType, BuildingType } from '@/types';
 
@@ -31,6 +35,7 @@ export default function SiteScreen() {
   const { user } = useAuth();
   const {
     sites,
+    projects,
     getBlocksBySiteId,
     getHalfBlocksByBlockId,
     getUnitsByHalfBlockId,
@@ -42,6 +47,8 @@ export default function SiteScreen() {
     updateHalfBlock,
     createUnit,
     updateUnit,
+    createScenario,
+    updateScenario,
   } = useZURB();
 
   const [refreshing, setRefreshing] = useState<boolean>(false);
@@ -198,7 +205,7 @@ export default function SiteScreen() {
 
 
   const handleGenerateAutoScenarios = useCallback(async () => {
-    if (!id || !user) return;
+    if (!id || !user || !site) return;
     
     setGeneratingScenarios(true);
     setShowAiOverlay(true);
@@ -208,55 +215,108 @@ export default function SiteScreen() {
     setAiThinking(prev => [...prev, '🔍 Analyzing site configuration...']);
     await new Promise(resolve => setTimeout(resolve, 500));
     
+    const blocks = getBlocksBySiteId(id);
+    const halfBlocksData = blocks.flatMap(block => {
+      const hbs = getHalfBlocksByBlockId(block.id);
+      return hbs.map(hb => ({
+        blockNumber: block.block_number,
+        position: hb.position,
+        type: hb.type,
+        villaLayout: hb.villa_layout,
+        apartmentLayout: hb.apartment_layout,
+        units: getUnitsByHalfBlockId(hb.id).map(u => ({
+          unitType: u.unit_type,
+          buildingType: u.building_type,
+          sizeM2: u.size_m2,
+        })),
+      }));
+    });
+    
+    const project = projects.find(p => p.id === site.project_id);
+    
     setAiThinking(prev => [...prev, '📊 Loading project data and market parameters...']);
     await new Promise(resolve => setTimeout(resolve, 400));
+    
+    const villaCount = halfBlocksData.filter(hb => hb.type === 'villas').length;
+    const apartmentCount = halfBlocksData.filter(hb => hb.type === 'apartments').length;
+    const totalUnits = halfBlocksData.reduce((sum, hb) => sum + hb.units.length, 0);
     
     setAiThinking(prev => [...prev, '💰 Calculating construction costs and revenue potential...']);
     await new Promise(resolve => setTimeout(resolve, 400));
     
     setAiThinking(prev => [...prev, '🤖 Consulting AI financial advisor...']);
     
-    setAiThinking(prev => [...prev, '🧠 AI is analyzing market dynamics and profitability...']);
-    
-    setAiThinking(prev => [...prev, '📈 Optimizing rental periods and pricing strategies...']);
-    
     try {
-      const baseUrl = process.env.EXPO_PUBLIC_RORK_API_BASE_URL || '';
-      const apiUrl = `${baseUrl}/api/scenarios/generate-intelligent`;
-      console.log('[Site] Calling AI API:', apiUrl);
-      
-      const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          siteId: id,
-          userId: user.id,
-        }),
+      const scenarioSchema = z.object({
+        scenarios: z.array(z.object({
+          name: z.string().describe('Short descriptive name for the scenario'),
+          notes: z.string().describe('Brief explanation of the investment strategy'),
+          rentalPeriodYears: z.number().min(5).max(50).describe('Optimal rental period in years'),
+          reasoning: z.string().describe('Why this rental period is optimal'),
+        })).min(2).max(4),
       });
       
-      const responseText = await response.text();
-      console.log('[Site] API response status:', response.status);
+      const prompt = `You are a real estate investment advisor. Analyze this site and suggest 2-4 optimal investment scenarios.
+
+Site Information:
+- Name: ${site.name}
+- Total Area: ${site.area_ha} hectares
+- Number of 6ha Blocks: ${blocks.length}
+- Villa Half-Blocks: ${villaCount}
+- Apartment Half-Blocks: ${apartmentCount}
+- Total Units Configured: ${totalUnits}
+- Max Rental Period Allowed: ${project?.max_rental_period_years || 30} years
+
+Housing Types Available:
+${Object.entries(HOUSING_TYPES).map(([code, info]) => `- ${code}: ${info.name} (${info.defaultArea}m², rent: ${info.defaultRent} CFA/month)`).join('\n')}
+
+Construction Cost Types:
+${Object.entries(CONSTRUCTION_COSTS).map(([code, info]) => `- ${code}: ${info.name} (${info.goldGramsPerM2}g gold/m²)`).join('\n')}
+
+Generate diverse scenarios with different investment strategies:
+1. A conservative scenario with longer rental period for stable returns
+2. An aggressive scenario with shorter period for faster ROI
+3. A balanced scenario optimizing risk vs return
+4. (Optional) A premium scenario if high-end units are present
+
+Consider:
+- Construction costs vs rental income
+- Break-even analysis
+- Market demand for different unit types
+- Risk mitigation through diversification`;
+
+      setAiThinking(prev => [...prev, '🧠 AI is analyzing market dynamics and profitability...']);
       
-      let data;
-      try {
-        data = JSON.parse(responseText);
-      } catch {
-        console.error('[Site] Failed to parse response:', responseText.substring(0, 200));
-        throw new Error('Server returned an invalid response. Please try again.');
-      }
+      console.log('[Site] Calling AI generateObject...');
+      const result = await generateObject({
+        messages: [{ role: 'user', content: prompt }],
+        schema: scenarioSchema,
+      });
       
-      if (!response.ok) {
-        throw new Error(data?.error || `Server error: ${response.status}`);
-      }
+      console.log('[Site] AI generated scenarios:', result);
       
-      console.log('[Site] AI Scenarios generated:', data);
-      setAiThinking(prev => [...prev, '✨ Creating scenario configurations...']);
+      setAiThinking(prev => [...prev, '📈 Optimizing rental periods and pricing strategies...']);
       await new Promise(resolve => setTimeout(resolve, 400));
       
-      const scenariosCount = data.scenarios?.length || 0;
-      setAiThinking(prev => [...prev, `✅ Generated ${scenariosCount} profitable scenarios!`]);
+      setAiThinking(prev => [...prev, '✨ Creating scenario configurations...']);
+      
+      const createdScenarios: string[] = [];
+      for (const scenario of result.scenarios) {
+        const newScenario = await createScenario(id, scenario.name, scenario.notes);
+        if (newScenario) {
+          await updateScenario(newScenario.id, { rental_period_years: scenario.rentalPeriodYears });
+          createdScenarios.push(scenario.name);
+          console.log('[Site] Created scenario:', scenario.name, 'with', scenario.rentalPeriodYears, 'years');
+        }
+      }
+      
+      await new Promise(resolve => setTimeout(resolve, 400));
+      
+      setAiThinking(prev => [...prev, `✅ Generated ${createdScenarios.length} profitable scenarios!`]);
+      
+      if (createdScenarios.length > 0) {
+        setAiThinking(prev => [...prev, `📋 Created: ${createdScenarios.join(', ')}`]);
+      }
       
       await loadScenarios();
       setGenerationComplete(true);
@@ -275,7 +335,7 @@ export default function SiteScreen() {
         );
       }, 100);
     }
-  }, [id, user, loadScenarios]);
+  }, [id, user, site, projects, getBlocksBySiteId, getHalfBlocksByBlockId, getUnitsByHalfBlockId, createScenario, updateScenario, loadScenarios]);
 
   const selectedHalfBlock = useMemo(() => {
     if (!selectedHalfBlockId) return null;
