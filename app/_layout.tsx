@@ -6,7 +6,6 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ZURBContext } from "@/contexts/ZURBContext";
 import { AuthContext } from "@/contexts/AuthContext";
-import { trpc, trpcClient } from "@/lib/trpc";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -31,17 +30,15 @@ export default function RootLayout() {
   }, []);
 
   return (
-    <trpc.Provider client={trpcClient} queryClient={queryClient}>
-      <QueryClientProvider client={queryClient}>
-        <AuthContext>
-          <ZURBContext>
-            <GestureHandlerRootView style={styles.container}>
-              <RootLayoutNav />
-            </GestureHandlerRootView>
-          </ZURBContext>
-        </AuthContext>
-      </QueryClientProvider>
-    </trpc.Provider>
+    <QueryClientProvider client={queryClient}>
+      <AuthContext>
+        <ZURBContext>
+          <GestureHandlerRootView style={styles.container}>
+            <RootLayoutNav />
+          </GestureHandlerRootView>
+        </ZURBContext>
+      </AuthContext>
+    </QueryClientProvider>
   );
 }
 

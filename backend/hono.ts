@@ -1,8 +1,7 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import { generateText, generateObject } from "@rork-ai/toolkit-sdk";
+import { generateText } from "@rork-ai/toolkit-sdk";
 import { createClient } from "@supabase/supabase-js";
-import { z } from "zod";
 
 const app = new Hono();
 
@@ -75,30 +74,43 @@ app.post("/api/ai/generate-scenarios-object", async (c) => {
       return c.json({ error: "Prompt is required" }, 400);
     }
 
-    const housingTypeRentalSchema = z.object({
-      code: z.string().describe('Housing type code'),
-      proposedRent: z.number().describe('Proposed monthly rent in XOF'),
-      reasoning: z.string().describe('Why this rental level for this type'),
-    });
-    
-    const scenarioSchema = z.object({
-      scenarios: z.array(z.object({
-        name: z.string().describe('Descriptive scenario name'),
-        strategyDescription: z.string().describe('Detailed strategy explanation'),
-        rentalPeriodYears: z.number().min(5).max(50).describe('Rental period in years'),
-        housingTypeRentals: z.array(housingTypeRentalSchema).describe('Specific rental for each housing type'),
-        thinkingProcess: z.array(z.string()).describe('Step by step reasoning for this scenario'),
-      })).min(2).max(3),
-    });
-
     console.log('[AI Scenarios Object] Generating object with prompt length:', prompt.length);
 
-    const result = await generateObject({
-      messages: [{ role: 'user', content: prompt }],
-      schema: scenarioSchema,
+    const result = await generateText({
+      messages: [{ role: 'user', content: prompt + "\n\nReturn ONLY a valid JSON object matching the schema. Do not include markdown formatting or explanations outside the JSON." }],
     });
 
-    return c.json(result);
+    console.log('[AI Scenarios Object] AI Response received, length:', result.length);
+
+    let parsedResponse;
+    try {
+      let jsonText = result.trim();
+      
+      const jsonMatch = result.match(/\{[\s\S]*"scenarios"[\s\S]*\}/s);
+      if (jsonMatch) {
+        jsonText = jsonMatch[0];
+      }
+      
+      jsonText = jsonText.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+      
+      console.log('[AI Scenarios Object] Attempting to parse JSON');
+      parsedResponse = JSON.parse(jsonText);
+      
+      // Validate structure loosely
+      if (!parsedResponse.scenarios || !Array.isArray(parsedResponse.scenarios)) {
+        throw new Error('Invalid response structure: missing scenarios array');
+      }
+    } catch (e: any) {
+      console.error('[AI Scenarios Object] Failed to parse AI response:', e);
+      console.error('[AI Scenarios Object] Raw response:', result);
+      return c.json({ 
+        error: 'AI returned invalid response format. Please try again.',
+        details: e.message,
+        rawResponse: result.substring(0, 500)
+      }, 500);
+    }
+
+    return c.json(parsedResponse);
   } catch (error: any) {
     console.error('[AI Scenarios Object] Error:', error);
     return c.json({ error: error.message || 'Failed to generate scenarios' }, 500);
