@@ -229,9 +229,22 @@ export default function SiteScreen() {
       .select('*')
       .eq('project_id', project?.id || '');
     
-    const unitTypeCounts: { [key: string]: { count: number; totalArea: number; monthlyRent: number; costType: string; unitCost: number } } = {};
+    const unitTypeCounts: { [key: string]: { count: number; totalArea: number; monthlyRent: number; costType: string; unitCost: number; totalTypeCost: number } } = {};
     let totalConstructionCost = 0;
     let totalMonthlyRent = 0;
+    
+    const { data: projectConstructionCosts } = await supabase
+      .from('project_construction_costs')
+      .select('*')
+      .eq('project_id', project?.id || '');
+    
+    const { data: accountSettings } = await supabase
+      .from('account_settings')
+      .select('gold_price_per_gram')
+      .eq('user_id', user.id)
+      .single();
+    
+    const goldPrice = accountSettings?.gold_price_per_gram || 55720;
     
     blocks.forEach(block => {
       const hbs = getHalfBlocksByBlockId(block.id);
@@ -248,15 +261,19 @@ export default function SiteScreen() {
                 const area = projectHousing?.default_area_m2 || housing?.defaultArea || 100;
                 const rent = projectHousing?.default_rent_monthly || housing?.defaultRent || 500000;
                 const costTypeCode = projectHousing?.default_cost_type || housing?.defaultCostType || 'ZME';
-                const costConfig = CONSTRUCTION_COSTS[costTypeCode];
-                const costPerM2 = costConfig ? costConfig.goldGramsPerM2 * 85 * 656 : 1000;
+                
+                const projectCost = projectConstructionCosts?.find(c => c.code === costTypeCode);
+                const defaultCostConfig = CONSTRUCTION_COSTS[costTypeCode];
+                const goldGramsPerM2 = projectCost?.gold_grams_per_m2 || defaultCostConfig?.goldGramsPerM2 || 14.91;
+                const costPerM2 = goldGramsPerM2 * goldPrice;
                 const unitCost = area * costPerM2;
                 
                 if (!unitTypeCounts[villaType]) {
-                  unitTypeCounts[villaType] = { count: 0, totalArea: 0, monthlyRent: rent, costType: costTypeCode, unitCost };
+                  unitTypeCounts[villaType] = { count: 0, totalArea: 0, monthlyRent: rent, costType: costTypeCode, unitCost, totalTypeCost: 0 };
                 }
                 unitTypeCounts[villaType].count++;
                 unitTypeCounts[villaType].totalArea += area;
+                unitTypeCounts[villaType].totalTypeCost += unitCost;
                 
                 totalConstructionCost += unitCost;
                 totalMonthlyRent += rent;
@@ -278,15 +295,19 @@ export default function SiteScreen() {
                 const area = projectHousing?.default_area_m2 || housing?.defaultArea || 80;
                 const rent = projectHousing?.default_rent_monthly || housing?.defaultRent || 300000;
                 const costTypeCode = projectHousing?.default_cost_type || housing?.defaultCostType || 'ZME';
-                const costConfig = CONSTRUCTION_COSTS[costTypeCode];
-                const costPerM2 = costConfig ? costConfig.goldGramsPerM2 * 85 * 656 : 1000;
+                
+                const projectCost = projectConstructionCosts?.find(c => c.code === costTypeCode);
+                const defaultCostConfig = CONSTRUCTION_COSTS[costTypeCode];
+                const goldGramsPerM2 = projectCost?.gold_grams_per_m2 || defaultCostConfig?.goldGramsPerM2 || 14.91;
+                const costPerM2 = goldGramsPerM2 * goldPrice;
                 const unitCost = area * costPerM2;
                 
                 if (!unitTypeCounts[unitType]) {
-                  unitTypeCounts[unitType] = { count: 0, totalArea: 0, monthlyRent: rent, costType: costTypeCode, unitCost };
+                  unitTypeCounts[unitType] = { count: 0, totalArea: 0, monthlyRent: rent, costType: costTypeCode, unitCost, totalTypeCost: 0 };
                 }
                 unitTypeCounts[unitType].count += totalCount;
                 unitTypeCounts[unitType].totalArea += area * totalCount;
+                unitTypeCounts[unitType].totalTypeCost += unitCost * totalCount;
                 
                 totalConstructionCost += unitCost * totalCount;
                 totalMonthlyRent += rent * totalCount;
@@ -356,36 +377,44 @@ export default function SiteScreen() {
         const housing = HOUSING_TYPES[type];
         const projectHousing = projectHousingTypes?.find(h => h.code === type);
         const name = projectHousing?.name || housing?.name || type;
-        return `- ${type} (${name}): ${info.count} units, current rent ${info.monthlyRent.toLocaleString()} XOF/month, unit construction cost ${info.unitCost.toLocaleString()} XOF`;
+        return `- ${type} (${name}): ${info.count} units × ${info.unitCost.toLocaleString()} XOF = ${info.totalTypeCost.toLocaleString()} XOF total construction, base rent ${info.monthlyRent.toLocaleString()} XOF/month`;
       }).join('\n');
       
       const prompt = `You are an Islamic finance real estate advisor. Analyze this project and generate 2-3 VIABLE scenarios.
 
-KEY CONSTRAINTS:
-- Total investment: ${totalConstructionCost.toLocaleString()} XOF (MUST be fully recouped)
-- Maximum rental period: ${maxPeriod} years
-- Break-even at current rates: ${breakEvenYears.toFixed(1)} years
-- ALL scenarios must generate POSITIVE surplus (profit over investment)
+KEY FINANCIAL DATA:
+- Total construction investment: ${totalConstructionCost.toLocaleString()} XOF (sum of all unit costs)
+- Maximum rental period allowed: ${maxPeriod} years
+- Current monthly rental income: ${totalMonthlyRent.toLocaleString()} XOF
+- Break-even at base rates: ${breakEvenYears.toFixed(1)} years
 
-HOUSING TYPES IN THIS PROJECT:
+HOUSING TYPES WITH COSTS AND BASE RENTS:
 ${unitTypeDetails}
 
-YOUR TASK:
-For each scenario, think deeply about:
-1. What rental period makes sense given the constraints?
-2. For EACH housing type, what monthly rent balances affordability vs profitability?
-3. Calculate: Total rent over period must exceed ${totalConstructionCost.toLocaleString()} XOF
+VERIFICATION:
+- Sum of type costs: ${Object.values(unitTypeCounts).reduce((sum, t) => sum + t.totalTypeCost, 0).toLocaleString()} XOF
+- This must equal total investment above
 
-GENERATE SCENARIOS:
-1. AFFORDABLE: Focus on lower rents for accessibility, longer period to compensate (ensure surplus 15-25%)
-2. BALANCED: Moderate rents, medium period, good surplus (25-35%)
-3. (Optional) ACCELERATED: If feasible within ${maxPeriod} years, shorter period with competitive rents (15-25% surplus)
+YOUR TASK - TWEAK RENTALS AND DURATION:
+1. Start from the BASE RENT for each housing type (shown above)
+2. Adjust rents UP or DOWN slightly to balance affordability vs profitability
+3. Choose a rental duration that ensures full cost recovery + surplus
 
-IMPORTANT:
-- Propose SPECIFIC rental amounts for EACH housing type (not percentages)
-- Each scenario's thinkingProcess should show your actual calculations
-- Surplus % = ((totalRentOverPeriod - totalInvestment) / totalInvestment) * 100
-- Surplus MUST be positive (profit, not loss)`;
+FOR EACH SCENARIO:
+- Show step-by-step calculation: (proposedRent × count × 12 months × years) for each type
+- Sum all to get total revenue
+- Calculate surplus: ((totalRevenue - ${totalConstructionCost.toLocaleString()}) / ${totalConstructionCost.toLocaleString()}) × 100
+- Surplus MUST be positive (10-40% range)
+
+GENERATE:
+1. AFFORDABLE: Lower rents (5-15% below base), longer period, ~15-25% surplus
+2. BALANCED: Near base rents (±5%), medium period, ~25-35% surplus  
+3. (Optional) ACCELERATED: Slightly higher rents, shorter period if viable, ~15-25% surplus
+
+RULES:
+- proposedRent must be realistic (close to base rent, not drastically different)
+- Each type's rent contributes: proposedRent × count × 12 × years to total revenue
+- thinkingProcess must show your math for that scenario`;
 
       addThought('🤖 AI analyzing optimal rental levels per housing type...');
       

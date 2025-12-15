@@ -48,19 +48,24 @@ export default function ScenarioScreen() {
     people_per_unit: number;
     category: string;
   }[]>([]);
+  const [goldPrice, setGoldPrice] = useState<number>(55720);
 
   useEffect(() => {
-    const loadOccupancyRates = async () => {
+    const loadAccountData = async () => {
       if (!user) return;
       
       try {
         const { data: accountSettings, error: settingsError } = await supabase
           .from('account_settings')
-          .select('id')
+          .select('id, gold_price_per_gram')
           .eq('user_id', user.id)
           .single();
 
         if (settingsError) throw settingsError;
+
+        if (accountSettings?.gold_price_per_gram) {
+          setGoldPrice(accountSettings.gold_price_per_gram);
+        }
 
         const { data: rates, error: ratesError } = await supabase
           .from('account_occupancy_rates')
@@ -73,11 +78,11 @@ export default function ScenarioScreen() {
 
         setOccupancyRates(rates || []);
       } catch (error) {
-        console.error('[Scenario] Error loading occupancy rates:', error);
+        console.error('[Scenario] Error loading account data:', error);
       }
     };
 
-    loadOccupancyRates();
+    loadAccountData();
   }, [user]);
 
   const getOccupancyRate = useCallback((area: number, category: 'villa' | 'apartment'): number => {
@@ -206,7 +211,7 @@ export default function ScenarioScreen() {
               
               const costTypeCode = projectHousing?.default_cost_type || housingConfig?.defaultCostType || 'ZME';
               const costParam = mergedConstructionCosts.find((c) => c.code === costTypeCode);
-              const costPerM2 = costParam ? costParam.gold_grams_per_m2 * 85 * 656 : 1000;
+              const costPerM2 = costParam ? costParam.gold_grams_per_m2 * goldPrice : 1000;
               
               const rentMonthly = projectHousing ? projectHousing.default_rent_monthly : (housingConfig?.defaultRent || 500000);
 
@@ -232,7 +237,7 @@ export default function ScenarioScreen() {
               const costParam = mergedConstructionCosts.find((c) => c.code === projectHousing?.default_cost_type);
               const housingConfig = HOUSING_TYPES[unitType];
               const buildArea = projectHousing ? projectHousing.default_area_m2 : (housingConfig?.defaultArea || 80);
-              const costPerM2 = costParam ? costParam.gold_grams_per_m2 * 85 * 656 : 900;
+              const costPerM2 = costParam ? costParam.gold_grams_per_m2 * goldPrice : 900;
               const rentMonthly = projectHousing ? projectHousing.default_rent_monthly : (housingConfig?.defaultRent || 400);
 
               const occupancyRate = getOccupancyRate(buildArea, 'apartment');
@@ -259,7 +264,7 @@ export default function ScenarioScreen() {
               
               const costTypeCode = projectEquipment ? projectEquipment.cost_type : 'ZMER';
               const projectCost = mergedConstructionCosts.find(c => c.code === costTypeCode);
-              const costPerM2 = projectCost ? projectCost.gold_grams_per_m2 * 85 * 656 : 0;
+              const costPerM2 = projectCost ? projectCost.gold_grams_per_m2 * goldPrice : 0;
 
               totalBuildArea += buildArea;
               totalCosts += buildArea * costPerM2;
@@ -277,7 +282,7 @@ export default function ScenarioScreen() {
               
               const costTypeCode = projectUtility ? projectUtility.cost_type : 'ZMER';
               const projectCost = mergedConstructionCosts.find(c => c.code === costTypeCode);
-              const costPerM2 = projectCost ? projectCost.gold_grams_per_m2 * 85 * 656 : 0;
+              const costPerM2 = projectCost ? projectCost.gold_grams_per_m2 * goldPrice : 0;
 
               totalBuildArea += buildArea;
               totalCosts += buildArea * costPerM2;
@@ -302,7 +307,7 @@ export default function ScenarioScreen() {
       rentalPeriodYears,
       estimatedPopulation,
     };
-  }, [scenario, siteBlocks, getHalfBlocksByBlockId, getUnitsByHalfBlockId, mergedConstructionCosts, mergedHousingTypes, mergedEquipmentUtilityTypes, getOccupancyRate]);
+  }, [scenario, siteBlocks, getHalfBlocksByBlockId, getUnitsByHalfBlockId, mergedConstructionCosts, mergedHousingTypes, mergedEquipmentUtilityTypes, getOccupancyRate, goldPrice]);
 
   if (!scenario || !site) {
     return (
@@ -400,7 +405,7 @@ export default function ScenarioScreen() {
               
               const costTypeCode = projectHousing?.default_cost_type || housingConfig?.defaultCostType || 'ZME';
               const costParam = mergedConstructionCosts.find((c) => c.code === costTypeCode);
-              const costPerM2 = costParam ? costParam.gold_grams_per_m2 * 85 * 656 : 1000;
+              const costPerM2 = costParam ? costParam.gold_grams_per_m2 * goldPrice : 1000;
               const constructionCost = area * costPerM2;
               
               const totalBuyingPrice = rentMonthly * 12 * summary.rentalPeriodYears;
