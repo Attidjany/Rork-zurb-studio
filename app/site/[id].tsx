@@ -1,4 +1,5 @@
 import { Stack, useLocalSearchParams } from 'expo-router';
+import { Image } from 'expo-image';
 import { Settings, Sparkles } from 'lucide-react-native';
 import React, { useMemo, useState, useCallback } from 'react';
 import { generateObject } from '@rork-ai/toolkit-sdk';
@@ -982,6 +983,13 @@ RULES:
                                     <Text style={styles.halfBlockSubtype}>
                                       {VILLA_LAYOUTS.find(l => l.id === northHB.villa_layout)?.name}
                                     </Text>
+                                    {VILLA_LAYOUTS.find(l => l.id === northHB.villa_layout)?.imageUrl && (
+                                      <Image
+                                        source={{ uri: VILLA_LAYOUTS.find(l => l.id === northHB.villa_layout)?.imageUrl }}
+                                        style={styles.layoutPreview}
+                                        contentFit="contain"
+                                      />
+                                    )}
                                     <TouchableOpacity
                                       style={styles.editBuildingsButton}
                                       onPress={(e) => {
@@ -1066,6 +1074,13 @@ RULES:
                                     <Text style={styles.halfBlockSubtype}>
                                       {VILLA_LAYOUTS.find(l => l.id === southHB.villa_layout)?.name}
                                     </Text>
+                                    {VILLA_LAYOUTS.find(l => l.id === southHB.villa_layout)?.imageUrl && (
+                                      <Image
+                                        source={{ uri: VILLA_LAYOUTS.find(l => l.id === southHB.villa_layout)?.imageUrl }}
+                                        style={[styles.layoutPreview, styles.layoutPreviewRotated]}
+                                        contentFit="contain"
+                                      />
+                                    )}
                                     <TouchableOpacity
                                       style={styles.editBuildingsButton}
                                       onPress={(e) => {
@@ -1170,6 +1185,16 @@ RULES:
                     <Text style={styles.layoutOptionTitle}>{layout.name}</Text>
                     <Text style={styles.layoutOptionDesc}>{layout.description}</Text>
                     <Text style={styles.layoutOptionUnits}>{layout.totalUnits} units</Text>
+                    {layout.imageUrl && (
+                      <Image
+                        source={{ uri: layout.imageUrl }}
+                        style={[
+                          styles.optionImage,
+                          selectedHalfBlock?.position === 'south' && styles.layoutPreviewRotated
+                        ]}
+                        contentFit="contain"
+                      />
+                    )}
                   </TouchableOpacity>
                 ))}
               </View>
@@ -2001,5 +2026,24 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700' as const,
     color: '#FFFFFF',
+  },
+  layoutPreview: {
+    width: '100%',
+    height: 80,
+    marginTop: 8,
+    borderRadius: 8,
+    backgroundColor: '#F8F9FA',
+  },
+  layoutPreviewRotated: {
+    transform: [{ rotate: '180deg' }],
+  },
+  optionImage: {
+    width: '100%',
+    height: 100,
+    marginTop: 12,
+    borderRadius: 8,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E9ECEF',
   },
 });

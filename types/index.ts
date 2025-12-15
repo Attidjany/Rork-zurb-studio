@@ -26,7 +26,7 @@ export interface DbBlock {
 
 export type HalfBlockPosition = 'north' | 'south';
 export type HalfBlockType = 'villas' | 'apartments';
-export type VillaLayout = '200_300_mix' | '480' | '1200';
+export type VillaLayout = '200_300_mix' | '480' | '1200' | '1000';
 export type ApartmentLayout = 'AB1' | 'AB2' | 'ABH';
 export type BuildingType = 'AB1' | 'AB2' | 'ABH' | 'BMS' | 'BML' | 'BH' | 'CH' | 'CO' | 'EQS' | 'EQL' | 'UTL';
 
@@ -95,6 +95,7 @@ export interface VillaLayoutConfig {
     count: number;
   }[];
   totalUnits: number;
+  imageUrl?: string;
 }
 
 export interface ApartmentLayoutConfig {
@@ -105,6 +106,7 @@ export interface ApartmentLayoutConfig {
   apartmentBuildings: number;
   equipmentSpots: number;
   utilitySpots: number;
+  imageUrl?: string;
 }
 
 export interface BuildingTypeConfig {

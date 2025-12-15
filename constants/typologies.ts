@@ -9,31 +9,44 @@ import {
 export const VILLA_LAYOUTS: VillaLayoutConfig[] = [
   {
     id: '200_300_mix',
-    name: '200/300 sqm Mix',
-    description: '26 plots of 200sqm + 24 plots of 300sqm',
+    name: 'Mixed Layout (200/300m²)',
+    description: 'High density mix: 26 plots of 200sqm + 24 plots of 300sqm',
     plots: [
       { size: 200, count: 26 },
       { size: 300, count: 24 },
     ],
     totalUnits: 50,
+    imageUrl: 'https://pub-e001eb4506b145aa938b5d3badbff6a5.r2.dev/attachments/avb0us848hxe680th6c8c',
   },
   {
     id: '480',
-    name: '480 sqm Layout',
-    description: '30 plots of 480sqm each',
+    name: 'Standard Layout (480m²)',
+    description: 'Medium density: 30 plots of 480sqm each',
     plots: [
       { size: 480, count: 30 },
     ],
     totalUnits: 30,
+    imageUrl: 'https://pub-e001eb4506b145aa938b5d3badbff6a5.r2.dev/attachments/pgf1s0m4yy8ggb42mexox',
   },
   {
     id: '1200',
-    name: '1200 sqm Layout',
-    description: '14 plots of 1200sqm each',
+    name: 'Luxury Layout (1200m²)',
+    description: 'Low density: 14 plots of 1200sqm each',
     plots: [
       { size: 1200, count: 14 },
     ],
     totalUnits: 14,
+    imageUrl: 'https://pub-e001eb4506b145aa938b5d3badbff6a5.r2.dev/attachments/fqhyroefq5r6z7jo1mjig',
+  },
+  {
+    id: '1000',
+    name: 'Estate Layout (1000m²)',
+    description: 'Premium density: 18 plots of 1000sqm each',
+    plots: [
+      { size: 1000, count: 18 },
+    ],
+    totalUnits: 18,
+    imageUrl: 'https://pub-e001eb4506b145aa938b5d3badbff6a5.r2.dev/attachments/fz3jxoxbawqkyccpujq5n',
   },
 ];
 
@@ -251,6 +264,7 @@ export const VILLA_TYPE_OPTIONS: { [plotSize: number]: BuildingTypeConfig[] } = 
   300: BUILDING_TYPES.filter(bt => ['BML', 'BH'].includes(bt.id)),
   480: BUILDING_TYPES.filter(bt => ['BH', 'CH'].includes(bt.id)),
   1200: BUILDING_TYPES.filter(bt => ['CH', 'CO'].includes(bt.id)),
+  1000: BUILDING_TYPES.filter(bt => ['BH', 'CH'].includes(bt.id)),
 };
 
 export const DEFAULT_LEASE_YEARS = 20;

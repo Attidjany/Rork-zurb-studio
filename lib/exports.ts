@@ -183,6 +183,18 @@ function getLayoutName(hb: DbHalfBlock): string {
   return 'Not configured';
 }
 
+function getLayoutImage(hb: DbHalfBlock): string | undefined {
+  if (hb.type === 'villas' && hb.villa_layout) {
+    const layout = VILLA_LAYOUTS.find(l => l.id === hb.villa_layout);
+    return layout?.imageUrl;
+  }
+  if (hb.type === 'apartments' && hb.apartment_layout) {
+    const layout = APARTMENT_LAYOUTS.find(l => l.id === hb.apartment_layout);
+    return layout?.imageUrl;
+  }
+  return undefined;
+}
+
 export function generatePDFHTML(data: ExportData): string {
   const { project, sites, blocks, halfBlocks, scenarios } = data;
   
@@ -319,6 +331,38 @@ export function generatePDFHTML(data: ExportData): string {
           <div class="blocks-grid">
             ${blocksHTML || '<p class="empty">No blocks configured</p>'}
           </div>
+          
+          <div class="layouts-visuals">
+             <h3>Layout Visuals</h3>
+             <div class="visuals-grid">
+               ${(() => {
+                 const siteBlocks = blocks.filter(b => b.site_id === site.id);
+                 let visualsHTML = '';
+                 const processedLayouts = new Set<string>();
+                 
+                 siteBlocks.forEach(block => {
+                   const blockHalfBlocks = halfBlocks.filter(hb => hb.block_id === block.id);
+                   blockHalfBlocks.forEach(hb => {
+                     const layoutName = getLayoutName(hb);
+                     const imageUrl = getLayoutImage(hb);
+                     const key = `${hb.type}-${hb.villa_layout || hb.apartment_layout}`;
+                     
+                     if (imageUrl && !processedLayouts.has(key)) {
+                       processedLayouts.add(key);
+                       visualsHTML += `
+                         <div class="visual-item">
+                           <div class="visual-title">${layoutName}</div>
+                           <img src="${imageUrl}" class="visual-image" alt="${layoutName}" />
+                           <div class="visual-desc">Used in Block ${block.block_number} (${hb.position === 'north' ? 'North' : 'South'})</div>
+                         </div>
+                       `;
+                     }
+                   });
+                 });
+                 return visualsHTML || '<p class="empty">No layout visuals available</p>';
+               })()}
+             </div>
+          </div>
         </div>
         
         <div class="scenarios-section">
@@ -431,6 +475,48 @@ export function generatePDFHTML(data: ExportData): string {
       display: flex;
       flex-wrap: wrap;
       gap: 10px;
+      margin-bottom: 20px;
+    }
+    .layouts-visuals {
+      margin-top: 20px;
+      page-break-inside: avoid;
+    }
+    .layouts-visuals h3 {
+      font-size: 14px;
+      color: #333;
+      margin-bottom: 10px;
+      padding-bottom: 5px;
+      border-bottom: 1px solid #eee;
+    }
+    .visuals-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+      gap: 15px;
+    }
+    .visual-item {
+      background: white;
+      border: 1px solid #eee;
+      border-radius: 8px;
+      padding: 10px;
+      page-break-inside: avoid;
+    }
+    .visual-title {
+      font-weight: 600;
+      color: #007AFF;
+      margin-bottom: 8px;
+      font-size: 12px;
+    }
+    .visual-image {
+      width: 100%;
+      height: 120px;
+      object-fit: contain;
+      background: #f8f9fa;
+      border-radius: 4px;
+      margin-bottom: 8px;
+    }
+    .visual-desc {
+      font-size: 10px;
+      color: #666;
     }
     .block-item {
       background: #f8f9fa;
