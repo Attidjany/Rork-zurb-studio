@@ -15,7 +15,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useZURB } from '@/contexts/ZURBContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { trpc } from '@/lib/trpc';
+
 import {
   VILLA_LAYOUTS,
   APARTMENT_LAYOUTS,
@@ -195,34 +195,7 @@ export default function SiteScreen() {
     await updateUnit(unitId, { utility_name: utilityName });
   }, [updateUnit]);
 
-  const generateScenariosMutation = trpc.scenarios.generateIntelligent.useMutation({
-    onSuccess: async (data) => {
-      console.log('[Site] AI Scenarios generated:', data);
-      setAiThinking(prev => [...prev, '✨ Creating scenario configurations...']);
-      await new Promise(resolve => setTimeout(resolve, 400));
-      
-      const scenariosCount = data.scenarios?.length || 0;
-      setAiThinking(prev => [...prev, `✅ Generated ${scenariosCount} profitable scenarios!`]);
-      
-      await loadScenarios();
-      setGenerationComplete(true);
-      setGeneratingScenarios(false);
-    },
-    onError: (error) => {
-      console.error('[Site] Error generating scenarios:', error);
-      setAiThinking(prev => [...prev, `❌ Error: ${error.message || 'Failed to generate scenarios'}`]);
-      setGenerationComplete(true);
-      setGeneratingScenarios(false);
-      
-      setTimeout(() => {
-        Alert.alert(
-          'Error',
-          error.message || 'Failed to generate scenarios. Please try again.',
-          [{ text: 'OK' }]
-        );
-      }, 100);
-    },
-  });
+
 
   const handleGenerateAutoScenarios = useCallback(async () => {
     if (!id || !user) return;
@@ -247,11 +220,50 @@ export default function SiteScreen() {
     
     setAiThinking(prev => [...prev, '📈 Optimizing rental periods and pricing strategies...']);
     
-    generateScenariosMutation.mutate({
-      siteId: id,
-      userId: user.id,
-    });
-  }, [id, user, generateScenariosMutation]);
+    try {
+      const response = await fetch('/api/scenarios/generate-intelligent', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          siteId: id,
+          userId: user.id,
+        }),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        throw new Error(errorData.error || `Server error: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      console.log('[Site] AI Scenarios generated:', data);
+      setAiThinking(prev => [...prev, '✨ Creating scenario configurations...']);
+      await new Promise(resolve => setTimeout(resolve, 400));
+      
+      const scenariosCount = data.scenarios?.length || 0;
+      setAiThinking(prev => [...prev, `✅ Generated ${scenariosCount} profitable scenarios!`]);
+      
+      await loadScenarios();
+      setGenerationComplete(true);
+      setGeneratingScenarios(false);
+    } catch (error: any) {
+      console.error('[Site] Error generating scenarios:', error);
+      setAiThinking(prev => [...prev, `❌ Error: ${error.message || 'Failed to generate scenarios'}`]);
+      setGenerationComplete(true);
+      setGeneratingScenarios(false);
+      
+      setTimeout(() => {
+        Alert.alert(
+          'Error',
+          error.message || 'Failed to generate scenarios. Please try again.',
+          [{ text: 'OK' }]
+        );
+      }, 100);
+    }
+  }, [id, user, loadScenarios]);
 
   const selectedHalfBlock = useMemo(() => {
     if (!selectedHalfBlockId) return null;
