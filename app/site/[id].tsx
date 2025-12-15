@@ -398,26 +398,26 @@ For each scenario, calculate expected surplus % = ((totalRent - totalCost) / tot
           .single();
         
         if (!error && newScenario) {
-          if (projectHousingTypes && projectHousingTypes.length > 0) {
-            const scenarioHousingTypesToInsert = projectHousingTypes.map(pht => ({
-              scenario_id: newScenario.id,
-              code: pht.code,
-              name: pht.name,
-              category: pht.category,
-              default_area_m2: pht.default_area_m2,
-              default_cost_type: pht.default_cost_type,
-              default_rent_monthly: Math.round(pht.default_rent_monthly * (1 + scenario.rentalAdjustmentPercent / 100)),
-            }));
+          if (projectHousingTypes && projectHousingTypes.length > 0 && scenario.rentalAdjustmentPercent !== 0) {
+            let updateSuccess = true;
+            for (const pht of projectHousingTypes) {
+              const adjustedRent = Math.round(pht.default_rent_monthly * (1 + scenario.rentalAdjustmentPercent / 100));
+              const { error: updateError } = await supabase
+                .from('scenario_housing_types')
+                .update({ default_rent_monthly: adjustedRent })
+                .eq('scenario_id', newScenario.id)
+                .eq('code', pht.code);
+              
+              if (updateError) {
+                console.error('[Site] Error updating scenario housing type:', pht.code, updateError);
+                updateSuccess = false;
+              }
+            }
             
-            const { error: housingError } = await supabase
-              .from('scenario_housing_types')
-              .insert(scenarioHousingTypesToInsert);
-            
-            if (housingError) {
-              console.error('[Site] Error creating scenario housing types:', JSON.stringify(housingError, null, 2));
-              addThought(`⚠️ Warning: Could not save custom rentals for ${scenario.name}`);
+            if (!updateSuccess) {
+              console.warn('[Site] Some housing types could not be updated for scenario:', newScenario.id);
             } else {
-              console.log('[Site] Created scenario housing types with', scenario.rentalAdjustmentPercent, '% rental adjustment');
+              console.log('[Site] Updated scenario housing types with', scenario.rentalAdjustmentPercent, '% rental adjustment');
             }
           }
           
@@ -484,18 +484,15 @@ For each scenario, calculate expected surplus % = ((totalRent - totalCost) / tot
             .select()
             .single();
           
-          if (!scError && newScenario && projectHousingTypesFallback) {
-            const housingTypesToInsert = projectHousingTypesFallback.map(pht => ({
-              scenario_id: newScenario.id,
-              code: pht.code,
-              name: pht.name,
-              category: pht.category,
-              default_area_m2: pht.default_area_m2,
-              default_cost_type: pht.default_cost_type,
-              default_rent_monthly: Math.round(pht.default_rent_monthly * (1 + fb.adjustment / 100)),
-            }));
-            
-            await supabase.from('scenario_housing_types').insert(housingTypesToInsert);
+          if (!scError && newScenario && projectHousingTypesFallback && fb.adjustment !== 0) {
+            for (const pht of projectHousingTypesFallback) {
+              const adjustedRent = Math.round(pht.default_rent_monthly * (1 + fb.adjustment / 100));
+              await supabase
+                .from('scenario_housing_types')
+                .update({ default_rent_monthly: adjustedRent })
+                .eq('scenario_id', newScenario.id)
+                .eq('code', pht.code);
+            }
             addThought(`   ✓ ${fb.name}: ${fb.years} yrs, ${fb.adjustment >= 0 ? '+' : ''}${fb.adjustment}% rent`);
           }
         }
