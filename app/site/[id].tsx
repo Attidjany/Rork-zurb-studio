@@ -221,7 +221,11 @@ export default function SiteScreen() {
     setAiThinking(prev => [...prev, '📈 Optimizing rental periods and pricing strategies...']);
     
     try {
-      const response = await fetch('/api/scenarios/generate-intelligent', {
+      const baseUrl = process.env.EXPO_PUBLIC_RORK_API_BASE_URL || '';
+      const apiUrl = `${baseUrl}/api/scenarios/generate-intelligent`;
+      console.log('[Site] Calling AI API:', apiUrl);
+      
+      const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -232,12 +236,20 @@ export default function SiteScreen() {
         }),
       });
       
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-        throw new Error(errorData.error || `Server error: ${response.status}`);
+      const responseText = await response.text();
+      console.log('[Site] API response status:', response.status);
+      
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch {
+        console.error('[Site] Failed to parse response:', responseText.substring(0, 200));
+        throw new Error('Server returned an invalid response. Please try again.');
       }
       
-      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data?.error || `Server error: ${response.status}`);
+      }
       
       console.log('[Site] AI Scenarios generated:', data);
       setAiThinking(prev => [...prev, '✨ Creating scenario configurations...']);
