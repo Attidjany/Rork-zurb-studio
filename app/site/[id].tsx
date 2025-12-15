@@ -48,6 +48,9 @@ export default function SiteScreen() {
     updateHalfBlock,
     createUnit,
     updateUnit,
+    loadScenarioHousingTypes,
+    loadScenarioConstructionCosts,
+    loadScenarioEquipmentUtilityTypes,
   } = useZURB();
 
   const [refreshing, setRefreshing] = useState<boolean>(false);
@@ -411,7 +414,8 @@ For each scenario, calculate expected surplus % = ((totalRent - totalCost) / tot
               .insert(scenarioHousingTypesToInsert);
             
             if (housingError) {
-              console.error('[Site] Error creating scenario housing types:', housingError);
+              console.error('[Site] Error creating scenario housing types:', JSON.stringify(housingError, null, 2));
+              addThought(`⚠️ Warning: Could not save custom rentals for ${scenario.name}`);
             } else {
               console.log('[Site] Created scenario housing types with', scenario.rentalAdjustmentPercent, '% rental adjustment');
             }
@@ -430,7 +434,12 @@ For each scenario, calculate expected surplus % = ((totalRent - totalCost) / tot
         addThought('💡 All scenarios ensure investment recovery + halal surplus');
       }
       
-      await loadScenarios();
+      await Promise.all([
+        loadScenarios(),
+        loadScenarioHousingTypes(),
+        loadScenarioConstructionCosts(),
+        loadScenarioEquipmentUtilityTypes(),
+      ]);
       setGenerationComplete(true);
       setGeneratingScenarios(false);
     } catch (error: any) {
@@ -492,7 +501,12 @@ For each scenario, calculate expected surplus % = ((totalRent - totalCost) / tot
         }
         
         addThought('✅ Created fallback scenarios');
-        await loadScenarios();
+        await Promise.all([
+          loadScenarios(),
+          loadScenarioHousingTypes(),
+          loadScenarioConstructionCosts(),
+          loadScenarioEquipmentUtilityTypes(),
+        ]);
         setGenerationComplete(true);
         setGeneratingScenarios(false);
         return;
@@ -510,7 +524,7 @@ For each scenario, calculate expected surplus % = ((totalRent - totalCost) / tot
         );
       }, 100);
     }
-  }, [id, user, site, projects, getBlocksBySiteId, getHalfBlocksByBlockId, getUnitsByHalfBlockId, loadScenarios]);
+  }, [id, user, site, projects, getBlocksBySiteId, getHalfBlocksByBlockId, getUnitsByHalfBlockId, loadScenarios, loadScenarioHousingTypes, loadScenarioConstructionCosts, loadScenarioEquipmentUtilityTypes]);
 
   const selectedHalfBlock = useMemo(() => {
     if (!selectedHalfBlockId) return null;
