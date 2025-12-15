@@ -548,41 +548,39 @@ export default function SiteScreen() {
         return `- ${type} (${name}): ${info.count} units × ${info.unitCost.toLocaleString()} XOF = ${info.totalTypeCost.toLocaleString()} XOF total construction, base rent ${info.monthlyRent.toLocaleString()} XOF/month`;
       }).join('\n');
       
-      const prompt = `You are an Islamic finance real estate advisor. Analyze this project and generate 2-3 VIABLE scenarios.
+      const prompt = `Analyze this real estate project and generate 2-3 profitable scenarios.
+CONTEXT:
+- Investment: ${totalConstructionCost.toLocaleString()} XOF
+- Max Period: ${maxPeriod} years
+- Current Income: ${totalMonthlyRent.toLocaleString()} XOF
+- Break-even: ${breakEvenYears.toFixed(1)} years
 
-KEY FINANCIAL DATA:
-- Total construction investment: ${totalConstructionCost.toLocaleString()} XOF (sum of all unit costs)
-- Maximum rental period allowed: ${maxPeriod} years
-- Current monthly rental income: ${totalMonthlyRent.toLocaleString()} XOF
-- Break-even at base rates: ${breakEvenYears.toFixed(1)} years
-
-HOUSING TYPES WITH COSTS AND BASE RENTS:
+UNITS:
 ${unitTypeDetails}
 
-VERIFICATION:
-- Sum of type costs: ${Object.values(unitTypeCounts).reduce((sum, t) => sum + t.totalTypeCost, 0).toLocaleString()} XOF
-- This must equal total investment above
+TASK:
+Generate these scenarios JSON:
+1. AFFORDABLE: Lower rents (-5 to -15%), longer period, 15-25% surplus.
+2. BALANCED: Base rents (±5%), medium period, 25-35% surplus.
+3. ACCELERATED: Higher rents (+5 to +15%), shorter period, 15-25% surplus.
 
-YOUR TASK - TWEAK RENTALS AND DURATION:
-1. Start from the BASE RENT for each housing type (shown above)
-2. Adjust rents UP or DOWN slightly to balance affordability vs profitability
-3. Choose a rental duration that ensures full cost recovery + surplus
+OUTPUT FORMAT:
+{
+  "scenarios": [
+    {
+      "name": "Scenario Name",
+      "strategyDescription": "Brief strategy description",
+      "rentalPeriodYears": number,
+      "housingTypeRentals": [
+        { "code": "unit_code", "proposedRent": number, "reasoning": "brief reason" }
+      ],
+      "thinkingProcess": ["step 1", "step 2"]
+    }
+  ]
+}
 
-FOR EACH SCENARIO:
-- Show step-by-step calculation: (proposedRent × count × 12 months × years) for each type
-- Sum all to get total revenue
-- Calculate surplus: ((totalRevenue - ${totalConstructionCost.toLocaleString()}) / ${totalConstructionCost.toLocaleString()}) × 100
-- Surplus MUST be positive (10-40% range)
-
-GENERATE:
-1. AFFORDABLE: Lower rents (5-15% below base), longer period, ~15-25% surplus
-2. BALANCED: Near base rents (±5%), medium period, ~25-35% surplus  
-3. (Optional) ACCELERATED: Slightly higher rents, shorter period if viable, ~15-25% surplus
-
-RULES:
-- proposedRent must be realistic (close to base rent, not drastically different)
-- Each type's rent contributes: proposedRent × count × 12 × years to total revenue
-- thinkingProcess must show your math for that scenario`;
+Ensure surplus is POSITIVE (10-40%).
+Keep thinkingProcess concise (max 3 steps).`;
 
       addThought('🤖 AI analyzing optimal rental levels per housing type...');
       
@@ -758,9 +756,17 @@ RULES:
     } catch (error: any) {
       console.error('[Site] Error generating scenarios:', error);
       const errorMessage = error?.message || 'Failed to generate scenarios';
-      const isNetworkError = errorMessage.toLowerCase().includes('load failed') || 
-                             errorMessage.toLowerCase().includes('network') ||
-                             errorMessage.toLowerCase().includes('fetch');
+      const errorLower = errorMessage.toLowerCase();
+      const isNetworkError = errorLower.includes('load failed') || 
+                             errorLower.includes('network') ||
+                             errorLower.includes('fetch') ||
+                             errorLower.includes('timeout') ||
+                             errorLower.includes('server did not start') ||
+                             errorMessage.includes('408') ||
+                             errorMessage.includes('500') ||
+                             errorMessage.includes('502') ||
+                             errorMessage.includes('503') ||
+                             errorMessage.includes('504');
       
       if (isNetworkError) {
         addThought('⚠️ Network error - creating optimized fallback scenarios...');

@@ -76,9 +76,17 @@ app.post("/api/ai/generate-scenarios-object", async (c) => {
 
     console.log('[AI Scenarios Object] Generating object with prompt length:', prompt.length);
 
-    const result = await generateText({
+    // 50 second timeout to avoid Vercel 60s limit hard kill
+    const timeoutMs = 50000;
+    
+    const generatePromise = generateText({
       messages: [{ role: 'user', content: prompt + "\n\nReturn ONLY a valid JSON object matching the schema. Do not include markdown formatting or explanations outside the JSON." }],
     });
+
+    const result = await Promise.race([
+      generatePromise,
+      new Promise<string>((_, reject) => setTimeout(() => reject(new Error('AI generation timed out after 50s')), timeoutMs))
+    ]);
 
     console.log('[AI Scenarios Object] AI Response received, length:', result.length);
 

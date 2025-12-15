@@ -1,5 +1,9 @@
 import app from '../../backend/hono';
 
+export const config = {
+  maxDuration: 60,
+};
+
 export async function GET(req: Request) {
   return app.fetch(req);
 }

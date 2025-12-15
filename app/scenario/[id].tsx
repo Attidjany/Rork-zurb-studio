@@ -59,7 +59,7 @@ export default function ScenarioScreen() {
           .from('account_settings')
           .select('id, gold_price_per_gram')
           .eq('user_id', user.id)
-          .single();
+          .maybeSingle();
 
         if (settingsError) throw settingsError;
 
@@ -67,16 +67,18 @@ export default function ScenarioScreen() {
           setGoldPrice(accountSettings.gold_price_per_gram);
         }
 
-        const { data: rates, error: ratesError } = await supabase
-          .from('account_occupancy_rates')
-          .select('*')
-          .eq('account_settings_id', accountSettings.id)
-          .order('category', { ascending: true })
-          .order('min_area_m2', { ascending: true });
+        if (accountSettings?.id) {
+          const { data: rates, error: ratesError } = await supabase
+            .from('account_occupancy_rates')
+            .select('*')
+            .eq('account_settings_id', accountSettings.id)
+            .order('category', { ascending: true })
+            .order('min_area_m2', { ascending: true });
 
-        if (ratesError) throw ratesError;
+          if (ratesError) throw ratesError;
 
-        setOccupancyRates(rates || []);
+          setOccupancyRates(rates || []);
+        }
       } catch (error: any) {
         console.error('[Scenario] Error loading account data:', error?.message || JSON.stringify(error));
       }
