@@ -16,6 +16,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useZURB } from '@/contexts/ZURBContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { generateObject } from '@rork-ai/toolkit-sdk';
+import { z } from 'zod';
 
 import {
   VILLA_LAYOUTS,
@@ -29,53 +31,6 @@ import {
 } from '@/constants/typologies';
 import { supabase } from '@/lib/supabase';
 import { DbBlock, DbHalfBlock, VillaLayout, ApartmentLayout, HalfBlockType, BuildingType } from '@/types';
-
-async function fetchWithRetry(
-  url: string,
-  options: RequestInit,
-  maxRetries: number = 3,
-  baseDelayMs: number = 2000
-): Promise<Response> {
-  let lastError: Error | null = null;
-  
-  for (let attempt = 0; attempt < maxRetries; attempt++) {
-    try {
-      console.log(`[FetchRetry] Attempt ${attempt + 1}/${maxRetries} for ${url}`);
-      const response = await fetch(url, options);
-      
-      if (response.status === 429) {
-        const retryAfter = response.headers.get('Retry-After');
-        const delayMs = retryAfter 
-          ? parseInt(retryAfter) * 1000 
-          : baseDelayMs * Math.pow(2, attempt);
-        
-        console.log(`[FetchRetry] Rate limited (429), waiting ${delayMs}ms before retry...`);
-        await new Promise(resolve => setTimeout(resolve, delayMs));
-        continue;
-      }
-      
-      if (response.status >= 500 && attempt < maxRetries - 1) {
-        const delayMs = baseDelayMs * Math.pow(2, attempt);
-        console.log(`[FetchRetry] Server error (${response.status}), waiting ${delayMs}ms before retry...`);
-        await new Promise(resolve => setTimeout(resolve, delayMs));
-        continue;
-      }
-      
-      return response;
-    } catch (error: any) {
-      lastError = error;
-      console.error(`[FetchRetry] Attempt ${attempt + 1} failed:`, error.message);
-      
-      if (attempt < maxRetries - 1) {
-        const delayMs = baseDelayMs * Math.pow(2, attempt);
-        console.log(`[FetchRetry] Waiting ${delayMs}ms before retry...`);
-        await new Promise(resolve => setTimeout(resolve, delayMs));
-      }
-    }
-  }
-  
-  throw lastError || new Error('All retry attempts failed');
-}
 
 type UnitTypeInfo = {
   count: number;
@@ -625,52 +580,37 @@ Keep thinkingProcess concise (max 3 steps).`;
 
       addThought('🤖 AI analyzing optimal rental levels per housing type...');
       
-      console.log('[Site] Calling AI generateObject via backend proxy...');
+      console.log('[Site] Calling AI generateObject via SDK...');
       
       let result: ScenarioResult;
       try {
-        const baseUrl = process.env.EXPO_PUBLIC_RORK_API_BASE_URL || '';
         addThought('🔄 Connecting to AI service...');
         
-        const response = await fetchWithRetry(
-          `${baseUrl}/api/ai/generate-scenarios-object`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
+        const scenarioSchema = z.object({
+          scenarios: z.array(z.object({
+            name: z.string(),
+            strategyDescription: z.string(),
+            rentalPeriodYears: z.number(),
+            housingTypeRentals: z.array(z.object({
+              code: z.string(),
+              proposedRent: z.number(),
+              reasoning: z.string(),
+            })),
+            thinkingProcess: z.array(z.string()),
+          })),
+        });
+        
+        result = await generateObject({
+          messages: [
+            {
+              role: 'user',
+              content: prompt,
             },
-            body: JSON.stringify({ prompt }),
-          },
-          3,
-          3000
-        );
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`API error: ${response.status} ${errorText.substring(0, 200)}`);
-        }
-
-        const data = await response.json();
+          ],
+          schema: scenarioSchema,
+        });
         
-        // The generateObject from SDK returns the object directly matching the schema (or .object property depending on version, but usually direct)
-        // Let's assume the backend returns result.object or just result
-        // Based on backend implementation: return c.json(result); 
-        // generateObject returns { object: T, ... } or just T? 
-        // It returns { object: T, usage: ... } in newer SDK, but let's check my backend code.
-        // Backend calls generateObject. 
-        // Docs say: "generateObject... Returns a promise that resolves to a result object that contains the generated object."
-        // It usually returns { object: ... }.
-        // BUT wait, in backend/hono.ts I wrote: return c.json(result);
-        // If generateObject returns { object: ... }, then result.object is what we want.
-        
-        if (data.object) {
-          result = data.object;
-        } else if (data.scenarios) {
-           result = data;
-        } else {
-           // Maybe it is wrapped in object
-           result = data.object || data;
-        }
+        console.log('[Site] AI generateObject result:', result);
 
       } catch (aiError: any) {
         console.error('[Site] AI generateObject error:', aiError?.message || JSON.stringify(aiError));
