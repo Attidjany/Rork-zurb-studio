@@ -48,7 +48,7 @@ export default function ScenarioScreen() {
     people_per_unit: number;
     category: string;
   }[]>([]);
-  const [goldPrice, setGoldPrice] = useState<number>(55720);
+  const [goldPrice] = useState<number>(55720);
 
   useEffect(() => {
     const loadAccountData = async () => {
@@ -57,15 +57,11 @@ export default function ScenarioScreen() {
       try {
         const { data: accountSettings, error: settingsError } = await supabase
           .from('account_settings')
-          .select('id, gold_price_per_gram')
+          .select('id')
           .eq('user_id', user.id)
           .maybeSingle();
 
         if (settingsError) throw settingsError;
-
-        if (accountSettings?.gold_price_per_gram) {
-          setGoldPrice(accountSettings.gold_price_per_gram);
-        }
 
         if (accountSettings?.id) {
           const { data: rates, error: ratesError } = await supabase

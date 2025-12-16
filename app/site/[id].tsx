@@ -419,13 +419,7 @@ export default function SiteScreen() {
       .select('*')
       .eq('project_id', project?.id || '');
     
-    const { data: accountSettings } = await supabase
-      .from('account_settings')
-      .select('gold_price_per_gram')
-      .eq('user_id', user.id)
-      .single();
-    
-    const goldPrice = accountSettings?.gold_price_per_gram || 55720;
+    const goldPrice = 55720;
     
     blocks.forEach(block => {
       const hbs = getHalfBlocksByBlockId(block.id);
