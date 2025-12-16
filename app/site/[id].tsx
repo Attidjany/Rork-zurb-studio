@@ -30,6 +30,53 @@ import {
 import { supabase } from '@/lib/supabase';
 import { DbBlock, DbHalfBlock, VillaLayout, ApartmentLayout, HalfBlockType, BuildingType } from '@/types';
 
+async function fetchWithRetry(
+  url: string,
+  options: RequestInit,
+  maxRetries: number = 3,
+  baseDelayMs: number = 2000
+): Promise<Response> {
+  let lastError: Error | null = null;
+  
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      console.log(`[FetchRetry] Attempt ${attempt + 1}/${maxRetries} for ${url}`);
+      const response = await fetch(url, options);
+      
+      if (response.status === 429) {
+        const retryAfter = response.headers.get('Retry-After');
+        const delayMs = retryAfter 
+          ? parseInt(retryAfter) * 1000 
+          : baseDelayMs * Math.pow(2, attempt);
+        
+        console.log(`[FetchRetry] Rate limited (429), waiting ${delayMs}ms before retry...`);
+        await new Promise(resolve => setTimeout(resolve, delayMs));
+        continue;
+      }
+      
+      if (response.status >= 500 && attempt < maxRetries - 1) {
+        const delayMs = baseDelayMs * Math.pow(2, attempt);
+        console.log(`[FetchRetry] Server error (${response.status}), waiting ${delayMs}ms before retry...`);
+        await new Promise(resolve => setTimeout(resolve, delayMs));
+        continue;
+      }
+      
+      return response;
+    } catch (error: any) {
+      lastError = error;
+      console.error(`[FetchRetry] Attempt ${attempt + 1} failed:`, error.message);
+      
+      if (attempt < maxRetries - 1) {
+        const delayMs = baseDelayMs * Math.pow(2, attempt);
+        console.log(`[FetchRetry] Waiting ${delayMs}ms before retry...`);
+        await new Promise(resolve => setTimeout(resolve, delayMs));
+      }
+    }
+  }
+  
+  throw lastError || new Error('All retry attempts failed');
+}
+
 type UnitTypeInfo = {
   count: number;
   totalArea: number;
@@ -583,17 +630,24 @@ Keep thinkingProcess concise (max 3 steps).`;
       let result: ScenarioResult;
       try {
         const baseUrl = process.env.EXPO_PUBLIC_RORK_API_BASE_URL || '';
-        const response = await fetch(`${baseUrl}/api/ai/generate-scenarios-object`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
+        addThought('🔄 Connecting to AI service...');
+        
+        const response = await fetchWithRetry(
+          `${baseUrl}/api/ai/generate-scenarios-object`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ prompt }),
           },
-          body: JSON.stringify({ prompt }),
-        });
+          3,
+          3000
+        );
 
         if (!response.ok) {
           const errorText = await response.text();
-          throw new Error(`API error: ${response.status} ${errorText}`);
+          throw new Error(`API error: ${response.status} ${errorText.substring(0, 200)}`);
         }
 
         const data = await response.json();
@@ -756,7 +810,11 @@ Keep thinkingProcess concise (max 3 steps).`;
                              errorLower.includes('fetch') ||
                              errorLower.includes('timeout') ||
                              errorLower.includes('server did not start') ||
+                             errorLower.includes('rate limit') ||
+                             errorLower.includes('temporarily unavailable') ||
+                             errorLower.includes('high traffic') ||
                              errorMessage.includes('408') ||
+                             errorMessage.includes('429') ||
                              errorMessage.includes('500') ||
                              errorMessage.includes('502') ||
                              errorMessage.includes('503') ||
