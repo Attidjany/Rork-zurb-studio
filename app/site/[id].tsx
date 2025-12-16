@@ -16,8 +16,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useZURB } from '@/contexts/ZURBContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { generateObject } from '@rork-ai/toolkit-sdk';
-import { z } from 'zod';
+import { generateText } from '@rork-ai/toolkit-sdk';
 
 import {
   VILLA_LAYOUTS,
@@ -586,34 +585,42 @@ Keep thinkingProcess concise (max 3 steps).`;
       try {
         addThought('🔄 Connecting to AI service...');
         
-        const scenarioSchema = z.object({
-          scenarios: z.array(z.object({
-            name: z.string(),
-            strategyDescription: z.string(),
-            rentalPeriodYears: z.number(),
-            housingTypeRentals: z.array(z.object({
-              code: z.string(),
-              proposedRent: z.number(),
-              reasoning: z.string(),
-            })),
-            thinkingProcess: z.array(z.string()),
-          })),
-        });
+        const jsonPrompt = `${prompt}
+
+IMPORTANT: Respond with ONLY valid JSON, no markdown, no code blocks, no explanation. Just the raw JSON object.`;
         
-        result = await generateObject({
+        const textResult = await generateText({
           messages: [
             {
               role: 'user',
-              content: prompt,
+              content: jsonPrompt,
             },
           ],
-          schema: scenarioSchema,
         });
         
-        console.log('[Site] AI generateObject result:', result);
+        console.log('[Site] AI generateText result:', textResult);
+        
+        let jsonString = textResult.trim();
+        if (jsonString.startsWith('```json')) {
+          jsonString = jsonString.slice(7);
+        } else if (jsonString.startsWith('```')) {
+          jsonString = jsonString.slice(3);
+        }
+        if (jsonString.endsWith('```')) {
+          jsonString = jsonString.slice(0, -3);
+        }
+        jsonString = jsonString.trim();
+        
+        result = JSON.parse(jsonString) as ScenarioResult;
+        
+        if (!result.scenarios || !Array.isArray(result.scenarios)) {
+          throw new Error('Invalid response format: missing scenarios array');
+        }
+        
+        console.log('[Site] Parsed AI result:', result);
 
       } catch (aiError: any) {
-        console.error('[Site] AI generateObject error:', aiError?.message || JSON.stringify(aiError));
+        console.error('[Site] AI generateText error:', aiError?.message || JSON.stringify(aiError));
         throw aiError;
       }
       
