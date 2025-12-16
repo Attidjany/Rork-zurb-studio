@@ -12,8 +12,8 @@ import {
   RefreshControl,
   ActivityIndicator,
   Alert,
-  Platform,
 } from 'react-native';
+import { generateText } from '@rork-ai/toolkit-sdk';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useZURB } from '@/contexts/ZURBContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -589,49 +589,16 @@ Keep thinkingProcess concise (max 3 steps).`;
 
 IMPORTANT: Respond with ONLY valid JSON, no markdown, no code blocks, no explanation. Just the raw JSON object.`;
         
-        let textResult: string;
+        console.log('[Site] Calling generateText from SDK...');
         
-        const toolkitUrl = process.env.EXPO_PUBLIC_TOOLKIT_URL || 'https://toolkit.rork.com';
-        const agentUrl = `${toolkitUrl}/agent/chat`;
-        
-        console.log('[Site] Making AI request to:', agentUrl);
-        console.log('[Site] Platform:', Platform.OS);
-        
-        const response = await fetch(agentUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            messages: [
-              {
-                role: 'user',
-                content: jsonPrompt,
-              },
-            ],
-          }),
+        const textResult = await generateText({
+          messages: [
+            {
+              role: 'user',
+              content: jsonPrompt,
+            },
+          ],
         });
-        
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error('[Site] AI API error:', response.status, errorText.substring(0, 200));
-          throw new Error(`API error: ${response.status} ${errorText.substring(0, 100)}`);
-        }
-        
-        const responseData = await response.json();
-        console.log('[Site] AI response data:', JSON.stringify(responseData).substring(0, 500));
-        
-        if (responseData.text) {
-          textResult = responseData.text;
-        } else if (responseData.content) {
-          textResult = responseData.content;
-        } else if (responseData.message) {
-          textResult = responseData.message;
-        } else if (typeof responseData === 'string') {
-          textResult = responseData;
-        } else {
-          textResult = JSON.stringify(responseData);
-        }
         
         console.log('[Site] AI text result:', textResult.substring(0, 500));
         
