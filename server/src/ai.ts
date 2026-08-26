@@ -11,7 +11,7 @@ import { getPool, q, exec, uuid, withTx } from './db.js';
 import { ownerPredicate } from './registry.js';
 import { APARTMENT_BUILDING_UNITS, CONSTRUCTION_COST_DEFAULTS, HOUSING_TYPE_DEFAULTS } from './typologies.js';
 
-const MODEL = () => process.env.ANTHROPIC_MODEL || 'claude-opus-5';
+const MODEL = () => process.env.ANTHROPIC_MODEL || 'claude-sonnet-5';
 let client: Anthropic | null = null;
 const anthropic = () => (client ??= new Anthropic());
 
