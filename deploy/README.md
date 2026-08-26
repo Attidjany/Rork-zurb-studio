@@ -1,6 +1,6 @@
 # Deploying ZURB Studio on Cloudways
 
-Live: Cloudways app `gpqjkzkwbe` on server `178.62.214.98` (default URL `phpstack-1601195-6636805.cloudwaysapps.com`, target domain `studio.zenoah.org`). MariaDB 10.11 — the schema is MySQL/MariaDB compatible.
+Live: Cloudways app `gpqjkzkwbe` on server `178.62.214.98` (default URL `phpstack-1601195-6636805.cloudwaysapps.com`, live domain `https://studio.zenoah.org`). MariaDB 10.11 — the schema is MySQL/MariaDB compatible.
 
 Layout on the server:
 

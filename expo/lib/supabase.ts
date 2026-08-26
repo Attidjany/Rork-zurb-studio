@@ -12,7 +12,7 @@ export interface Session { access_token: string; token_type: string; user: User 
 export interface ApiError { message: string; code?: string; details?: string }
 export type AuthChangeEvent = 'INITIAL_SESSION' | 'SIGNED_IN' | 'SIGNED_OUT' | 'TOKEN_REFRESHED';
 
-const DEFAULT_PROD_API = 'https://zurbstudio.zenoah.org';
+const DEFAULT_PROD_API = 'https://studio.zenoah.org';
 
 export function apiBaseUrl(): string {
   const env = (process.env.EXPO_PUBLIC_API_BASE_URL || '').trim().replace(/\/$/, '');
