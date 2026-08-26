@@ -1,0 +1,22 @@
+# ZURB Studio — Cloudways app
+# /api/* → Node API via proxy.php ; everything else → single-page app
+RewriteEngine On
+RewriteBase /
+
+# API
+RewriteRule ^api(/.*)?$ proxy.php [L,QSA]
+
+# Static assets that exist are served as-is
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+
+# SPA fallback
+RewriteRule ^ index.html [L]
+
+<IfModule mod_headers.c>
+  # never cache the shell; hashed bundles under _expo/ stay long-cacheable
+  <FilesMatch "^(index\.html|proxy\.php)$">
+    Header set Cache-Control "no-store"
+  </FilesMatch>
+</IfModule>

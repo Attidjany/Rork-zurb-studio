@@ -1,3 +1,8 @@
-node_modules
+node_modules/
 .env
-.expo
+.env.production
+deploy/deploy.env
+server/dist/
+expo/dist/
+expo/.expo/
+.DS_Store

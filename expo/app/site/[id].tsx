@@ -13,7 +13,7 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
-import { generateText } from '@rork-ai/toolkit-sdk';
+import { generateText } from '@/lib/ai';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useZURB } from '@/contexts/ZURBContext';
 import { useAuth } from '@/contexts/AuthContext';

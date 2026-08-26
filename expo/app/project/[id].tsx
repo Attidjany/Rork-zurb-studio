@@ -86,11 +86,11 @@ export default function ProjectScreen() {
       try {
         const { data } = await supabase
           .from('account_settings')
-          .select('gold_price_per_gram')
+          .select('gold_price_per_oz')
           .eq('user_id', user.id)
-          .single();
-        if (data?.gold_price_per_gram) {
-          setGoldPrice(data.gold_price_per_gram);
+          .maybeSingle();
+        if (data?.gold_price_per_oz) {
+          setGoldPrice(data.gold_price_per_oz / 31.1035);
         }
       } catch (error) {
         console.log('[Project] Error loading gold price:', error);

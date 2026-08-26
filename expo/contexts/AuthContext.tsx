@@ -1,7 +1,7 @@
 import createContextHook from '@nkzw/create-context-hook';
 import { supabase } from '@/lib/supabase';
 import { useEffect, useState } from 'react';
-import { Session, User } from '@supabase/supabase-js';
+import type { Session, User } from '@/lib/supabase';
 import { Alert } from 'react-native';
 import { useRouter, useSegments } from 'expo-router';
 

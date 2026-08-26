@@ -1,7 +1,7 @@
 import createContextHook from '@nkzw/create-context-hook';
 import { useState, useEffect, useCallback } from 'react';
 import { Alert } from 'react-native';
-import { supabase } from '@/lib/supabase';
+import { supabase, apiPost } from '@/lib/supabase';
 import { useAuth } from './AuthContext';
 import {
   DbProject,
@@ -699,112 +699,10 @@ export const [ZURBContext, useZURB] = createContextHook(() => {
         const original = projects.find(p => p.id === projectId);
         if (!original) throw new Error('Project not found');
 
-        const { data: newProject, error: projectError } = await supabase
-          .from('projects')
-          .insert({
-            name: `${original.name} (Copy)`,
-            description: original.description,
-            owner_id: user!.id,
-          })
-          .select()
-          .single();
-
-        if (projectError || !newProject) throw projectError;
-
+        const { data: newProject } = await apiPost<{ data: DbProject }>(`/api/projects/${projectId}/duplicate`, {});
         console.log('[ZURB] Project duplicated:', newProject);
 
-        const originalSites = getSitesByProjectId(projectId);
-        if (originalSites.length > 0) {
-          for (const site of originalSites) {
-            const { data: newSite, error: siteError } = await supabase
-              .from('sites')
-              .insert({
-                project_id: newProject.id,
-                name: site.name,
-                area_ha: site.area_ha,
-              })
-              .select()
-              .single();
-
-            if (siteError || !newSite) {
-              console.error('[ZURB] Error duplicating site:', siteError);
-              continue;
-            }
-
-            const originalBlocks = getBlocksBySiteId(site.id);
-            const blockIdMap: { [oldId: string]: string } = {};
-            
-            for (const block of originalBlocks) {
-              const { data: newBlock, error: blockError } = await supabase
-                .from('blocks')
-                .insert({
-                  site_id: newSite.id,
-                  block_number: block.block_number,
-                })
-                .select()
-                .single();
-
-              if (!blockError && newBlock) {
-                blockIdMap[block.id] = newBlock.id;
-                
-                const originalHalfBlocks = getHalfBlocksByBlockId(block.id);
-                const halfBlockIdMap: { [oldId: string]: string } = {};
-                
-                for (const halfBlock of originalHalfBlocks) {
-                  const { data: newHalfBlock, error: hbError } = await supabase
-                    .from('half_blocks')
-                    .insert({
-                      block_id: newBlock.id,
-                      position: halfBlock.position,
-                      type: halfBlock.type,
-                      villa_layout: halfBlock.villa_layout,
-                      apartment_layout: halfBlock.apartment_layout,
-                    })
-                    .select()
-                    .single();
-
-                  if (!hbError && newHalfBlock) {
-                    halfBlockIdMap[halfBlock.id] = newHalfBlock.id;
-                    
-                    const originalUnits = getUnitsByHalfBlockId(halfBlock.id);
-                    for (const unit of originalUnits) {
-                      await supabase.from('units').insert({
-                        half_block_id: newHalfBlock.id,
-                        unit_number: unit.unit_number,
-                        unit_type: unit.unit_type,
-                        size_m2: unit.size_m2,
-                        building_type: unit.building_type,
-                        equipment_name: unit.equipment_name,
-                        utility_name: unit.utility_name,
-                      });
-                    }
-                  }
-                }
-              }
-            }
-
-            const originalScenarios = getScenariosBySiteId(site.id);
-            for (const scenario of originalScenarios) {
-              const { error: scenarioError } = await supabase
-                .from('scenarios')
-                .insert({
-                  site_id: newSite.id,
-                  name: scenario.name,
-                  notes: scenario.notes,
-                  rental_period_years: scenario.rental_period_years,
-                  created_by: user!.id,
-                })
-                .select()
-                .single();
-
-              if (scenarioError) {
-                console.error('[ZURB] Error duplicating scenario:', scenarioError);
-              }
-            }
-          }
-        }
-
-        await Promise.all([loadSites(), loadBlocks(), loadHalfBlocks(), loadUnits(), loadScenarios()]);
+        await Promise.all([loadProjects(), loadSites(), loadBlocks(), loadHalfBlocks(), loadUnits(), loadScenarios(), loadProjectConstructionCosts(), loadProjectHousingTypes(), loadProjectEquipmentUtilityTypes(), loadScenarioConstructionCosts(), loadScenarioHousingTypes(), loadScenarioEquipmentUtilityTypes()]);
         return newProject;
       } catch (error: any) {
         console.error('[ZURB] Error duplicating project:', error);
@@ -812,7 +710,7 @@ export const [ZURBContext, useZURB] = createContextHook(() => {
         return null;
       }
     },
-    [projects, user, getSitesByProjectId, getScenariosBySiteId, getBlocksBySiteId, getHalfBlocksByBlockId, getUnitsByHalfBlockId, loadSites, loadBlocks, loadHalfBlocks, loadUnits, loadScenarios]
+    [projects, loadProjects, loadSites, loadBlocks, loadHalfBlocks, loadUnits, loadScenarios, loadProjectConstructionCosts, loadProjectHousingTypes, loadProjectEquipmentUtilityTypes, loadScenarioConstructionCosts, loadScenarioHousingTypes, loadScenarioEquipmentUtilityTypes]
   );
 
   const createSite = useCallback(
@@ -905,85 +803,10 @@ export const [ZURBContext, useZURB] = createContextHook(() => {
         const original = sites.find(s => s.id === siteId);
         if (!original) throw new Error('Site not found');
 
-        const { data: newSite, error: siteError } = await supabase
-          .from('sites')
-          .insert({
-            project_id: original.project_id,
-            name: `${original.name} (Copy)`,
-            area_ha: original.area_ha,
-          })
-          .select()
-          .single();
-
-        if (siteError || !newSite) throw siteError;
-
+        const { data: newSite } = await apiPost<{ data: DbSite }>(`/api/sites/${siteId}/duplicate`, {});
         console.log('[ZURB] Site duplicated:', newSite);
 
-        const originalBlocks = getBlocksBySiteId(siteId);
-        for (const block of originalBlocks) {
-          const { data: newBlock, error: blockError } = await supabase
-            .from('blocks')
-            .insert({
-              site_id: newSite.id,
-              block_number: block.block_number,
-            })
-            .select()
-            .single();
-
-          if (!blockError && newBlock) {
-            const originalHalfBlocks = getHalfBlocksByBlockId(block.id);
-            
-            for (const halfBlock of originalHalfBlocks) {
-              const { data: newHalfBlock, error: hbError } = await supabase
-                .from('half_blocks')
-                .insert({
-                  block_id: newBlock.id,
-                  position: halfBlock.position,
-                  type: halfBlock.type,
-                  villa_layout: halfBlock.villa_layout,
-                  apartment_layout: halfBlock.apartment_layout,
-                })
-                .select()
-                .single();
-
-              if (!hbError && newHalfBlock) {
-                const originalUnits = getUnitsByHalfBlockId(halfBlock.id);
-                for (const unit of originalUnits) {
-                  await supabase.from('units').insert({
-                    half_block_id: newHalfBlock.id,
-                    unit_number: unit.unit_number,
-                    unit_type: unit.unit_type,
-                    size_m2: unit.size_m2,
-                    building_type: unit.building_type,
-                    equipment_name: unit.equipment_name,
-                    utility_name: unit.utility_name,
-                  });
-                }
-              }
-            }
-          }
-        }
-
-        const originalScenarios = getScenariosBySiteId(siteId);
-        for (const scenario of originalScenarios) {
-          const { error: scenarioError } = await supabase
-            .from('scenarios')
-            .insert({
-              site_id: newSite.id,
-              name: scenario.name,
-              notes: scenario.notes,
-              rental_period_years: scenario.rental_period_years,
-              created_by: user!.id,
-            })
-            .select()
-            .single();
-
-          if (scenarioError) {
-            console.error('[ZURB] Error duplicating scenario:', scenarioError);
-          }
-        }
-
-        await Promise.all([loadBlocks(), loadHalfBlocks(), loadUnits(), loadScenarios()]);
+        await Promise.all([loadSites(), loadBlocks(), loadHalfBlocks(), loadUnits(), loadScenarios(), loadScenarioConstructionCosts(), loadScenarioHousingTypes(), loadScenarioEquipmentUtilityTypes()]);
         return newSite;
       } catch (error: any) {
         console.error('[ZURB] Error duplicating site:', error);
@@ -991,7 +814,7 @@ export const [ZURBContext, useZURB] = createContextHook(() => {
         return null;
       }
     },
-    [sites, user, getScenariosBySiteId, getBlocksBySiteId, getHalfBlocksByBlockId, getUnitsByHalfBlockId, loadBlocks, loadHalfBlocks, loadUnits, loadScenarios]
+    [sites, loadSites, loadBlocks, loadHalfBlocks, loadUnits, loadScenarios, loadScenarioConstructionCosts, loadScenarioHousingTypes, loadScenarioEquipmentUtilityTypes]
   );
 
   const updateHalfBlock = useCallback(

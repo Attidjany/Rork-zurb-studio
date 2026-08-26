@@ -36,7 +36,7 @@ export default function DiagnosticsScreen() {
       (Constants as unknown as { hostUri?: string } | undefined)?.hostUri ??
       "";
 
-    const apiBaseUrl = process.env.EXPO_PUBLIC_RORK_API_BASE_URL ?? "";
+    const apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL ?? "";
 
     const normalizedApiBaseUrl = apiBaseUrl
       ? apiBaseUrl.trim().replace(/\/+$/, "")
@@ -53,8 +53,8 @@ export default function DiagnosticsScreen() {
       hostUri,
       linkingUrl: Linking.createURL("/"),
       apiBaseUrl: normalizedApiBaseUrl,
-      supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL ?? "",
-      hasSupabaseAnonKey: Boolean(process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY),
+      supabaseUrl: process.env.EXPO_PUBLIC_API_BASE_URL ?? "(same origin)",
+      hasSupabaseAnonKey: true,
     };
   }, []);
 
@@ -115,17 +115,17 @@ export default function DiagnosticsScreen() {
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Backend env</Text>
           <Row
-            label="EXPO_PUBLIC_RORK_API_BASE_URL"
+            label="EXPO_PUBLIC_API_BASE_URL"
             value={info.apiBaseUrl || "(missing)"}
             testID="diagnostics/apiBaseUrl"
           />
           <Row
-            label="EXPO_PUBLIC_SUPABASE_URL"
+            label="API base URL"
             value={info.supabaseUrl || "(missing)"}
             testID="diagnostics/supabaseUrl"
           />
           <Row
-            label="EXPO_PUBLIC_SUPABASE_ANON_KEY"
+            label="Auth"
             value={info.hasSupabaseAnonKey ? "(set)" : "(missing)"}
             testID="diagnostics/supabaseAnonKey"
           />
