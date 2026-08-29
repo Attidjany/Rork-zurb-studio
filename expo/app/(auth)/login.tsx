@@ -2,7 +2,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { Link } from 'expo-router';
 import { LogIn } from 'lucide-react-native';
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -12,8 +12,8 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
+import { Alert } from '@/lib/alert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function LoginScreen() {
@@ -21,32 +21,34 @@ export default function LoginScreen() {
   const [email, setEmail] = useState<string>('');
   const [password, setPassword] = useState<string>('');
   const [isResetting, setIsResetting] = useState<boolean>(false);
+  const [formError, setFormError] = useState<string>('');
+  const [formInfo, setFormInfo] = useState<string>('');
+  const passwordRef = useRef<TextInput>(null);
 
   const handleSignIn = async () => {
     if (!email.trim() || !password.trim()) {
       return;
     }
+    setFormError('');
+    setFormInfo('');
     const result = await signIn(email.trim(), password);
     if (result?.error) {
-      const errorMessage = result.error.message;
-      if (errorMessage.includes('Invalid login credentials')) {
-        Alert.alert(
-          'Sign In Failed',
-          'The email or password you entered is incorrect. Please check your credentials and try again.',
-          [
-            { text: 'Try Again', style: 'cancel' },
-            { text: 'Reset Password', onPress: handleForgotPassword }
-          ]
-        );
-      }
+      const errorMessage = result.error.message || '';
+      setFormError(
+        errorMessage.includes('Invalid login credentials')
+          ? 'The email or password you entered is incorrect.'
+          : errorMessage || 'Could not sign in. Please try again.'
+      );
     }
   };
 
   const handleForgotPassword = async () => {
     if (!email.trim()) {
-      Alert.alert('Email Required', 'Please enter your email address first, then tap "Forgot Password".');
+      setFormError('Enter your email address first, then tap “Forgot Password”.');
       return;
     }
+    setFormError('');
+    setFormInfo('');
     
     setIsResetting(true);
     try {
@@ -58,10 +60,7 @@ export default function LoginScreen() {
         console.error('[Login] Password reset error:', error);
         Alert.alert('Error', error.message);
       } else {
-        Alert.alert(
-          'Check Your Email',
-          'If an account exists with this email, you will receive a password reset link.'
-        );
+        setFormInfo('If an account exists with this email, you will receive a password reset link.');
       }
     } catch (err) {
       console.error('[Login] Password reset exception:', err);
@@ -93,10 +92,13 @@ export default function LoginScreen() {
             keyboardType="email-address"
             autoComplete="email"
             editable={!isLoading}
+            returnKeyType="next"
+            onSubmitEditing={() => passwordRef.current?.focus()}
             testID="email-input"
           />
 
           <TextInput
+            ref={passwordRef}
             style={styles.input}
             placeholder="Password"
             value={password}
@@ -105,8 +107,13 @@ export default function LoginScreen() {
             autoCapitalize="none"
             autoComplete="password"
             editable={!isLoading}
+            returnKeyType="go"
+            onSubmitEditing={handleSignIn}
             testID="password-input"
           />
+
+          {!!formError && <Text style={styles.formError} testID="form-error">{formError}</Text>}
+          {!!formInfo && <Text style={styles.formInfo} testID="form-info">{formInfo}</Text>}
 
           <TouchableOpacity
             style={[styles.button, isLoading && styles.buttonDisabled]}
@@ -223,5 +230,17 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#007AFF',
     fontWeight: '500' as const,
+  },
+  formError: {
+    color: '#B42318',
+    fontSize: 14,
+    marginBottom: 12,
+    lineHeight: 19,
+  },
+  formInfo: {
+    color: '#0E7A4D',
+    fontSize: 14,
+    marginBottom: 12,
+    lineHeight: 19,
   },
 });

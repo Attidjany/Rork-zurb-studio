@@ -1,4 +1,7 @@
 /** Mirror of expo/constants/typologies.ts — the parts the server needs to price a site. */
+
+/** One conversion rate for the whole server (matches the rate shown in the app UI). */
+export const USD_TO_XOF = 570;
 export const APARTMENT_BUILDING_UNITS: Record<string, Record<string, number>> = {
   AB1: { AMS: 18, AML: 4, XM: 6 },
   AB2: { AML: 16, XM: 6 },

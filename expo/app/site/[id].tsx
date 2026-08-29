@@ -11,8 +11,8 @@ import {
   Modal,
   RefreshControl,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
+import { Alert } from '@/lib/alert';
 import { generateText } from '@/lib/ai';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useZURB } from '@/contexts/ZURBContext';
@@ -970,8 +970,16 @@ IMPORTANT: Respond with ONLY valid JSON, no markdown, no code blocks, no explana
           </View>
           {siteBlocks.length === 0 ? (
             <View style={styles.emptyContainer}>
-              <ActivityIndicator size="small" color="#007AFF" />
-              <Text style={styles.emptyText}>Generating blocks...</Text>
+              {site && site.area_ha < 6 ? (
+                <Text style={styles.emptyText}>
+                  This site is smaller than one 6 ha block ({site.area_ha} ha), so there are no blocks to configure. Edit the site area to at least 6 ha.
+                </Text>
+              ) : (
+                <>
+                  <ActivityIndicator size="small" color="#007AFF" />
+                  <Text style={styles.emptyText}>Generating blocks…</Text>
+                </>
+              )}
             </View>
           ) : (
             siteBlocks.map((block: DbBlock) => {

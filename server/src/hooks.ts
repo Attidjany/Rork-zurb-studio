@@ -60,9 +60,12 @@ export async function populateProjectTypes(conn: Conn, projectId: string, ownerI
 // ---------------------------------------------------------------- sites / blocks
 
 /** auto_generate_blocks — FLOOR(area_ha / 6) blocks, each with a north + south half-block. */
+export const MIN_SITE_HA = 6;
+export const MAX_SITE_HA = 5000;
+
 export async function generateBlocks(conn: Conn, siteId: string, areaHa: number, changed: Changed) {
   await exec(conn, 'DELETE FROM blocks WHERE site_id = ?', [siteId]);
-  const n = Math.floor(Number(areaHa) / 6);
+  const n = Math.min(Math.max(Math.floor(Number(areaHa) / 6), 0), Math.floor(MAX_SITE_HA / 6));
   for (let i = 1; i <= n; i++) {
     const blockId = uuid();
     await exec(conn, 'INSERT INTO blocks (id, site_id, block_number) VALUES (?,?,?)', [blockId, siteId, i]);
@@ -116,6 +119,10 @@ export async function isSiteConfigured(conn: Conn, siteId: string): Promise<bool
 /** check_and_generate_auto_scenarios — for a set of sites touched by unit/half-block writes. */
 export async function maybeGenerateAutoScenarios(conn: Conn, siteIds: Iterable<string>, changed: Changed) {
   for (const siteId of new Set(siteIds)) {
+    // Generate once, when the site first becomes fully configured. Never regenerate
+    // automatically — that used to delete any edits users made to "Auto:" scenarios.
+    const existing = await q(conn, 'SELECT 1 FROM scenarios WHERE site_id = ? AND is_auto_scenario = 1 LIMIT 1', [siteId]);
+    if (existing.length) continue;
     if (await isSiteConfigured(conn, siteId)) {
       await generateAutoScenarios(conn, siteId);
       changed.add('scenarios');

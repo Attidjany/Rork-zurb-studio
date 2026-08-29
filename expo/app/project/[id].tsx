@@ -12,8 +12,8 @@ import {
   ScrollView,
   ActivityIndicator,
   RefreshControl,
-  Alert,
 } from 'react-native';
+import { Alert } from '@/lib/alert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useZURB } from '@/contexts/ZURBContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -232,11 +232,27 @@ export default function ProjectScreen() {
   const project = projects.find(p => p.id === id);
   const projectSites = getSitesByProjectId(id || '');
 
+  const MIN_SITE_HA = 6;
+  const MAX_SITE_HA = 5000;
+
+  const parsedArea = parseFloat(siteArea.replace(',', '.'));
+  const areaError = !siteArea.trim()
+    ? ''
+    : isNaN(parsedArea) || !isFinite(parsedArea)
+      ? 'Enter the area in hectares, e.g. 30'
+      : parsedArea < MIN_SITE_HA
+        ? `A site needs at least ${MIN_SITE_HA} ha (one full block).`
+        : parsedArea > MAX_SITE_HA
+          ? `Maximum supported site area is ${MAX_SITE_HA.toLocaleString()} ha.`
+          : '';
+  const plannedBlocks = !areaError && siteArea.trim() && !isNaN(parsedArea) ? Math.floor(parsedArea / 6) : 0;
+  const unusedHa = plannedBlocks > 0 ? parsedArea - plannedBlocks * 6 : 0;
+
   const handleCreateSite = async () => {
     if (!siteName.trim() || !siteArea.trim() || !id) return;
 
-    const area = parseFloat(siteArea);
-    if (isNaN(area)) return;
+    const area = parsedArea;
+    if (isNaN(area) || areaError) return;
 
     setIsCreating(true);
     try {
@@ -512,6 +528,14 @@ export default function ProjectScreen() {
               testID="site-area-input"
             />
 
+            {!!areaError && <Text style={styles.areaError} testID="area-error">{areaError}</Text>}
+            {!areaError && plannedBlocks > 0 && (
+              <Text style={styles.areaHint} testID="area-hint">
+                = {plannedBlocks} block{plannedBlocks > 1 ? 's' : ''} of 6 ha
+                {unusedHa > 0.001 ? ` (${unusedHa.toLocaleString(undefined, { maximumFractionDigits: 2 })} ha unused)` : ''}
+              </Text>
+            )}
+
             <View style={styles.modalButtons}>
               <TouchableOpacity
                 style={[styles.modalButton, styles.cancelButton]}
@@ -524,7 +548,7 @@ export default function ProjectScreen() {
               <TouchableOpacity
                 style={[styles.modalButton, styles.createButton]}
                 onPress={handleCreateSite}
-                disabled={!siteName.trim() || !siteArea.trim() || isCreating}
+                disabled={!siteName.trim() || !siteArea.trim() || !!areaError || isCreating}
                 testID="confirm-create-button"
               >
                 {isCreating ? (
@@ -960,5 +984,17 @@ const styles = StyleSheet.create({
   },
   scenarioItemAction: {
     padding: 4,
+  },
+  areaError: {
+    color: '#B42318',
+    fontSize: 13.5,
+    marginTop: -6,
+    marginBottom: 10,
+  },
+  areaHint: {
+    color: '#6B7385',
+    fontSize: 13.5,
+    marginTop: -6,
+    marginBottom: 10,
   },
 });

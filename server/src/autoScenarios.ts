@@ -4,7 +4,7 @@
  * each only created when projected revenue > projected cost.
  */
 import { Conn, exec, q, uuid } from './db.js';
-import { APARTMENT_BUILDING_UNITS, CONSTRUCTION_COST_DEFAULTS, HOUSING_TYPE_DEFAULTS } from './typologies.js';
+import { APARTMENT_BUILDING_UNITS, CONSTRUCTION_COST_DEFAULTS, HOUSING_TYPE_DEFAULTS, USD_TO_XOF } from './typologies.js';
 
 const TROY_OZ_GRAMS = 31.1034768;
 
@@ -116,7 +116,8 @@ export async function priceSiteUnits(conn: Conn, siteId: string, housing: any[],
     const costType = ph?.default_cost_type ?? def?.costType ?? 'ZME';
     const pc = costs.find(c => c.code === costType);
     const gg = Number(pc?.gold_grams_per_m2 ?? CONSTRUCTION_COST_DEFAULTS[costType] ?? 14.91);
-    return { code, rent, area, cost: area * gg * usdPerGram };
+    // Cost in XOF — rents are XOF, so the profitability gate compares like with like.
+    return { code, rent, area, cost: area * gg * usdPerGram * USD_TO_XOF };
   };
   const out: PricedUnit[] = [];
   const apartmentBuildings = new Map<string, number>(); // apartment_layout → building count

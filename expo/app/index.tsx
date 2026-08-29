@@ -11,8 +11,8 @@ import {
   TextInput,
   ActivityIndicator,
   RefreshControl,
-  Alert,
 } from 'react-native';
+import { Alert } from '@/lib/alert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useZURB } from '@/contexts/ZURBContext';
 

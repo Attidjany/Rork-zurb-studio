@@ -2,7 +2,7 @@ import createContextHook from '@nkzw/create-context-hook';
 import { supabase } from '@/lib/supabase';
 import { useEffect, useState } from 'react';
 import type { Session, User } from '@/lib/supabase';
-import { Alert } from 'react-native';
+import { Alert } from '@/lib/alert';
 import { useRouter, useSegments } from 'expo-router';
 
 export const [AuthContext, useAuth] = createContextHook(() => {

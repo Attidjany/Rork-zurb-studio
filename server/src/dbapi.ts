@@ -65,6 +65,18 @@ function buildWhere(table: string, filters: Filter[], userId: string) {
   return { sql: parts.join(' AND '), params };
 }
 
+function validateRow(table: string, row: any) {
+  for (const [k, v] of Object.entries(row)) {
+    if (typeof v === 'number' && !Number.isFinite(v)) throw new ApiError(400, `invalid numeric value for "${k}"`);
+  }
+  if (table === 'sites' && 'area_ha' in row) {
+    const a = Number(row.area_ha);
+    if (!Number.isFinite(a) || a < 6 || a > 5000) {
+      throw new ApiError(400, 'Site area must be between 6 and 5,000 hectares.');
+    }
+  }
+}
+
 function serialize(table: string, value: any) {
   const def = TABLES[table];
   const out: any = {};
@@ -182,6 +194,7 @@ dbRoutes.post('/:table/insert', async c => {
   await withTx(async conn => {
     for (const raw of input) {
       const row = serialize(table, raw);
+      validateRow(table, row);
       await assertParentOwned(conn, table, row, user.id);
       const id = raw.id && typeof raw.id === 'string' ? raw.id : uuid();
       const cols = ['id', ...Object.keys(row)];
@@ -207,6 +220,7 @@ dbRoutes.post('/:table/update', async c => {
   const user = c.get('user');
   const body = await c.req.json().catch(() => ({}));
   const values = serialize(table, body.values || {});
+  validateRow(table, values);
   const filters: Filter[] = body.filters || [];
   if (!filters.length) throw new ApiError(400, 'update requires at least one filter');
   const changed: Changed = new Set([table]);

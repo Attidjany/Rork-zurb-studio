@@ -6,6 +6,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ZURBContext } from "@/contexts/ZURBContext";
 import { AuthContext } from "@/contexts/AuthContext";
+import { AlertHost } from "@/lib/alert";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -35,6 +36,7 @@ export default function RootLayout() {
         <ZURBContext>
           <GestureHandlerRootView style={styles.container}>
             <RootLayoutNav />
+            <AlertHost />
           </GestureHandlerRootView>
         </ZURBContext>
       </AuthContext>

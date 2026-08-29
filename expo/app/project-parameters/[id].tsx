@@ -10,9 +10,9 @@ import {
   TextInput,
   RefreshControl,
   ActivityIndicator,
-  Alert,
   Modal,
 } from 'react-native';
+import { Alert } from '@/lib/alert';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useZURB } from '@/contexts/ZURBContext';
 import { fetchLiveGoldPrice, getCachedGoldPrice, getDefaultGoldPrice, GoldPriceData, USD_TO_XOF } from '@/lib/goldPrice';

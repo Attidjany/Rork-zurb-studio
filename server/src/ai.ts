@@ -9,7 +9,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { AuthEnv, requireAuth } from './auth.js';
 import { getPool, q, exec, uuid, withTx } from './db.js';
 import { ownerPredicate } from './registry.js';
-import { APARTMENT_BUILDING_UNITS, CONSTRUCTION_COST_DEFAULTS, HOUSING_TYPE_DEFAULTS } from './typologies.js';
+import { APARTMENT_BUILDING_UNITS, CONSTRUCTION_COST_DEFAULTS, HOUSING_TYPE_DEFAULTS, USD_TO_XOF } from './typologies.js';
 
 const MODEL = () => process.env.ANTHROPIC_MODEL || 'claude-sonnet-5';
 let client: Anthropic | null = null;
@@ -91,7 +91,7 @@ aiRoutes.post('/scenarios/generate-intelligent', async c => {
 
   const goldPrice = Number(settings?.gold_price_per_oz || 3000);
   const usdPerGram = goldPrice / 31.1034768;
-  const xofPerUsd = 656;
+  const xofPerUsd = USD_TO_XOF;
 
   let unitsBreakdown = '';
   let totalUnits = 0;

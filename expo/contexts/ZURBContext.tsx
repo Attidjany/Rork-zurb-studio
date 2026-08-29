@@ -1,6 +1,6 @@
 import createContextHook from '@nkzw/create-context-hook';
 import { useState, useEffect, useCallback } from 'react';
-import { Alert } from 'react-native';
+import { Alert } from '@/lib/alert';
 import { supabase, apiPost } from '@/lib/supabase';
 import { useAuth } from './AuthContext';
 import {
